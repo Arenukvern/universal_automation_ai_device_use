@@ -5,24 +5,10 @@ description: >-
 publish_to: none
 
 environment:
-  sdk: ^3.12.0
+  sdk: ^3.13.0
 
 workspace:
-  - pkgs/universal_automation_conformance
-  - pkgs/universal_automation_interface
-  - pkgs/universal_automation_semantics
-  - pkgs/universal_automation_toolkit
-  - pkgs/universal_browser_cdp
-  - pkgs/universal_browser_webdriver
-  - pkgs/universal_capture_flutter
-  - pkgs/universal_capture_macos
-  - pkgs/universal_driver_linux
-  - pkgs/universal_driver_macos
-  - pkgs/universal_driver_windows
-  - pkgs/universal_lexicon
-  - pkgs/universal_screencast
-  - pkgs/universal_webrtc
-  - pkgs/universal_webrtc_raw
+  - pkgs/*
 
 dependency_overrides:
   meta: 1.19.0

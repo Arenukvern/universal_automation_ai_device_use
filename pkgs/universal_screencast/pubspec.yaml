@@ -11,7 +11,7 @@ issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automatio
 documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_screencast
 
 environment:
-  sdk: ^3.12.0
+  sdk: ^3.13.0
 
 resolution: workspace
 
