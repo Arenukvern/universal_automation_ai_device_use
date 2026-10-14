@@ -4,6 +4,9 @@ Private workspace for the **universal automation** family (agent
 observe / act / verify, MCP + CLI). Extracted from
 `~/xs/storage_problem/dart_flutter_packages` on 2026-10-14.
 
+**Remote:** https://github.com/Arenukvern/ai_computer_use_universal_automation
+(private).
+
 ## Packages
 
 | Package | Role |
