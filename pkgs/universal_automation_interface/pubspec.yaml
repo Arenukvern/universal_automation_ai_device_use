@@ -4,10 +4,10 @@ description: >-
   session handles, drivers, actions, snapshots, fail-closed specs, and
   structured events. No Flutter, no protocol clients.
 version: 0.2.0
-homepage: https://github.com/xsoulspace/ai_computer_use_universal_automation
-repository: https://github.com/xsoulspace/ai_computer_use_universal_automation
-issue_tracker: https://github.com/xsoulspace/ai_computer_use_universal_automation/issues
-documentation: https://github.com/xsoulspace/ai_computer_use_universal_automation
+homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
+repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
+issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
+documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation
 
 environment:
   sdk: ^3.12.0

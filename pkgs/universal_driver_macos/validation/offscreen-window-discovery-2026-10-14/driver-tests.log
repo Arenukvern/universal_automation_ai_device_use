@@ -1,0 +1,50 @@
+Running build hooks...Running build hooks...00:00 +0: loading test/macos_driver_test.dart
+00:00 +0: capabilities declare a11y tree, input synthesis, and screenshots
+00:00 +1: clickAt moves, then presses with escalating click state
+00:00 +2: clickAt preserves the button axis
+00:00 +3: moveTo posts a single move
+00:00 +4: drag presses at the from-point and releases at the to-point
+00:00 +5: coordinate verbs surface the typed permission exception
+00:00 +6: unknown button names are refused loudly
+00:00 +7: shift+click holds the chord key around flagged presses
+00:00 +8: meta+drag holds the chord through press, carry, and release
+00:00 +9: app management: discover/activate/launch/terminate/snapshot
+00:00 +10: app management errors map to the family exceptions
+00:00 +11: frontmost parses the bridge record
+00:00 +12: snapshot parses the bridge JSON into the family model
+00:00 +13: click by name resolves the cached handle and presses
+00:00 +14: click by role+name resolves a unique match
+00:00 +15: ambiguous ClickAction refuses before native mutation
+00:00 +16: ambiguous SetValueAction refuses before native mutation
+00:00 +17: ambiguous ElementAction refuses before native mutation
+00:00 +18: stale click cannot retry into an ambiguous replacement tree
+00:00 +19: click with a css locator is refused loudly
+00:00 +20: missing element throws ElementNotFoundException
+00:00 +21: stale handle triggers one re-observe and retry
+00:00 +22: type sends text; submit appends Enter
+00:00 +23: unmapped keys are refused, mapped keys dispatch
+00:00 +24: scroll maps direction to signed line deltas
+00:00 +25: navigate and evaluate are refused (no AX equivalent)
+00:00 +26: elementAtPosition hit-tests through the bridge
+00:00 +27: untrusted accessibility raises the typed permission exception
+00:00 +28: bridge error codes surface as protocol or not-found exceptions
+00:00 +29: close releases the native state and poisons every method
+00:00 +30: screenshot returns bytes; missing consent is typed
+00:00 +31: window discovery and window-scoped capture
+00:00 +32: offscreen listing preserves visibility states
+00:00 +33: legacy custom bridge refuses offscreen listing before a bridge call
+00:00 +34: snapshot json payload is round-trippable through the model
+00:00 +35: setValue resolves the handle and writes in background
+00:00 +36: setValue with a css locator is refused loudly
+00:00 +37: setValue host refusal (not settable) is a clear protocol failure
+00:00 +38: stale setValue handle re-observes once and retries
+00:00 +39: elementAction performs the advertised action by name
+00:00 +40: unadvertised element actions surface the host refusal
+00:00 +41: anchored driver observes the anchored pid, not the focused one
+00:00 +42: focus contract: global verb on a background anchor is refused
+00:00 +43: focus contract: matching frontmost passes; no snapshot adopts the frontmost app
+00:00 +44: focus contract: semantic verbs bypass the gate entirely
+00:00 +45: pid-scoped rung: anchored typing posts to the target, focus untouched
+00:00 +46: pid-scoped rung: chords post hold/tap/release to the pid in order
+00:00 +47: pid-scoped rung: pointer verbs stay focus-bound on an anchored session
+00:00 +48: All tests passed!

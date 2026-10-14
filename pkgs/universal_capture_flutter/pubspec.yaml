@@ -1,0 +1,29 @@
+name: universal_capture_flutter
+description: >-
+  FrameSource over a running Flutter app's MCP toolkit screenshots: paced
+  polling of `ext.mcp.toolkit.view_screenshots` through the Dart VM
+  service, feeding the universal_screencast pipeline.
+version: 0.1.1
+homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
+repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
+issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
+documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_capture_flutter
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  universal_screencast: ^0.1.0
+  vm_service: ^15.3.0
+
+dev_dependencies:
+  test: ^1.31.2
+  universal_automation_conformance: ^0.2.0
+  xsoulspace_lints: ^0.1.2
+topics:
+  - flutter
+  - screencast
+  - frames
+  - automation

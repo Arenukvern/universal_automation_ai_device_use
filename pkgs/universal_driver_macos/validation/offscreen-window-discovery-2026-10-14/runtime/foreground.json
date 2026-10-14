@@ -1,0 +1,1 @@
+{"passed":true,"childExitCode":0,"foregroundPid":22839,"samples":339,"maximumGapUs":30998,"changes":[],"scope":"OS foreground PID sampled through Universal Automation during the owned command, actions and teardown; transitions shorter than sample gaps are not ruled out"}

@@ -1,0 +1,27 @@
+name: universal_lexicon
+description: >-
+  Offline dictionary logic for input methods and text tools: an abstract
+  Lexicon (words + unigram frequencies + ranked prefix candidates), count
+  normalization, and a block-compressed DefinitionPack format that keeps
+  word definitions on-device with a constant few-MB memory footprint —
+  no network, no server, no full-dictionary load.
+version: 0.1.0-dev.3
+homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
+repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
+issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation
+documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  archive: ^4.0.9
+  meta: ^1.19.0
+  universal_io: ^2.3.1
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.26.2
+  xsoulspace_lints: ^0.1.2

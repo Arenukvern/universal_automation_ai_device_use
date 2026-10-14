@@ -1,45 +1,33 @@
 # ai_computer_use_universal_automation
 
-Private workspace for the **universal automation** family (agent
-observe / act / verify, MCP + CLI). Extracted from
-`~/xs/storage_problem/dart_flutter_packages` on 2026-10-14.
+Private workspace for **universal automation** (observe / act / verify,
+MCP + CLI), OS/browser/capture/WebRTC **drivers**, and **lexicon**.
+
+[![maintained with Skill Steward](https://raw.githubusercontent.com/Arenukvern/skill_steward/main/docs/brand/assets/svg/badge-light.svg)](https://github.com/Arenukvern/skill_steward)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
 **Remote:** https://github.com/Arenukvern/ai_computer_use_universal_automation
-(private).
+(**private**). Sibling storage product:
+[`universal_storage`](https://github.com/Arenukvern/universal_storage).
 
 ## Packages
 
 | Package | Role |
 | --- | --- |
-| `universal_automation_interface` | Pure contracts |
-| `universal_automation_semantics` | Semantics layer |
-| `universal_automation_toolkit` | CLI + MCP serve surface |
-| `universal_automation_conformance` | Conformance oracles |
+| `universal_automation_*` | Contracts, semantics, conformance, toolkit |
+| `universal_driver_*` | OS drivers |
+| `universal_browser_*` | Browser drivers |
+| `universal_screencast` / `universal_capture_*` | Frames / capture |
+| `universal_webrtc` / `_raw` | WebRTC + sidecar |
+| `universal_lexicon` | Lexicon packs |
 
-Platform drivers (`universal_driver_*`, `universal_browser_*`,
-`universal_screencast`) stay in DFP for now and are path-overridden from
-this workspace root.
-
-## Consumers
-
-Point path deps here (not DFP):
-
-```yaml
-universal_automation_toolkit:
-  path: ../ai_computer_use_universal_automation/pkgs/universal_automation_toolkit
-universal_automation_interface:
-  path: ../ai_computer_use_universal_automation/pkgs/universal_automation_interface
-```
-
-Env for harness UATK lane: `UATK_ROOT` →
-`…/pkgs/universal_automation_toolkit` (or rely on `resolveUatkRoot` once
-wired).
-
-## Develop
+## Develop / Steward
 
 ```sh
-cd ~/xs/ai_computer_use_universal_automation
 dart pub get
-dart analyze pkgs/universal_automation_interface
-dart test pkgs/universal_automation_interface
+steward doctor --json
+steward map
+# validate: see stewardship.quality.validate in steward.yaml
 ```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md).

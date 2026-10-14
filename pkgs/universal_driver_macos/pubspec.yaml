@@ -1,0 +1,33 @@
+name: universal_driver_macos
+description: >-
+  macOS accessibility driver for the universal automation family:
+  semantic snapshot and element-at-position over AXUIElement, input
+  synthesis over CGEvent. Pure Dart through native-assets build hooks
+  (swiftc-compiled code asset, @Native bindings). No Flutter, no plugin
+  surface.
+version: 0.2.1
+homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
+repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
+issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
+documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_driver_macos
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+topics:
+  - macos
+  - accessibility
+  - automation
+
+dependencies:
+  code_assets: ^2.0.0
+  ffi: ^2.2.0
+  hooks: ^2.0.0
+  universal_automation_interface: ^0.2.0
+
+dev_dependencies:
+  test: ^1.31.2
+  universal_automation_conformance: ^0.2.0
+  xsoulspace_lints: ^0.1.2

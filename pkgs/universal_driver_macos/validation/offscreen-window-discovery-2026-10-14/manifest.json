@@ -1,0 +1,102 @@
+{
+  "files": [
+    {
+      "path": "source/bridge/src/driver_bridge.swift.txt",
+      "sha256": "bdef2513c4d83e06fa3aa66757c9cb10f1491a5c4b55bae790b91d3f86777988",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/bridge/src/driver_bridge.swift"
+    },
+    {
+      "path": "source/lib/src/driver_bindings.dart.txt",
+      "sha256": "29990e20ad2ab28cfc1a1c237ad6d036016a69d2de72d8e3dc40547e1a9da09a",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/lib/src/driver_bindings.dart"
+    },
+    {
+      "path": "source/lib/src/driver_bridge.dart.txt",
+      "sha256": "c2cd4d2153185750301253548f8fa772120bf379a4de030cd9577d1700a8f83a",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/lib/src/driver_bridge.dart"
+    },
+    {
+      "path": "source/lib/src/macos_driver.dart.txt",
+      "sha256": "266ca875c47cc3ee6074ee2a514587a431a5c86665cb9765a416d65bc27d5ffc",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/lib/src/macos_driver.dart"
+    },
+    {
+      "path": "source/lib/src/macos_app.dart.txt",
+      "sha256": "671effd8a7c52bd80a5c05d63b948b3397677cdaaddabfa619fc2c33de8b8afe",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/lib/src/macos_app.dart"
+    },
+    {
+      "path": "source/test/macos_driver_test.dart.txt",
+      "sha256": "29fb48783cb94f93a2a16fd6a9c2abd5d6c50123fb8cf2b0ba7e0b58abd6fa9a",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/test/macos_driver_test.dart"
+    },
+    {
+      "path": "source/test/native_hook_test.dart.txt",
+      "sha256": "0284350ecebb26dfd2aacf852583f03825c3bb4470b6d21e47330ee93c007218",
+      "source": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/test/native_hook_test.dart"
+    },
+    {
+      "path": "source/consumer.dart.txt",
+      "sha256": "494d71ef65c725097bddd29f95342b2950a4beb93c361ee631fbe7cb2511a143",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/native_capture/bin/native_window_capture.dart"
+    },
+    {
+      "path": "runtime/result.json",
+      "sha256": "b026eea28ccb64b419c36cf1de6c16efad10825891ed122b39ea5d8667a90964",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/result.json"
+    },
+    {
+      "path": "runtime/launch.json",
+      "sha256": "2b30477b9c80b7bdf8cba30352e80984b1e2c07e8d0b488d7d371df7b6d74853",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/launch.json"
+    },
+    {
+      "path": "runtime/native-frame.png",
+      "sha256": "6bd6f3da9e603cde7d0b66235de43e673c49a0707277d4b95be49fd2924ef6f4",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/native-frame.png"
+    },
+    {
+      "path": "runtime/native-frame.png.identity.json",
+      "sha256": "4c04e12e4bb757eea5bfaea7b3e3cfbea28f56873ccbe08083c711a53a9800e1",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/native-frame.png.identity.json"
+    },
+    {
+      "path": "runtime/native-capture-owner-refusal.log",
+      "sha256": "e14797395e73e9bee3f3c53c97162dff42db7fef7cdc017344884a5dacc35ebf",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/native-capture-owner-refusal.log"
+    },
+    {
+      "path": "runtime/semantic-write-effects.json",
+      "sha256": "cd22560efe770d9e5322f35fb46e1907d409cd855fa47cb586f59739090db81e",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/semantic-write-effects.json"
+    },
+    {
+      "path": "runtime/toolkit-key-effect.json",
+      "sha256": "e151cab957d8c9b99a6f186df8675dc8e0a9901ef498fcd5b553cfcb7faeb15e",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/toolkit-key-effect.json"
+    },
+    {
+      "path": "runtime/toolkit-app-errors.json",
+      "sha256": "51539240a556b3666443b85a212f100cb604b4e73600107c16a7209db81bdc77",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/toolkit-app-errors.json"
+    },
+    {
+      "path": "runtime/supervisor-result.json",
+      "sha256": "4121edacf9a44e999a60614c9a78d93696390396bdeabd6fd30aaa467344ee30",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/supervisor-result.json"
+    },
+    {
+      "path": "runtime/facts.jsonl",
+      "sha256": "5dd54c3eed6d84e0638c4e440ed8c387d463c6137198cc9291f096fdf465f03b",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-2026-10-14/facts.jsonl"
+    },
+    {
+      "path": "runtime/foreground.json",
+      "sha256": "9e75131926b47b6695de9487f93b5c04a493e7418e5f09be99d6663521990b19",
+      "source": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/output/native-ua-window-focus-2026-10-14.json"
+    }
+  ],
+  "driverTestExitCode": 0,
+  "namedSourcesUnchanged": true,
+  "scope": "Package native ABI/bridge/window observations and one owned Flutter/Oka runtime, not full compiler closure or publication"
+}

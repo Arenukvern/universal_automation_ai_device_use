@@ -10,3 +10,7 @@
   (`automation_observe/act/verify/screenshot/validate_plan/run_plan`).
 - v1 links the CDP tier; other transports fail loudly until linked
   (ADR 0046).
+
+## 0.1.1
+
+- Require `universal_driver_macos` ^0.2.1 (hooks/code_assets ^2) and `universal_screencast` ^0.1.2 (CDP ^0.3).

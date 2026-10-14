@@ -1,0 +1,31 @@
+name: universal_screencast
+description: >-
+  Declarative frame pipeline for automation targets: FrameSource (CDP
+  screencast, paced polling) to FrameSink (binary WebSocket, MJPEG HTTP,
+  file recorder) with fail-closed composition validation and audience
+  policies.
+version: 0.1.2
+homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
+repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
+issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
+documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_screencast
+
+environment:
+  sdk: ^3.12.0
+
+resolution: workspace
+
+dependencies:
+  meta: ^1.19.0
+  universal_automation_interface: ^0.2.0
+  universal_browser_cdp: ^0.3.0
+
+dev_dependencies:
+  test: ^1.31.2
+  universal_automation_conformance: ^0.2.0
+  xsoulspace_lints: ^0.1.2
+topics:
+  - screencast
+  - frames
+  - pipeline
+  - mjpeg
