@@ -1,0 +1,37 @@
+name: ai_computer_use_universal_automation
+description: >-
+  Private workspace for the universal automation family (computer-use /
+  agent observe-act-verify). Extracted from dart_flutter_packages.
+publish_to: none
+
+environment:
+  sdk: ^3.12.0
+
+workspace:
+  - pkgs/universal_automation_interface
+  - pkgs/universal_automation_semantics
+  - pkgs/universal_automation_toolkit
+  - pkgs/universal_automation_conformance
+
+dependency_overrides:
+  # Drivers and browser stacks remain in DFP until extracted separately.
+  universal_browser_cdp:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_browser_cdp
+  universal_browser_webdriver:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_browser_webdriver
+  universal_driver_linux:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_driver_linux
+  universal_driver_macos:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_driver_macos
+  universal_driver_windows:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_driver_windows
+  universal_screencast:
+    path: ../storage_problem/dart_flutter_packages/pkgs/universal_screencast
+  meta: 1.19.0
+  test_api: 0.7.13
+
+  xsoulspace_permission_core:
+    path: ../storage_problem/dart_flutter_packages/pkgs/xsoulspace_permission_core
+  xsoulspace_lints:
+    path: ../storage_problem/dart_flutter_packages/pkgs/xsoulspace_lints
+
