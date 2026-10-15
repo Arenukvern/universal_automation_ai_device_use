@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "universal-automation": {
+      "command": "${UNIVERSAL_AUTOMATION_BIN:-universal-automation}",
+      "args": [
+        "serve",
+        "--os"
+      ],
+      "env": {}
+    }
+  }
+}

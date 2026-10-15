@@ -15,7 +15,7 @@ typedef BridgeBytesResult = ({int code, Uint8List bytes});
 /// CGEventFlags raw mask for the family's modifier names (shift
 /// 0x020000, control 0x040000, alt/option 0x080000, meta/command
 /// 0x100000); unknown names contribute 0.
-int cgEventModifierMask(final Iterable<String> modifiers) {
+int cgEventModifierMask(Iterable<String> modifiers) {
   var mask = 0;
   for (final modifier in modifiers) {
     mask |= switch (modifier) {

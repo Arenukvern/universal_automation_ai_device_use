@@ -215,4 +215,4 @@ symlinks it.
   platform-bound.
 - The intent layer is contract-shaped (intentcall hint JSON), not a
   package dependency; intentcall's export path is unverified end-to-end.
-- MCP surface is tools-only; the HTTP transport binds loopback only.
+- MCP product surface is the automation tools. Resources and prompts lists are empty and advertised with `listChanged` so clients refresh. The HTTP transport binds loopback only and does not push list-changed notices; stdio does.

@@ -12,21 +12,20 @@ Future<Map<String, Object?>?> call(
   int id,
   String method, [
   Object? params,
-]) =>
-    server.handle({
-      'jsonrpc': '2.0',
-      'id': id,
-      'method': method,
-      if (params != null) 'params': params,
-    });
+]) => server.handle({
+  'jsonrpc': '2.0',
+  'id': id,
+  'method': method,
+  if (params != null) 'params': params,
+});
 
 /// Decodes the text content payload of a tools/call result.
-Map<String, Object?> payloadOf(Map<String, Object?>? response) =>
-    jsonDecode(
-      (((response!['result'] as Map<String, Object?>)['content']
-              as List<Object?>)
-          .single as Map<String, Object?>)['text'] as String,
-    ) as Map<String, Object?>;
+Map<String, Object?> payloadOf(Map<String, Object?>? response) => jsonDecode(
+  (((response!['result'] as Map<String, Object?>)['content'] as List<Object?>)
+              .single
+          as Map<String, Object?>)['text']
+      as String,
+) as Map<String, Object?>;
 
 void main() {
   late FakeCdpServer fake;
@@ -82,6 +81,18 @@ void main() {
       (result['serverInfo'] as Map<String, Object?>)['name'],
       'universal-automation-toolkit',
     );
+    expect(
+      (result['serverInfo'] as Map<String, Object?>)['instructions'],
+      isNull,
+    );
+    expect(result['instructions'], contains('list-changed'));
+    final capabilities = result['capabilities'] as Map<String, Object?>;
+    for (final kind in ['tools', 'resources', 'prompts']) {
+      expect(
+        (capabilities[kind] as Map<String, Object?>)['listChanged'],
+        isTrue,
+      );
+    }
   });
 
   test('tools/list advertises the toolkit surface', () async {
@@ -105,8 +116,7 @@ void main() {
     );
   });
 
-  test('notifications get no response; unknown methods get -32601',
-      () async {
+  test('notifications get no response; unknown methods get -32601', () async {
     final server = ToolkitMcpServer();
     expect(
       await server.handle({
@@ -114,6 +124,14 @@ void main() {
         'method': 'notifications/initialized',
       }),
       isNull,
+    );
+    expect(
+      [for (final notice in server.takeOutbound()) notice['method']],
+      [
+        'notifications/tools/list_changed',
+        'notifications/resources/list_changed',
+        'notifications/prompts/list_changed',
+      ],
     );
     final error = await call(server, 3, 'no/such/method');
     expect((error!['error'] as Map<String, Object?>)['code'], -32601);
@@ -137,8 +155,7 @@ void main() {
     expect(payloadOf(response)['snapshot'], isNotNull);
   });
 
-  test('automation_act clicks through the driver and reports ok',
-      () async {
+  test('automation_act clicks through the driver and reports ok', () async {
     final server = ToolkitMcpServer(defaultEndpoint: endpoint);
     final response = await call(server, 5, 'tools/call', {
       'name': 'automation_act',
@@ -151,8 +168,7 @@ void main() {
     );
   });
 
-  test('automation_act with humanPrior reports the behavior outcome',
-      () async {
+  test('automation_act with humanPrior reports the behavior outcome', () async {
     final server = ToolkitMcpServer(defaultEndpoint: endpoint);
     final response = await call(server, 6, 'tools/call', {
       'name': 'automation_act',
@@ -176,8 +192,12 @@ void main() {
       'name': 'automation_verify',
       'arguments': {
         'checks': [
-          {'exists': {'role': 'button', 'name': 'Submit'}},
-          {'exists': {'name': 'NoSuchThing'}},
+          {
+            'exists': {'role': 'button', 'name': 'Submit'},
+          },
+          {
+            'exists': {'name': 'NoSuchThing'},
+          },
         ],
       },
     });
@@ -239,10 +259,7 @@ Future<void> main() async {
     // resolved executable is flutter_tester (not a dart VM), so resolve
     // the real VM from PATH. No `dart run` pub machinery: fast and
     // stable under parallel load.
-    final process = await Process.start('/usr/bin/env', [
-      'dart',
-      script.path,
-    ]);
+    final process = await Process.start('/usr/bin/env', ['dart', script.path]);
     final output = process.stdout
         .transform(utf8.decoder)
         .transform(const LineSplitter());
@@ -278,65 +295,73 @@ Future<void> main() async {
     );
   }, timeout: Timeout(Duration(minutes: 3)));
 
-  test('desktop tier: osAccessibility default observes the focused app',
-      () async {
-    final server = ToolkitMcpServer(
-      defaultTransport: AutomationTransport.osAccessibility,
-      factories: {
-        AutomationTransport.osAccessibility: (binding, endpoint, timeout) async {
-          expect(endpoint, Uri.parse('oka:focused'));
-          return _FakeOsResolvedSession(binding);
+  test(
+    'desktop tier: osAccessibility default observes the focused app',
+    () async {
+      final server = ToolkitMcpServer(
+        defaultTransport: AutomationTransport.osAccessibility,
+        factories: {
+          AutomationTransport.osAccessibility:
+              (binding, endpoint, timeout) async {
+                expect(endpoint, Uri.parse('oka:focused'));
+                return _FakeOsResolvedSession(binding);
+              },
         },
-      },
-    );
-    final response = await call(server, 10, 'tools/call', {
-      'name': 'automation_observe',
-      'arguments': {},
-    });
-    expect((response!['result'] as Map<String, Object?>)['isError'], isFalse);
-    final payload = payloadOf(response);
-    expect(payload['transport'], 'osAccessibility');
-    expect(payload['endpoint'], 'oka:focused');
-    final snapshot = payload['snapshot'] as Map<String, Object?>;
-    expect(jsonEncode(snapshot), contains('Focused Fake'));
-  });
+      );
+      final response = await call(server, 10, 'tools/call', {
+        'name': 'automation_observe',
+        'arguments': {},
+      });
+      expect((response!['result'] as Map<String, Object?>)['isError'], isFalse);
+      final payload = payloadOf(response);
+      expect(payload['transport'], 'osAccessibility');
+      expect(payload['endpoint'], 'oka:focused');
+      final snapshot = payload['snapshot'] as Map<String, Object?>;
+      expect(jsonEncode(snapshot), contains('Focused Fake'));
+    },
+  );
 
-  test('observe view renders; diff closes the loop; returnState on act',
-      () async {
-    final server = ToolkitMcpServer(defaultEndpoint: endpoint);
-    final viewed = await call(server, 20, 'tools/call', {
-      'name': 'automation_observe',
-      'arguments': {
-        'view': {'maxNodes': 2},
-      },
-    });
-    final viewPayload = payloadOf(viewed!)['view'] as Map<String, Object?>;
-    expect(viewPayload['render'], contains('# observation'));
-    expect(viewPayload['refs'], contains('s_0'));
+  test(
+    'observe view renders; diff closes the loop; returnState on act',
+    () async {
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      final viewed = await call(server, 20, 'tools/call', {
+        'name': 'automation_observe',
+        'arguments': {
+          'view': {'maxNodes': 2},
+        },
+      });
+      final viewPayload = payloadOf(viewed!)['view'] as Map<String, Object?>;
+      expect(viewPayload['render'], contains('# observation'));
+      expect(viewPayload['refs'], contains('s_0'));
 
-    final diffed = await call(server, 21, 'tools/call', {
-      'name': 'automation_observe',
-      'arguments': {
-        'view': {'maxNodes': 2},
-        'diff': true,
-      },
-    });
-    expect(payloadOf(diffed!)['delta'], '# no change');
+      final diffed = await call(server, 21, 'tools/call', {
+        'name': 'automation_observe',
+        'arguments': {
+          'view': {'maxNodes': 2},
+          'diff': true,
+        },
+      });
+      expect(payloadOf(diffed!)['delta'], '# no change');
 
-    final acted = await call(server, 22, 'tools/call', {
-      'name': 'automation_act',
-      'arguments': {'action': 'click', 'name': 'Submit', 'returnState': true},
-    });
-    expect((payloadOf(acted!)['state'] as String), contains('button "Submit"'));
-  });
+      final acted = await call(server, 22, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'click', 'name': 'Submit', 'returnState': true},
+      });
+      expect(
+        (payloadOf(acted!)['state'] as String),
+        contains('button "Submit"'),
+      );
+    },
+  );
 
-  test('per-call transport override switches tiers; unknown refuses',
-      () async {
+  test('per-call transport override switches tiers; unknown refuses', () async {
     final server = ToolkitMcpServer(
       factories: {
-        AutomationTransport.osAccessibility: (binding, endpoint, timeout) async {
-          return _FakeOsResolvedSession(binding);
-        },
+        AutomationTransport.osAccessibility:
+            (binding, endpoint, timeout) async {
+              return _FakeOsResolvedSession(binding);
+            },
       },
     );
     final os = await call(server, 11, 'tools/call', {
@@ -357,72 +382,79 @@ Future<void> main() async {
       'arguments': {'transport': 'telepathy'},
     });
     expect(
-      (((unknown!['result'] as Map<String, Object?>)['content'] as List)
-              .single as Map<String, Object?>)['text'],
+      (((unknown!['result'] as Map<String, Object?>)['content'] as List).single
+          as Map<String, Object?>)['text'],
       contains('unknown transport'),
     );
   });
 
-  test('screenshot image blocks are opt-in; windowId refuses off-tier',
-      () async {
-    final server = ToolkitMcpServer(
-      factories: {
-        AutomationTransport.osAccessibility: (binding, endpoint, timeout) async {
-          return _FakeOsResolvedSession(binding);
+  test(
+    'screenshot image blocks are opt-in; windowId refuses off-tier',
+    () async {
+      final server = ToolkitMcpServer(
+        factories: {
+          AutomationTransport.osAccessibility:
+              (binding, endpoint, timeout) async {
+                return _FakeOsResolvedSession(binding);
+              },
         },
-      },
-    );
-    final dir = await Directory.systemTemp.createTemp('uat-shot');
-    addTearDown(() => dir.deleteSync(recursive: true));
-    final path = '${dir.path}/shot.png';
+      );
+      final dir = await Directory.systemTemp.createTemp('uat-shot');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final path = '${dir.path}/shot.png';
 
-    // Default: file only, no image content.
-    final plain = await call(server, 31, 'tools/call', {
-      'name': 'automation_screenshot',
-      'arguments': {'transport': 'osAccessibility', 'path': path},
-    });
-    final plainResult = plain!['result'] as Map<String, Object?>;
-    expect(plainResult['content'], hasLength(1));
-    expect(payloadOf(plain)['bytes'], 3);
+      // Default: file only, no image content.
+      final plain = await call(server, 31, 'tools/call', {
+        'name': 'automation_screenshot',
+        'arguments': {'transport': 'osAccessibility', 'path': path},
+      });
+      final plainResult = plain!['result'] as Map<String, Object?>;
+      expect(plainResult['content'], hasLength(1));
+      expect(payloadOf(plain)['bytes'], 3);
 
-    // image: true appends an image content block; the reserved key
-    // never reaches the JSON text.
-    final withImage = await call(server, 32, 'tools/call', {
-      'name': 'automation_screenshot',
-      'arguments': {
-        'transport': 'osAccessibility',
-        'path': path,
-        'image': true,
-      },
-    });
-    final content = (withImage!['result'] as Map<String, Object?>)['content']
-        as List<Object?>;
-    expect(content, hasLength(2));
-    final image = content[1] as Map<String, Object?>;
-    expect(image['type'], 'image');
-    expect(image['mimeType'], 'image/png');
-    expect(image['data'], base64Encode([1, 2, 3]));
-    expect(
-      (content.first as Map<String, Object?>)['text'],
-      isNot(contains('_imageContent')),
-    );
+      // image: true appends an image content block; the reserved key
+      // never reaches the JSON text.
+      final withImage = await call(server, 32, 'tools/call', {
+        'name': 'automation_screenshot',
+        'arguments': {
+          'transport': 'osAccessibility',
+          'path': path,
+          'image': true,
+        },
+      });
+      final content =
+          (withImage!['result'] as Map<String, Object?>)['content']
+              as List<Object?>;
+      expect(content, hasLength(2));
+      final image = content[1] as Map<String, Object?>;
+      expect(image['type'], 'image');
+      expect(image['mimeType'], 'image/png');
+      expect(image['data'], base64Encode([1, 2, 3]));
+      expect(
+        (content.first as Map<String, Object?>)['text'],
+        isNot(contains('_imageContent')),
+      );
 
-    // windowId on a non-OS-tier driver refuses loudly.
-    final windowed = await call(server, 33, 'tools/call', {
-      'name': 'automation_screenshot',
-      'arguments': {'transport': 'osAccessibility', 'path': path, 'windowId': 7},
-    });
-    expect(
-      ((windowed!['result'] as Map<String, Object?>)['content']
-              as List)
-          .single,
-      isA<Map<String, Object?>>().having(
-        (block) => block['text'],
-        'text',
-        contains('windowId needs the OS tier'),
-      ),
-    );
-  });
+      // windowId on a non-OS-tier driver refuses loudly.
+      final windowed = await call(server, 33, 'tools/call', {
+        'name': 'automation_screenshot',
+        'arguments': {
+          'transport': 'osAccessibility',
+          'path': path,
+          'windowId': 7,
+        },
+      });
+      expect(
+        ((windowed!['result'] as Map<String, Object?>)['content'] as List)
+            .single,
+        isA<Map<String, Object?>>().having(
+          (block) => block['text'],
+          'text',
+          contains('windowId needs the OS tier'),
+        ),
+      );
+    },
+  );
 }
 
 final class _FakeOsResolvedSession implements ResolvedSession {

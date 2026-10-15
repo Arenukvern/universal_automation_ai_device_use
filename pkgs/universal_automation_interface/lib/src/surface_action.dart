@@ -18,7 +18,7 @@ final class SurfaceActionDescriptor {
   }) : assert(name != '', 'name must not be empty');
 
   /// Restores a descriptor from [toJson] output; `null` when malformed.
-  static SurfaceActionDescriptor? fromJson(final Object? json) {
+  static SurfaceActionDescriptor? fromJson(Object? json) {
     if (json is! Map<Object?, Object?>) return null;
     final name = json['name'];
     if (name is! String || name.isEmpty) return null;

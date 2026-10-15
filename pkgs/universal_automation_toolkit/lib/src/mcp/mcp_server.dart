@@ -32,6 +32,17 @@ const mcpServerInfo = {
 /// The handler is separable from the stdio shell so tests exercise the
 /// protocol in-process.
 final class ToolkitMcpServer {
+  final List<Map<String, Object?>> _outbound = [];
+
+  /// Server-initiated notices queued by [handle]. The stdio loop writes
+  /// them; callers that only use [handle] can read them here.
+  List<Map<String, Object?>> takeOutbound() {
+    if (_outbound.isEmpty) return const [];
+    final copy = List<Map<String, Object?>>.of(_outbound);
+    _outbound.clear();
+    return copy;
+  }
+
   /// Creates a server; [defaultEndpoint] backs ad-hoc verbs when a tool
   /// call carries no explicit endpoint, and [defaultTransport] selects
   /// the tier those verbs attach to (`--os` serve flag → the desktop
@@ -114,12 +125,33 @@ final class ToolkitMcpServer {
         case 'initialize':
           return _result(id, await _initialize(params));
         case 'notifications/initialized':
+          _outbound.addAll([
+            <String, Object?>{
+              'jsonrpc': '2.0',
+              'method': 'notifications/tools/list_changed',
+            },
+            <String, Object?>{
+              'jsonrpc': '2.0',
+              'method': 'notifications/resources/list_changed',
+            },
+            <String, Object?>{
+              'jsonrpc': '2.0',
+              'method': 'notifications/prompts/list_changed',
+            },
+          ]);
+          return null;
         case 'notifications/cancelled':
           return null;
         case 'ping':
           return _result(id, <String, Object?>{});
         case 'tools/list':
           return _result(id, {'tools': toolDescriptors()});
+        case 'resources/list':
+          return _result(id, {'resources': <Object?>[]});
+        case 'resources/templates/list':
+          return _result(id, {'resourceTemplates': <Object?>[]});
+        case 'prompts/list':
+          return _result(id, {'prompts': <Object?>[]});
         case 'tools/call':
           if (isNotification) return null;
           return _result(id, await _toolsCall(params));
@@ -153,9 +185,12 @@ final class ToolkitMcpServer {
     return {
       'protocolVersion': version,
       'capabilities': {
-        'tools': {'listChanged': false},
+        'tools': {'listChanged': true},
+        'resources': {'subscribe': false, 'listChanged': true},
+        'prompts': {'listChanged': true},
       },
       'serverInfo': mcpServerInfo,
+      'instructions': 'Universal automation toolkit. Honor list-changed notices and call tools/list, resources/list, and prompts/list again.',
     };
   }
 
@@ -1116,6 +1151,9 @@ Future<void> serveMcpStdio({
       continue;
     }
     final response = await server.handle(message);
+    for (final notice in server.takeOutbound()) {
+      stdout.writeln(jsonEncode(notice));
+    }
     if (response != null) {
       stdout.writeln(jsonEncode(response));
     }
@@ -1126,7 +1164,8 @@ Future<void> serveMcpStdio({
 /// Binds a loopback HTTP server exposing the same toolkit as MCP over
 /// HTTP: `POST /mcp` with one JSON-RPC message per request, one JSON
 /// response per reply (the stateless shape of the MCP streamable-HTTP
-/// transport; this server never sends server-initiated messages).
+/// transport). Stdio writes list-changed notices; HTTP accepts
+/// `notifications/initialized` with 202 and does not push them.
 ///
 /// Loopback only. For remote clients (e.g. the ChatGPT connector, which
 /// requires a public HTTPS origin) front it with a tunnel deliberately —
@@ -1189,6 +1228,7 @@ Future<void> _handleHttpMessage(
     return;
   }
   final response = await server.handle(message);
+  server.takeOutbound();
   if (response == null) {
     // A notification (or malformed notification): accepted, no body.
     await respond(202, null);

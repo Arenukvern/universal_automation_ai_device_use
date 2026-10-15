@@ -180,8 +180,8 @@ class CdpDriver
 
   /// Dispatches one `window.__mcpActions` handler and awaits its result.
   Future<void> _invokeSurfaceAction(
-    final String name,
-    final Map<String, Object?> args,
+    String name,
+    Map<String, Object?> args,
   ) async {
     final nameJson = jsonEncode(name);
     final argsJson = jsonEncode(args);

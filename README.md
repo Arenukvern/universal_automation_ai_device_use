@@ -21,6 +21,17 @@ MCP + CLI), OS/browser/capture/WebRTC **drivers**, and **lexicon**.
 | `universal_webrtc` / `_raw` | WebRTC + sidecar |
 | `universal_lexicon` | Lexicon packs |
 
+## Agent plugin (MCP + skill)
+
+The shippable Cursor/Codex/Claude/ZCode bundle lives in [`plugin/`](plugin/).
+Run `plugin/install.sh` to build the AOT CLI and link `~/.local/bin/universal-automation`.
+
+From the harness workspace:
+
+```sh
+/Users/antonio/xs/ecsai_harness/tool/install_universal_automation_plugin.sh
+```
+
 ## Develop / Steward
 
 ```sh

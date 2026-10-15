@@ -21,22 +21,22 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 /// One dialect for every face that prints or parses a ref — producers
 /// issue them with this, the observation grammar resolves them, agents
 /// read them off either.
-String snapshotRef(final int index) => 's_$index';
+String snapshotRef(int index) => 's_$index';
 
 /// Builds a family [Snapshot] from one snapshot's node maps (the
 /// `nodes` list of a semantic snapshot envelope, in walk order, parents
 /// before children).
 Snapshot familySnapshotFromNodes(
-  final List<Map<String, Object?>> nodes, {
-  required final int snapshotId,
-  required final DateTime capturedAt,
+  List<Map<String, Object?>> nodes, {
+  required int snapshotId,
+  required DateTime capturedAt,
 }) {
   final byRef = <String, Map<String, Object?>>{
     for (final node in nodes) node['ref']! as String: node,
   };
   final built = <String, AxNode>{};
 
-  AxNode build(final Map<String, Object?> node) {
+  AxNode build(Map<String, Object?> node) {
     final ref = node['ref']! as String;
     final existing = built[ref];
     if (existing != null) return existing;
@@ -70,7 +70,7 @@ Snapshot familySnapshotFromNodes(
   );
 }
 
-AxBounds? _boundsOf(final Object? raw) {
+AxBounds? _boundsOf(Object? raw) {
   if (raw is! Map<Object?, Object?>) return null;
   final left = (raw['left'] as num?)?.toDouble();
   final top = (raw['top'] as num?)?.toDouble();
@@ -87,7 +87,7 @@ AxBounds? _boundsOf(final Object? raw) {
   );
 }
 
-Map<String, String> _attributesOf(final Map<String, Object?> node) => {
+Map<String, String> _attributesOf(Map<String, Object?> node) => {
   for (final entry in node.entries)
     if (entry.value != null &&
         entry.key != 'ref' &&

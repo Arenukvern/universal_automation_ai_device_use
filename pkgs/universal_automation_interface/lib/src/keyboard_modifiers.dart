@@ -13,7 +13,7 @@ const keyboardModifiers = <String>{'shift', 'control', 'alt', 'meta'};
 
 /// The step-level key name for a modifier (the family's named-key
 /// convention, same shape as `Enter`).
-String modifierKeyName(final String modifier) => switch (modifier) {
+String modifierKeyName(String modifier) => switch (modifier) {
   'shift' => 'Shift',
   'control' => 'Control',
   'alt' => 'Alt',
@@ -23,7 +23,7 @@ String modifierKeyName(final String modifier) => switch (modifier) {
 
 /// Normalizes one modifier alias (`ctrl`, `option`, `cmd`, `command`,
 /// `windows`); `null` outside the vocabulary.
-String? normalizeModifier(final String raw) => switch (raw.toLowerCase()) {
+String? normalizeModifier(String raw) => switch (raw.toLowerCase()) {
   'shift' => 'shift',
   'control' || 'ctrl' => 'control',
   'alt' || 'option' => 'alt',
@@ -33,7 +33,7 @@ String? normalizeModifier(final String raw) => switch (raw.toLowerCase()) {
 
 /// Parses a wire modifier list: aliases normalize, unknown names throw
 /// (fail-closed — a dropped modifier is a misfired chord).
-List<String> parseModifiers(final Iterable<Object?> raw) => [
+List<String> parseModifiers(Iterable<Object?> raw) => [
   for (final item in raw)
     if (normalizeModifier('$item') case final normalized?) normalized
     else throw FormatException(

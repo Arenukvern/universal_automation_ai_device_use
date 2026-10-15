@@ -20,9 +20,9 @@ library;
 /// - `children` lists prune to refs that survived [keep];
 /// - a `children` key whose pruning emptied it is dropped.
 List<Map<String, Object?>> projectSnapshotNodes(
-  final Iterable<Map<String, Object?>> nodes, {
-  final bool Function(Map<String, Object?> node)? keep,
-  final List<String>? fields,
+  Iterable<Map<String, Object?>> nodes, {
+  bool Function(Map<String, Object?> node)? keep,
+  List<String>? fields,
 }) {
   final kept = <Map<String, Object?>>[
     for (final node in nodes) if (keep == null || keep(node)) node,
@@ -42,7 +42,7 @@ List<Map<String, Object?>> projectSnapshotNodes(
             else
               key: value,
       }..removeWhere(
-        (final key, final value) =>
+        (key, value) =>
             key == 'children' && (value! as List<String>).isEmpty,
       ),
   ];

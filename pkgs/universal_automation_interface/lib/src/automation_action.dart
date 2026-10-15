@@ -1,7 +1,7 @@
 import 'package:meta/meta.dart';
 
 /// Renders the chord suffix for action toString output.
-String _chordSuffix(final List<String> modifiers) =>
+String _chordSuffix(List<String> modifiers) =>
     modifiers.isEmpty ? '' : ' +${modifiers.join('+')}';
 
 /// Base class of driver actions.
