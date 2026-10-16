@@ -42,10 +42,11 @@ int definitionWordHash(String word) {
 /// the caller can patch `indexOffset` (u64 at byte 16) once the data
 /// section length is known.
 ByteData writeDefinitionPackHeader(
-  final BytesBuilder sink, {
-  required final int blockCount,
-  required final int entryCount,
-}) {header = ByteData(definitionPackHeaderLength)
+  BytesBuilder sink, {
+  required int blockCount,
+  required int entryCount,
+}) {
+  final header = ByteData(definitionPackHeaderLength)
     ..setUint8(0, definitionPackMagic[0])
     ..setUint8(1, definitionPackMagic[1])
     ..setUint8(2, definitionPackMagic[2])

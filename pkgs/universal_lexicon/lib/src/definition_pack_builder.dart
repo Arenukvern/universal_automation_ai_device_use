@@ -22,7 +22,8 @@ final class DefinitionPackBuilder {
   final int entriesPerBlock;
   final BlockCodec codec;
 
-  Uint8List build(Iterable<DefinitionEntry> entries) {sorted = entries.toList(growable: false)
+  Uint8List build(Iterable<DefinitionEntry> entries) {
+    final sorted = entries.toList(growable: false)
       ..sort((a, b) => a.word.compareTo(b.word));
     if (sorted.isEmpty) {
       throw ArgumentError.value(entries, 'entries', 'must not be empty');
@@ -45,7 +46,8 @@ final class DefinitionPackBuilder {
     final blockSpans = <int>[]; // offset, length pairs
     final hashIndex = <(int, int)>[]; // (wordHash, blockId)
 
-    for (var start = 0; start < sorted.length; start += entriesPerBlock) {end = math.min(start + entriesPerBlock, sorted.length);
+    for (var start = 0; start < sorted.length; start += entriesPerBlock) {
+      final end = math.min(start + entriesPerBlock, sorted.length);
       final chunk = sorted.sublist(start, end);
       final payload = StringBuffer();
       for (final entry in chunk) {

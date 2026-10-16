@@ -7,6 +7,14 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Validate](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml)
 
+**pub.dev (published packages):**  
+[![universal_automation_interface](https://img.shields.io/pub/v/universal_automation_interface.svg?label=interface)](https://pub.dev/packages/universal_automation_interface)
+[![universal_automation_toolkit](https://img.shields.io/pub/v/universal_automation_toolkit.svg?label=toolkit)](https://pub.dev/packages/universal_automation_toolkit)
+[![universal_driver_macos](https://img.shields.io/pub/v/universal_driver_macos.svg?label=driver_macos)](https://pub.dev/packages/universal_driver_macos)
+[![universal_browser_cdp](https://img.shields.io/pub/v/universal_browser_cdp.svg?label=browser_cdp)](https://pub.dev/packages/universal_browser_cdp)
+[![universal_screencast](https://img.shields.io/pub/v/universal_screencast.svg?label=screencast)](https://pub.dev/packages/universal_screencast)
+[![universal_webrtc](https://img.shields.io/pub/v/universal_webrtc.svg?label=webrtc)](https://pub.dev/packages/universal_webrtc)
+
 ![Open devices to people and agents with care — composable automation across device classes](docs/brand/assets/png/banner-16x9.png)
 <!-- banner easter-egg: squint at the SVG/PNG horizon for other curious users -->
 
@@ -18,7 +26,7 @@ with **consent, receipts, and honest proof** — not unattended takeover of user
 devices. Dart contracts, platform drivers, capture/WebRTC plumbing, lexicon
 packs, plus an MCP + CLI toolkit.
 
-- 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [llms.txt](llms.txt))
+- 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [DX FAQ](docs/DX_FAQ.mdx) + [llms.txt](llms.txt))
 - 🤝 **Contribute:** [guide](docs/contributing/contribution_guide.mdx) · [contributors](docs/contributing/contributors.mdx) · [code of conduct](CODE_OF_CONDUCT.md) · [security](SECURITY.md)
 
 **Charter:** [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) · **Decisions:** [docs/decisions/](docs/decisions/) · [AGENTS.md](AGENTS.md) · **Brand:** [docs/brand/](docs/brand/)
@@ -40,15 +48,15 @@ Windows, CDP, WebDriver), screencast/capture helpers, WebRTC sidecars, and
 
 | Package | Role |
 | --- | --- |
-| [`universal_automation_interface`](pkgs/universal_automation_interface/) | Core contracts (`Snapshot`, actions, sessions) |
-| [`universal_automation_semantics`](pkgs/universal_automation_semantics/) | Semantic views and family projections |
-| [`universal_automation_conformance`](pkgs/universal_automation_conformance/) | Shared conformance harness |
-| [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/) | CLI, plans, MCP server |
-| `universal_driver_*` | Native OS automation (macOS, Linux, Windows) |
-| `universal_browser_*` | Browser automation (CDP, WebDriver) |
-| `universal_screencast` / `universal_capture_*` | Frames and capture |
-| `universal_webrtc` / `universal_webrtc_raw` | WebRTC helpers |
-| [`universal_lexicon`](pkgs/universal_lexicon/) | Lexicon packs |
+| [`universal_automation_interface`](pkgs/universal_automation_interface/) ([pub](https://pub.dev/packages/universal_automation_interface)) | Core contracts (`Snapshot`, actions, sessions) |
+| [`universal_automation_semantics`](pkgs/universal_automation_semantics/) ([pub](https://pub.dev/packages/universal_automation_semantics)) | Semantic views and family projections |
+| [`universal_automation_conformance`](pkgs/universal_automation_conformance/) ([pub](https://pub.dev/packages/universal_automation_conformance)) | Shared conformance harness |
+| [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/) ([pub](https://pub.dev/packages/universal_automation_toolkit)) | CLI, plans, MCP server |
+| `universal_driver_*` ([macOS](https://pub.dev/packages/universal_driver_macos) · [Linux](https://pub.dev/packages/universal_driver_linux) · [Windows](https://pub.dev/packages/universal_driver_windows)) | Native OS automation |
+| `universal_browser_*` ([CDP](https://pub.dev/packages/universal_browser_cdp) · [WebDriver](https://pub.dev/packages/universal_browser_webdriver)) | Browser automation |
+| `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
+| `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
+| [`universal_lexicon`](pkgs/universal_lexicon/) | Lexicon packs (monorepo only — not on pub.dev yet) |
 
 Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).
 

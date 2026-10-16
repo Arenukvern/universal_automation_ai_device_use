@@ -21,7 +21,8 @@ void main(List<String> args) {
     'file: ${bytes.length} B, resident cache: ≤${pack.maxCachedBlocks} '
     'blocks',
   );
-  for (final word in args.skip(1)) {definition = pack.definition(word);
+  for (final word in args.skip(1)) {
+    final definition = pack.definition(word);
     stdout.writeln(
       definition == null ? '$word → (unknown)' : '$word → $definition',
     );

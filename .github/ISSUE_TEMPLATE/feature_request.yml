@@ -1,0 +1,47 @@
+name: Feature request
+description: Propose a new capability or improvement
+title: "[feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the problem and the smallest change that would help. Link related ADRs or North Star value paths when the idea touches charter boundaries.
+
+  - type: input
+    id: package
+    attributes:
+      label: Package or area
+      placeholder: e.g. universal_automation_toolkit, drivers, docs
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or pain
+      description: What are you trying to do today, and what blocks you?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: API sketch, CLI flag, driver behavior, or doc change — keep it concrete.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Workarounds, sibling repos, or "do nothing"
+
+  - type: checkboxes
+    id: consent
+    attributes:
+      label: Consent & safety
+      options:
+        - label: This idea respects explicit user consent and fail-closed automation (see SECURITY.md / North Star).

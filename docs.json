@@ -65,6 +65,7 @@
       "pages": [
         { "title": "Overview", "href": "/" },
         { "title": "North Star", "href": "/NORTH_STAR" },
+        { "title": "DX FAQ", "href": "/DX_FAQ" },
         { "title": "Docs map", "href": "/start_here/docs_map" },
         { "title": "Brand assets", "href": "/brand" }
       ]

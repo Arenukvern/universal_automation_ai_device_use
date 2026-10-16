@@ -37,7 +37,8 @@ void main(List<String> args) {
     if (entity is! File || !entity.path.endsWith('_freq.tsv')) continue;
     final lang = entity.path.split('/').last.replaceAll('_freq.tsv', '');
     final counts = <String, int>{};
-    for (final line in entity.readAsLinesSync()) {tab = line.indexOf('\t');
+    for (final line in entity.readAsLinesSync()) {
+      final tab = line.indexOf('\t');
       if (tab <= 0) continue;
       counts[line.substring(0, tab)] = int.parse(line.substring(tab + 1));
     }
@@ -56,7 +57,8 @@ void main(List<String> args) {
       rank[byCount[i].key] = i;
     }
     final defs = <DefinitionEntry>[];
-    for (final line in defsFile.readAsLinesSync()) {fields = line.split('\t');
+    for (final line in defsFile.readAsLinesSync()) {
+      final fields = line.split('\t');
       if (fields.length < 3) continue;
       final word = fields[0];
       // Keep definitions only for words the lexicon actually carries,

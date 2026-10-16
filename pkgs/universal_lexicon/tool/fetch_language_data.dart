@@ -48,7 +48,8 @@ Future<void> main(List<String> args) async {
 
   final wordNet = parseWordNet(sources);
 
-  for (final MapEntry(key: lang, value: spec) in languages.entries) {freqPath = '$sources/${spec.freqFile}';
+  for (final MapEntry(key: lang, value: spec) in languages.entries) {
+    final freqPath = '$sources/${spec.freqFile}';
     if (!File(freqPath).existsSync()) {
       stderr.writeln('$lang: missing $freqPath — skip');
       continue;
@@ -113,10 +114,12 @@ const defsTopWords = 3000;
 
 /// Already-fetched `word\tpos\tgloss` rows survive a re-run (the merge
 /// makes the fetch resumable across rate-limit windows).
-Map<String, (String?, String)> _readExistingDefs(String path) {file = File(path);
+Map<String, (String?, String)> _readExistingDefs(String path) {
+  final file = File(path);
   if (!file.existsSync()) return <String, (String?, String)>{};
   final defs = <String, (String?, String)>{};
-  for (final line in file.readAsLinesSync()) {fields = line.split('\t');
+  for (final line in file.readAsLinesSync()) {
+    final fields = line.split('\t');
     if (fields.length < 3) continue;
     defs[fields[0]] = (fields[1].isEmpty ? null : fields[1], fields[2]);
   }
@@ -124,12 +127,14 @@ Map<String, (String?, String)> _readExistingDefs(String path) {file = File(path)
 }
 
 /// `word count` lines → filtered, lowercased, capped at [topWords].
-List<(String, int)> readFreq(String path) {isCJK = path.contains('/zh_') || path.contains('/ja_');
+List<(String, int)> readFreq(String path) {
+  final isCJK = path.contains('/zh_') || path.contains('/ja_');
   final pattern = isCJK
       ? RegExp(r'^[⼀-鿿぀-ヿー・々]{1,12}$')
       : RegExp(r'^[a-zà-ÿа-яё]{2,}$', caseSensitive: false);
   final rows = <(String, int)>[];
-  for (final line in File(path).readAsLinesSync()) {space = line.lastIndexOf(' ');
+  for (final line in File(path).readAsLinesSync()) {
+    final space = line.lastIndexOf(' ');
     if (space <= 0) continue;
     final word = line.substring(0, space).toLowerCase();
     final count = int.tryParse(line.substring(space + 1)) ?? 0;
@@ -142,11 +147,13 @@ List<(String, int)> readFreq(String path) {isCJK = path.contains('/zh_') || path
 
 /// English Wiktionary glosses for [words], batched 50 titles/request.
 Future<Map<String, (String?, String)>> wiktionaryGlosses(
-  final List<String> words,
-  final String section,
-) async {glosses = <String, (String?, String)>{};
+  List<String> words,
+  String section,
+) async {
+  final glosses = <String, (String?, String)>{};
   final client = HttpClient()..userAgent = 'universal_lexicon-builder';
-  for (var start = 0; start < words.length; start += 50) {end = start + 50 > words.length ? words.length : start + 50;
+  for (var start = 0; start < words.length; start += 50) {
+    final end = start + 50 > words.length ? words.length : start + 50;
     final titles =
         words.sublist(start, end).map(Uri.encodeQueryComponent).join('|');
     final uri = Uri.parse(
@@ -154,7 +161,8 @@ Future<Map<String, (String?, String)>> wiktionaryGlosses(
       '?action=query&format=json&formatversion=2'
       '&prop=revisions&rvprop=content&rvslots=main&titles=$titles',
     );
-    try {request = await client.getUrl(uri);
+    try {
+      final request = await client.getUrl(uri);
       final response = await request.close();
       final body = await response.transform(utf8.decoder).join();
       if (!body.startsWith('{')) {
@@ -183,14 +191,16 @@ Future<Map<String, (String?, String)>> wiktionaryGlosses(
 }
 
 void _collect(
-  final String body,
-  final String section,
-  final Map<String, (String?, String)> glosses,
-) {page = jsonDecode(body) as Map<String, dynamic>;
+  String body,
+  String section,
+  Map<String, (String?, String)> glosses,
+) {
+  final page = jsonDecode(body) as Map<String, dynamic>;
   final query = page['query'] as Map<String, dynamic>?;
   final rawPages = query?['pages'] as List<dynamic>?;
   final pages = (rawPages ?? const <dynamic>[]).cast<Map<String, dynamic>>();
-  for (final entry in pages) {title = entry['title'] as String?;
+  for (final entry in pages) {
+    final title = entry['title'] as String?;
     final revisions = entry['revisions'] as List<dynamic>?;
     final revision = revisions?.first as Map<String, dynamic>?;
     final slots = revision?['slots'] as Map<String, dynamic>?;
@@ -203,7 +213,8 @@ void _collect(
 }
 
 /// The first definition lines under `==[section]==`.
-(String?, String)? firstGloss(String wikitext, String section) {pattern = RegExp('^==\\s*$section\\s*==\\s*\$', multiLine: true);
+(String?, String)? firstGloss(String wikitext, String section) {
+  final pattern = RegExp('^==\\s*$section\\s*==\\s*\$', multiLine: true);
   final header = pattern.firstMatch(wikitext);
   if (header == null) return null;
   var body = wikitext.substring(header.end);
@@ -212,12 +223,14 @@ void _collect(
 
   String? pos;
   final defLines = <String>[];
-  for (final line in body.split('\n')) {posHeader = RegExp(r'^===?\s*([^=]+?)\s*===?\s*$').firstMatch(line);
+  for (final line in body.split('\n')) {
+    final posHeader = RegExp(r'^===?\s*([^=]+?)\s*===?\s*$').firstMatch(line);
     if (posHeader != null) {
       pos = posTag(posHeader.group(1)!.trim());
       continue;
     }
-    if (RegExp('^#+[^#*:]').hasMatch(line)) {cleaned = cleanWikitext(line.replaceFirst(RegExp(r'^#+\s*'), ''));
+    if (RegExp('^#+[^#*:]').hasMatch(line)) {
+      final cleaned = cleanWikitext(line.replaceFirst(RegExp(r'^#+\s*'), ''));
       if (cleaned.length < 3) continue;
       defLines.add(cleaned);
       if (defLines.length == 2) break;
@@ -241,7 +254,8 @@ String cleanWikitext(String raw) {
       .trim();
 }
 
-String stripTemplates(String input) {out = StringBuffer();
+String stripTemplates(String input) {
+  final out = StringBuffer();
   var depth = 0;
   for (var i = 0; i < input.length; i++) {
     if (i + 1 < input.length && input[i] == '{' && input[i + 1] == '{') {
@@ -276,8 +290,8 @@ String? posTag(String header) => <String, String>{
 
 /// WordNet glosses restricted to the wanted words.
 Map<String, (String?, String)> glossesFor(
-  final Map<String, (String?, String)> wordNet,
-  final Set<String> words,
+  Map<String, (String?, String)> wordNet,
+  Set<String> words,
 ) => <String, (String?, String)>{
       for (final word in words)
         if (wordNet[word] != null) word: wordNet[word]!,
@@ -285,7 +299,8 @@ Map<String, (String?, String)> glossesFor(
 
 /// WordNet 3.1 (the nltk_data wordnet.zip, extracted to
 /// `<sources>/wordnet/dict`): lemma → first-synset gloss.
-Map<String, (String?, String)> parseWordNet(String sources) {dict = Directory('$sources/wordnet/dict');
+Map<String, (String?, String)> parseWordNet(String sources) {
+  final dict = Directory('$sources/wordnet/dict');
   if (!dict.existsSync()) {
     stderr.writeln('wordnet: $sources/wordnet/dict missing — en defs skip');
     return const {};
@@ -296,8 +311,10 @@ Map<String, (String?, String)> parseWordNet(String sources) {dict = Directory('$
     'v': 'data.verb',
     'a': 'data.adj',
     'r': 'data.adv',
-  }.entries) {map = <int, String>{};
-    for (final line in File('${dict.path}/${entry.value}').readAsLinesSync()) {pipe = line.indexOf('| ');
+  }.entries) {
+    final map = <int, String>{};
+    for (final line in File('${dict.path}/${entry.value}').readAsLinesSync()) {
+      final pipe = line.indexOf('| ');
       if (pipe < 0) continue;
       final offset = int.tryParse(line.substring(0, line.indexOf(' ')));
       if (offset == null) continue;

@@ -59,7 +59,7 @@ abstract interface class Lexicon {
   /// `hello`, and `he` must find it too — strict prefixes silently
   /// refuse everything a real hand writes.
   List<LexiconMatch> fuzzyPrefixCandidates(
-    final String prefix, {int limit,
-    final int maxDistance,
+    String prefix, {int limit,
+    int maxDistance,
   });
 }

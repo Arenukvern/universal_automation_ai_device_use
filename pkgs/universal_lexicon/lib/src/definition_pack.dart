@@ -86,7 +86,8 @@ final class DefinitionPack implements DefinitionStore {
       LinkedHashMap<int, List<String>>();
 
   @override
-  List<DefinitionEntry> lookup(String word) {probe = word.toLowerCase();
+  List<DefinitionEntry> lookup(String word) {
+    final probe = word.toLowerCase();
     final hash = definitionWordHash(probe);
     // Hash collisions are legal: gather every index entry with this
     // hash, decompress their blocks, and let the exact word match
@@ -99,7 +100,8 @@ final class DefinitionPack implements DefinitionStore {
     }
     final matches = <DefinitionEntry>[];
     for (final blockId in blocks) {
-      for (final line in _block(blockId)) {fields = line.split('\t');
+      for (final line in _block(blockId)) {
+        final fields = line.split('\t');
         if (fields.length >= 3 && fields[0] == probe) {
           matches.add(
             DefinitionEntry(
@@ -119,15 +121,18 @@ final class DefinitionPack implements DefinitionStore {
   }
 
   @override
-  String? definition(String word) {matches = lookup(word);
+  String? definition(String word) {
+    final matches = lookup(word);
     return matches.isEmpty ? null : matches.first.definition;
   }
 
   /// Every entry in the pack, block-ordered — the boot-time bulk read
   /// for in-memory consumers. One decompression per block.
-  List<DefinitionEntry> readAll() {entries = <DefinitionEntry>[];
+  List<DefinitionEntry> readAll() {
+    final entries = <DefinitionEntry>[];
     for (var blockId = 0; blockId < blockCount; blockId++) {
-      for (final line in _block(blockId)) {fields = line.split('\t');
+      for (final line in _block(blockId)) {
+        final fields = line.split('\t');
         if (fields.length < 3) continue;
         entries.add(
           DefinitionEntry(
@@ -145,7 +150,8 @@ final class DefinitionPack implements DefinitionStore {
   @visibleForTesting
   int get cachedBlockCount => _blockCache.length;
 
-  List<String> _block(int blockId) {cached = _blockCache.remove(blockId);
+  List<String> _block(int blockId) {
+    final cached = _blockCache.remove(blockId);
     if (cached != null) {
       _blockCache[blockId] = cached; // touch = move to most-recent
       return cached;
@@ -165,7 +171,8 @@ final class DefinitionPack implements DefinitionStore {
   int _lowerBound(int hash) {
     var lo = 0;
     var hi = _hashIndex.length;
-    while (lo < hi) {mid = (lo + hi) >> 1;
+    while (lo < hi) {
+      final mid = (lo + hi) >> 1;
       if (_hashIndex[mid].$1 < hash) {
         lo = mid + 1;
       } else {
