@@ -46,7 +46,7 @@ npx skills add Arenukvern/skill_steward --skill release-changelog-harness
 ## Publishing
 
 Dependency order is documented in
-[ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.md). Prefer
+[ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx). Prefer
 `dart pub publish --dry-run` per package before `dart pub publish -f`.
 
 `universal_storage_*` packages live in the sibling repo

@@ -51,25 +51,25 @@ driver tier is production-ready without platform-specific proof.
 
 | Principle | Where it comes from | What it means here |
 | --- | --- | --- |
-| **Consent and least privilege** | [SECURITY.md](../SECURITY.md), toolkit README | Prefer `ConsentGatedDriver` / OS permission flows before accessibility or screen-recording effects; run only on machines and apps you control. |
-| **Privileged surface, fail-closed plans** | [SECURITY.md](../SECURITY.md), toolkit README | Treat MCP/CLI like a developer agent capability; refuse loudly when a tier or permission is missing. |
-| **Honest claims and evidence** | [AGENTS.md](../AGENTS.md), [steward.yaml](../steward.yaml) | Name the exact claim, prove the weakest bar, record non-claims; ADRs gate durable changes. |
-| **Action effects and provenance** | [steward.yaml](../steward.yaml) | `security.action_effects`, `release.artifact_provenance` — automation that changes the world stays explicit and traceable. |
-| **Community conduct** | [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) | Contributor Covenant; security reports to anton@xsoulspace.dev per SECURITY.md. |
+| **Consent and least privilege** | [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md), toolkit README | Prefer `ConsentGatedDriver` / OS permission flows before accessibility or screen-recording effects; run only on machines and apps you control. |
+| **Privileged surface, fail-closed plans** | [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md), toolkit README | Treat MCP/CLI like a developer agent capability; refuse loudly when a tier or permission is missing. |
+| **Honest claims and evidence** | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md), [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/steward.yaml) | Name the exact claim, prove the weakest bar, record non-claims; ADRs gate durable changes. |
+| **Action effects and provenance** | [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/steward.yaml) | `security.action_effects`, `release.artifact_provenance` — automation that changes the world stays explicit and traceable. |
+| **Community conduct** | [CODE_OF_CONDUCT.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CODE_OF_CONDUCT.md) | Contributor Covenant; security reports to anton@xsoulspace.dev per SECURITY.md. |
 | **Engineering stewardship** | [Skill Steward North Star](https://github.com/Arenukvern/skill_steward/blob/main/docs/NORTH_STAR.mdx) | Shared map for humans and agents: doctor → map → validate → handoff. |
 
 ## North star impact habit
 
 Before durable structural changes, classify `north_star_impact`: `none`, `applies`,
 `clarifies`, `sub_star`, `amends`, or `conflicts`. `amends` / `conflicts` require
-ADR work before the repo center moves. See [AGENTS.md](../AGENTS.md).
+ADR work before the repo center moves. See [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md).
 
 ## Boundaries (non-negotiable)
 
 - Behavior SSOT is **code and schemas**; docs link inward.
-- New strategic **why** → ADR in [decisions/](decisions/).
+- New strategic **why** → ADR in [docs/decisions/](https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/docs/decisions).
 - Domain tutorials and app-specific harnesses stay in their product repos.
-- No public issue for unpatched security vulnerabilities ([SECURITY.md](../SECURITY.md)).
+- No public issue for unpatched security vulnerabilities ([SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)).
 
 ## Success looks like
 
@@ -77,14 +77,14 @@ ADR work before the repo center moves. See [AGENTS.md](../AGENTS.md).
 - Drivers and toolkit **refuse** rather than guess when consent or capability is missing.
 - Claims stay proportional to evidence (validation gate, per-package tests, platform proofs).
 - Fresh contributors find charter, ADRs, and native validation without hidden local paths.
-- Packages publish in dependency order with legible changelogs ([ADR 0001](decisions/0001_drivers_into_ua_private_oss_ready.md)).
+- Packages publish in dependency order with legible changelogs ([ADR 0001](/decisions/0001_drivers_into_ua_private_oss_ready)).
 
 ## References
 
-- [ADR index](decisions/README.md)
-- [ADR 0002 — public GitHub home and rename](decisions/0002_public_github_rename.md)
-- [CONTRIBUTING.md](../CONTRIBUTING.md)
-- [SECURITY.md](../SECURITY.md)
+- [ADR index](/decisions)
+- [ADR 0002 — public GitHub home and rename](/decisions/0002_public_github_rename)
+- [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)
+- [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)
 - [mcp_flutter — automation chain sibling](https://github.com/Arenukvern/mcp_flutter)
 - [skill_steward — stewardship patterns](https://github.com/Arenukvern/skill_steward)
 
@@ -93,5 +93,5 @@ ADR work before the repo center moves. See [AGENTS.md](../AGENTS.md).
 <sup>*</sup> *Quiet aside:* contracts are written for whoever needs legible
 device access next — today humans and agents; tomorrow maybe someone with fins,
 a star chart, or a handshake we have not imagined yet. That is curiosity, not a
-roadmap; see the [banner horizon](brand/assets/svg/banner.svg) if you
+roadmap; see the [banner horizon](/brand) if you
 like scavenger hunts.

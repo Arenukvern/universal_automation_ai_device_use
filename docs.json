@@ -1,0 +1,120 @@
+{
+  "$schema": "https://docs.page/schema.json",
+  "name": "Universal Automation Device Use",
+  "description": "Composable observe / act / verify automation for people and agents across desktop, mobile, browser, and beyond.",
+  "github": "https://github.com/Arenukvern/universal_automation_ai_device_use",
+  "logo": {
+    "light": "/assets/logo.png",
+    "dark": "/assets/logo.png"
+  },
+  "favicon": "/assets/favicon.png",
+  "socialPreview": "/assets/social-preview.png",
+  "theme": {
+    "defaultTheme": "system",
+    "primary": "#1e3a5f"
+  },
+  "header": {
+    "showName": true,
+    "showThemeToggle": true,
+    "showGitHubCard": true,
+    "links": [
+      {
+        "title": "GitHub",
+        "href": "https://github.com/Arenukvern/universal_automation_ai_device_use"
+      },
+      {
+        "title": "Quick start",
+        "href": "https://github.com/Arenukvern/universal_automation_ai_device_use#quick-start-toolkit--mcp",
+        "cta": true
+      }
+    ]
+  },
+  "anchors": [
+    {
+      "icon": "github",
+      "title": "GitHub",
+      "href": "https://github.com/Arenukvern/universal_automation_ai_device_use"
+    },
+    {
+      "icon": "book-open",
+      "title": "mcp_flutter",
+      "href": "https://github.com/Arenukvern/mcp_flutter"
+    }
+  ],
+  "social": {
+    "github": "Arenukvern",
+    "website": "https://github.com/Arenukvern/universal_automation_ai_device_use"
+  },
+  "seo": {
+    "noindex": false
+  },
+  "variables": {
+    "repo": "https://github.com/Arenukvern/universal_automation_ai_device_use",
+    "docs": "https://docs.page/arenukvern/universal_automation_ai_device_use"
+  },
+  "content": {
+    "headerDepth": 3,
+    "zoomImages": true,
+    "automaticallyInferNextPrevious": true,
+    "showPageTitle": true,
+    "showPageImage": true
+  },
+  "sidebar": [
+    {
+      "group": "Start Here",
+      "pages": [
+        { "title": "Overview", "href": "/" },
+        { "title": "North Star", "href": "/NORTH_STAR" },
+        { "title": "Docs map", "href": "/start_here/docs_map" },
+        { "title": "Brand assets", "href": "/brand" }
+      ]
+    },
+    {
+      "group": "Decisions",
+      "pages": [
+        { "title": "ADR index", "href": "/decisions" },
+        {
+          "title": "0001 — Drivers into UA workspace",
+          "href": "/decisions/0001_drivers_into_ua_private_oss_ready"
+        },
+        {
+          "title": "0002 — Public GitHub home and rename",
+          "href": "/decisions/0002_public_github_rename"
+        }
+      ]
+    },
+    {
+      "group": "Contributing",
+      "pages": [
+        { "title": "Contribution guide", "href": "/contributing/contribution_guide" },
+        { "title": "Contributors", "href": "/contributing/contributors" },
+        { "title": "Enable docs.page", "href": "/contributing/enable_docs_page" },
+        {
+          "title": "Code of conduct",
+          "href": "https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CODE_OF_CONDUCT.md"
+        },
+        {
+          "title": "Security",
+          "href": "https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md"
+        }
+      ]
+    },
+    {
+      "group": "Repo root (GitHub)",
+      "pages": [
+        {
+          "title": "README",
+          "href": "https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/README.md"
+        },
+        {
+          "title": "AGENTS.md",
+          "href": "https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md"
+        },
+        {
+          "title": "CONTRIBUTING.md",
+          "href": "https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md"
+        }
+      ]
+    }
+  ]
+}

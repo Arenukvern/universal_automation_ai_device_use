@@ -55,7 +55,8 @@ stewardship:
 docs:
   "ADR index": docs/decisions/README.md
   "North Star": docs/NORTH_STAR.mdx
-  "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.md
+  "Docs (docs.page)": docs/contributing/enable_docs_page.mdx
+  "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx
   "Contributing": CONTRIBUTING.md
   "Security": SECURITY.md
 

@@ -1,0 +1,30 @@
+# Contribution guide
+
+We welcome pull requests and issues on
+[GitHub](https://github.com/Arenukvern/universal_automation_ai_device_use).
+
+The repo root [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md) is the operational source; this page is the docs.page entry.
+
+## Local loop
+
+```sh
+dart pub get
+dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics \
+  pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast \
+  pkgs/universal_lexicon pkgs/universal_webrtc_raw
+```
+
+Per-package: `cd pkgs/<name> && dart pub get && dart test`.
+
+Optional: `steward doctor --json` when the [Skill Steward](https://github.com/Arenukvern/skill_steward) CLI is installed.
+
+## Before you open a PR
+
+- Run the analyze gate (also enforced in CI).
+- Update `CHANGELOG.md` for user-facing changes.
+- Read [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md) for automation safety.
+- Follow [CODE_OF_CONDUCT.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CODE_OF_CONDUCT.md).
+
+## Contributor credit
+
+See [Contributors](/contributing/contributors) and [all-contributors](https://allcontributors.org/).

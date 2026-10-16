@@ -24,7 +24,7 @@ Run the following commands to interact with the project's agentic tools:
 
 | I want to… | Read |
 |---|---|
-| Know why drivers left DFP | `docs/decisions/0001_drivers_into_ua_private_oss_ready.md` |
+| Know why drivers left DFP | `docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx` |
 | Publish packages | README → Publish order; `dart pub publish --dry-run` per package |
 | Wire a consumer | path override to `pkgs/<name>` (not DFP) |
 | Install MCP + skill plugin | `plugin/install.sh` (see [plugin/README.md](plugin/README.md)) |

@@ -1,5 +1,8 @@
 # universal_automation_ai_device_use
 
+[![Docs](https://img.shields.io/badge/docs-docs.page-blue)](https://docs.page/arenukvern/universal_automation_ai_device_use/)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Arenukvern/universal_automation_ai_device_use)
+[![All Contributors](https://img.shields.io/github/all-contributors/Arenukvern/universal_automation_ai_device_use?color=ee8449&style=flat-square)](https://github.com/Arenukvern/universal_automation_ai_device_use#contributors)
 [![maintained with Skill Steward](https://raw.githubusercontent.com/Arenukvern/skill_steward/main/docs/brand/assets/svg/badge-light.svg)](https://github.com/Arenukvern/skill_steward)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Validate](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml)
@@ -15,7 +18,10 @@ with **consent, receipts, and honest proof** — not unattended takeover of user
 devices. Dart contracts, platform drivers, capture/WebRTC plumbing, lexicon
 packs, plus an MCP + CLI toolkit.
 
-**Charter:** [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) · **Decisions:** [docs/decisions/](docs/decisions/) · [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · **Brand:** [docs/brand/](docs/brand/)
+- 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [llms.txt](llms.txt))
+- 🤝 **Contribute:** [guide](docs/contributing/contribution_guide.mdx) · [contributors](docs/contributing/contributors.mdx) · [code of conduct](CODE_OF_CONDUCT.md) · [security](SECURITY.md)
+
+**Charter:** [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) · **Decisions:** [docs/decisions/](docs/decisions/) · [AGENTS.md](AGENTS.md) · **Brand:** [docs/brand/](docs/brand/)
 
 **Repository:** https://github.com/Arenukvern/universal_automation_ai_device_use  
 **Sibling storage product:** [`universal_storage`](https://github.com/Arenukvern/universal_storage)  
@@ -44,7 +50,7 @@ Windows, CDP, WebDriver), screencast/capture helpers, WebRTC sidecars, and
 | `universal_webrtc` / `universal_webrtc_raw` | WebRTC helpers |
 | [`universal_lexicon`](pkgs/universal_lexicon/) | Lexicon packs |
 
-Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.md).
+Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).
 
 ## Quick start (toolkit + MCP)
 
@@ -94,6 +100,26 @@ dart analyze pkgs/universal_automation_interface pkgs/universal_automation_seman
 ```
 
 Full command list: `steward.yaml` → `stewardship.quality.validate`.
+
+## Contributors
+
+Thanks to everyone who improves this family.
+
+Roster: [all-contributors](https://allcontributors.org/) · [`.all-contributorsrc`](.all-contributorsrc) · [contributors guide](docs/contributing/contributors.mdx).
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Arenukvern"><img src="https://avatars.githubusercontent.com/u/15068151?v=4?s=100" width="100px;" alt="Anton Malofeev"/><br /><sub><b>Anton Malofeev</b></sub></a><br /><a href="https://github.com/Arenukvern/universal_automation_ai_device_use/commits?author=Arenukvern" title="Code">💻</a> <a href="https://github.com/Arenukvern/universal_automation_ai_device_use/commits?author=Arenukvern" title="Documentation">📖</a> <a href="#infra-Arenukvern" title="Infrastructure (Hosting, Build-Tools, etc)">🚇</a> <a href="#maintenance-Arenukvern" title="Maintenance">🚧</a></td>
+    </tr>
+  </tbody>
+</table>
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+<!-- ALL-CONTRIBUTORS-LIST:END -->
 
 ## License
 
