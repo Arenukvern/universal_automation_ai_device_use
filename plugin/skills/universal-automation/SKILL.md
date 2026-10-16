@@ -28,19 +28,21 @@ commands, oka calls, arbitrary checks.
 | --- | --- | --- |
 | Chromium / Flutter web AOT | `cdp` | snapshots, semantic clicks, profiles, `record` |
 | Safari / WebDriver ends | `webdriver` | actions + screenshots; no a11y tree |
-| macOS apps | `osAccessibility` | focused app; Accessibility (+Screen Recording) TCC |
-| Linux apps | `osAccessibility` | session D-Bus AT-SPI |
-| Windows apps | `osAccessibility` | UIA sidecar binary; loud elsewhere |
+| macOS apps | `osAccessibility` | focused app; Accessibility (+Screen Recording) TCC; `navigate` opens the system browser (ADR 0003) |
+| Linux apps | `osAccessibility` | session D-Bus AT-SPI; `navigate` opens the system browser |
+| Windows apps | `osAccessibility` | UIA sidecar binary; `navigate` opens the system browser |
 | Flutter JIT (debug) | `vmService` | inject `DriverFactory` (composition root) |
 
 ## MCP tools (plugin server mounted)
 
 | Tool | Purpose |
 | --- | --- |
+| `automation_capabilities` | What this server can reach — default transport, per-tier endpoints + reachability probe, verb matrix, routing + handle config. Call first when unsure which tier a verb will take. |
 | `automation_observe` | Semantic snapshot of a surface (read-only). Pass `view` (`{subtreeOf, identifierPrefix, fields, maxNodes, panes}`) for a rendered, ref-stable observation instead of the raw tree; `diff: true` adds +/-/~ rows against the previous viewed observation (ADR 0052). |
 | `automation_act` | navigate/click/type/key/scroll/evaluate/invoke; optional `profile` (ADR-0044 humanized delivery) + `seed`; `returnState: true` attaches the post-action state render — act + observe in one call. |
 | `automation_verify` | Checks: `{exists: {role?, name?}}`, `{absent: …}`, `{value: {locator, equals/contains}}`, `{urlContains: s}`. |
 | `automation_screenshot` | PNG to a local path (opt-in pixels; the semantic channel is primary). |
+| `automation_list_apps` | macOS tier: running, anchorable apps — feed a row into any OS call's `app` argument (background observe/act, ADR 0064). |
 | `automation_validate_plan` | Fail-closed snapshot validation. |
 | `automation_run_plan` | Run a scenario; structured JSON report + receipts. |
 
@@ -49,6 +51,34 @@ plus an `endpoint` (HTTP base); `osAccessibility` is the desktop tier —
 it binds the **focused application** and needs no endpoint. Without
 arguments the server uses its `serve` default (`--cdp <base>`, or
 `--os` for the desktop tier).
+
+## Cold start (first call)
+
+1. `automation_capabilities` — one read-only call: the default
+   transport, whether a browser tier is configured (and reachable), the
+   verb matrix. No trial-and-error.
+2. Desktop work: `automation_list_apps` → anchor via `app: {pid}` →
+   `automation_observe` with a `view` → act with `returnState: true`.
+3. Browser work: with a browser tier configured, `navigate`/`evaluate`/
+   `invoke` attach to it automatically (`routedTo` in the result says
+   so). With none configured, desktop `navigate` opens the OS default
+   browser — an **untracked** surface: observe it by anchoring the
+   browser app, drive it by configuring a tier (below).
+
+## Optional browser tier (ADR 0003)
+
+Flag beats env beats handle artifact:
+
+```bash
+universal-automation serve --os --cdp http://127.0.0.1:9222   # flags
+UNIVERSAL_AUTOMATION_CDP=http://127.0.0.1:9222 ... serve --os # env (mcp.json)
+universal-automation serve --os --handles-dir ~/.oka/handles --browser-handle moli
+```
+
+The handle artifact is the oka/moli route: something else starts the
+browser (e.g. `moli serve` or `chromium --remote-debugging-port=9222`)
+and publishes `<handles-dir>/<name>` containing the absolute URI; the
+toolkit attaches and never owns the process.
 
 ## The loop (semantic-first)
 

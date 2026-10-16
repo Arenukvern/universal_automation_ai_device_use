@@ -23,6 +23,7 @@ class WebDriverDriver implements AutomationDriver {
     inputSynthesis: true,
     pointerCoordinates: true,
     semanticWrite: true,
+    navigate: true,
   );
 
   /// The underlying client.
@@ -40,6 +41,9 @@ class WebDriverDriver implements AutomationDriver {
   Future<void> perform(AutomationAction action) async {
     switch (action) {
       case NavigateAction(:final url):
+        // ADR 0003: the scheme allowlist binds NavigateAction on every
+        // tier, protocol ones included.
+        validateOpenableUrl(url);
         await _client.navigate(url);
       case ClickAction(:final css, :final name):
         final element = css != null

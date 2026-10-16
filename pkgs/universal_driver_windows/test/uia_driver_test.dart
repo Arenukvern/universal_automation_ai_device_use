@@ -9,13 +9,15 @@ void main() {
   late FakeUiaSidecarTransport transport;
   late UiaSidecarClient client;
   late UiaDriver driver;
+  late List<Uri> openedUrls;
 
   setUp(() async {
     transport = FakeUiaSidecarTransport();
     client = UiaSidecarClient(transport);
     transport.serveHandshake();
     await client.handshake;
-    driver = UiaDriver(client);
+    openedUrls = [];
+    driver = UiaDriver(client, openUrl: (url) async => openedUrls.add(url));
   });
 
   tearDown(() async {
@@ -36,15 +38,21 @@ void main() {
     expect(last, contains('"OK"'));
   });
 
-  test('refuses surfaces UIA does not have, loudly', () async {
-    await expectLater(
-      driver.perform(NavigateAction(Uri.parse('https://example.test'))),
-      throwsA(isA<DriverUnsupportedException>()),
-    );
+  test('navigates through the system-browser seam, refuses the rest '
+      'loudly (ADR 0003)', () async {
+    final url = Uri.parse('https://example.test');
+    await driver.perform(NavigateAction(url));
+    expect(openedUrls, [url]);
+    expect(driver.capabilities.navigate, isTrue);
     await expectLater(
       driver.perform(EvaluateAction('1+1')),
       throwsA(isA<DriverUnsupportedException>()),
     );
+    await expectLater(
+      driver.perform(NavigateAction(Uri.parse('javascript:alert(1)'))),
+      throwsA(isA<DriverUnsupportedException>()),
+    );
+    expect(openedUrls, [url]);
     await expectLater(driver.screenshot(),
         throwsA(isA<DriverUnsupportedException>()));
   });

@@ -5,9 +5,13 @@ import 'macos_driver_test.dart' show FakeBridge;
 
 void main() {
   // Contract conformance against the injectable bridge (no TCC needed);
-  // the live smoke file covers the real-tree path.
+  // the live smoke file covers the real-tree path. The opener is a
+  // no-op: conformance must never open a real browser (ADR 0003 seam).
   automationDriverConformanceTests(
     'MacosDriver(fake bridge)',
-    createDriver: () async => MacosDriver(bridge: FakeBridge()),
+    createDriver: () async => MacosDriver(
+      bridge: FakeBridge(),
+      openUrl: (_) async {},
+    ),
   );
 }

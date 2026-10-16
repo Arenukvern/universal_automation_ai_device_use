@@ -11,14 +11,18 @@ import 'atspi_bus.dart';
 /// path screen readers use — no synthetic X events); semantic writes
 /// (ADR 0064) via `EditableText.SetTextContents`, laddering to the
 /// numeric `Value` interface, and named advertised actions through
-/// `Action.DoAction`. Verify: snapshot deltas. Navigation, keyboard
-/// synthesis, and free-form script evaluation have no AT-SPI equivalent
-/// and are refused loudly.
+/// `Action.DoAction`. Verify: snapshot deltas. Keyboard synthesis and
+/// free-form script evaluation have no AT-SPI equivalent and are
+/// refused loudly; `NavigateAction` opens the system browser (ADR 0003).
 class AtspiDriver implements AutomationDriver {
-  /// Creates a driver over [bus].
-  AtspiDriver(this.bus);
+  /// Creates a driver over [bus]. [openUrl] is the system-browser
+  /// navigation seam (ADR 0003); tests inject a recording no-op.
+  AtspiDriver(this.bus, {Future<void> Function(Uri url)? openUrl})
+    : _openUrl = openUrl ?? openUrlViaSystem;
 
   final AtspiBus bus;
+
+  final Future<void> Function(Uri url) _openUrl;
   bool _closed = false;
   int _revision = 0;
 
@@ -27,6 +31,7 @@ class AtspiDriver implements AutomationDriver {
     a11yTree: true,
     inputSynthesis: true,
     semanticWrite: true,
+    navigate: true,
   );
 
   @override
@@ -54,10 +59,10 @@ class AtspiDriver implements AutomationDriver {
         }
         await bus.doAction(node, 0);
       case NavigateAction(:final url):
-        throw DriverUnsupportedException(
-          'AT-SPI has no navigation surface (target: $url); navigation '
-          'is a browser-protocol capability',
-        );
+        // ADR 0003: hand the URL to the OS default handler (untracked
+        // surface) instead of refusing.
+        validateOpenableUrl(url);
+        await _openUrl(url);
       case TypeAction(:final text):
         throw DriverUnsupportedException(
           'typing ${text.length} chars needs keyboard synthesis, which '

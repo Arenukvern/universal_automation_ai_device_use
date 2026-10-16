@@ -717,16 +717,35 @@ void main() {
     );
   });
 
-  test('navigate and evaluate are refused (no AX equivalent)', () async {
-    final driver = driverWith(FakeBridge());
-    await expectLater(
-      driver.perform(NavigateAction(Uri.parse('https://example.com'))),
-      throwsA(isA<DriverUnsupportedException>()),
+  test('navigate lowers to the system-browser seam; evaluate refuses '
+      '(ADR 0003)', () async {
+    final opened = <Uri>[];
+    final driver = MacosDriver(
+      bridge: FakeBridge(),
+      openUrl: (url) async => opened.add(url),
     );
+    final url = Uri.parse('https://example.com');
+    await driver.perform(NavigateAction(url));
+    expect(opened, [url]);
+    expect(driver.capabilities.navigate, isTrue);
     await expectLater(
       driver.perform(const EvaluateAction('1 + 1')),
       throwsA(isA<DriverUnsupportedException>()),
     );
+  });
+
+  test('navigate refuses non-allowlisted schemes loudly (ADR 0003)',
+      () async {
+    final opened = <Uri>[];
+    final driver = MacosDriver(
+      bridge: FakeBridge(),
+      openUrl: (url) async => opened.add(url),
+    );
+    await expectLater(
+      driver.perform(NavigateAction(Uri.parse('javascript:alert(1)'))),
+      throwsA(isA<DriverUnsupportedException>()),
+    );
+    expect(opened, isEmpty);
   });
 
   test('elementAtPosition hit-tests through the bridge', () async {

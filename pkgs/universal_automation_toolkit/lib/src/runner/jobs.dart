@@ -134,14 +134,18 @@ final class BackgroundJob {
 final class JobQueue {
   /// Creates a queue persisting under [directory] (created lazily).
   /// [factories] passes through to each job's runner (the
-  /// composition-root seam).
-  JobQueue({required this.directory, this.factories});
+  /// composition-root seam); [handlesDirectory] resolves published
+  /// handle artifacts (e.g. the oka-published browser tier, ADR 0003).
+  JobQueue({required this.directory, this.factories, this.handlesDirectory});
 
   /// The jobs directory (`--jobs-dir`): one JSON record per job.
   final String directory;
 
   /// Per-transport driver factories each job's runner resolves with.
   final Map<AutomationTransport, DriverFactory>? factories;
+
+  /// Directory of handle artifacts jobs resolve bindings against.
+  final String? handlesDirectory;
 
   final Queue<BackgroundJob> _pending = Queue();
   final Map<String, BackgroundJob> _jobs = {};
@@ -199,7 +203,10 @@ final class JobQueue {
     _persist(job);
     try {
       final plan = await AutomationPlan.load(queued.planPath);
-      final report = await PlanRunner(factories: factories).run(
+      final report = await PlanRunner(
+        factories: factories,
+        handleBaseDirectory: handlesDirectory,
+      ).run(
         plan,
         scenarioName: queued.scenario,
         sessionOverrides: queued.overrides,

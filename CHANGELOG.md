@@ -4,6 +4,16 @@ Workspace-level notes. Per-package changelogs live under `pkgs/*/CHANGELOG.md`.
 
 ## Unreleased
 
+- **Seamless tier routing + optional browser tier (ADR 0003):** the
+  cold-start failure where `navigate` dead-ended on a desktop-only
+  server is fixed at four layers — desktop drivers now lower
+  `navigate` to the OS default browser (scheme allowlist, injected
+  seam); `serve` accepts `--cdp/--webdriver/--os` together plus
+  `--browser-handle`/`--handles-dir` (oka/moli handle artifacts) and
+  `UNIVERSAL_AUTOMATION_CDP` env fallback; `navigate`/`evaluate`/
+  `invoke` affinity-route to a configured browser tier with a
+  `routedTo` receipt; new `automation_capabilities` tool + error
+  remedies now survive the MCP boundary as structured JSON blocks.
 - docs.page: `docs.json`, `docs/index.mdx`, sidebar navigation, `llms.txt`, CI `docs.yml`.
 - all-contributors: `.all-contributorsrc`, README contributors table and badge.
 - OSS hygiene: `.editorconfig`, `CODEOWNERS`, Dependabot for Actions and pub.

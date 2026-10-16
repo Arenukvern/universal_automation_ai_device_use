@@ -72,33 +72,55 @@ Uri? _parseEndpoint(String? value, String flag) {
   return uri;
 }
 
-/// The resolved default face of a serve command: which transport ad-hoc
-/// calls attach to, and over which endpoint (null for the endpoint-free
-/// desktop tier).
-typedef DefaultSurface = (AutomationTransport, Uri?);
+/// The resolved serve face (ADR 0003): which transport ad-hoc calls
+/// attach to by default, and the per-transport endpoint registry.
+///
+/// `--cdp`, `--webdriver`, and `--os` are no longer mutually exclusive:
+/// every tier named is configured. Unspecified tiers fall back to the
+/// environment (`UNIVERSAL_AUTOMATION_CDP`, `UNIVERSAL_AUTOMATION_WEBDRIVER`)
+/// so MCP configs can add a browser without editing `args`. The default
+/// transport is the desktop tier when `--os` is given (the plugin
+/// default), else cdp when configured, else webdriver, else cdp.
+typedef ServeTierConfig = (AutomationTransport, Map<AutomationTransport, Uri>);
 
-DefaultSurface _defaultSurface(ArgResults options) {
+/// The env value for [key], with the empty string reading as unset —
+/// MCP configs ship empty env values as visible knobs.
+String? _env(String key) {
+  final value = Platform.environment[key];
+  return value == null || value.isEmpty ? null : value;
+}
+
+ServeTierConfig _serveTierConfig(ArgResults options) {
   final cdp = _parseCdp(options['cdp'] as String?);
   final webdriver = _parseEndpoint(
     options['webdriver'] as String?,
     '--webdriver',
   );
   final os = options['os'] == true;
-  final chosen = [
-    if (cdp != null) '--cdp',
-    if (webdriver != null) '--webdriver',
-    if (os) '--os',
-  ];
-  if (chosen.length > 1) {
-    throw UsageException('${chosen.join(' and ')} are mutually exclusive');
-  }
-  if (os) return (AutomationTransport.osAccessibility, null);
-  if (webdriver != null) return (AutomationTransport.webdriver, webdriver);
-  return (AutomationTransport.cdp, cdp);
+  final envCdp = _parseCdp(_env('UNIVERSAL_AUTOMATION_CDP'));
+  final envWebdriver = _parseEndpoint(
+    _env('UNIVERSAL_AUTOMATION_WEBDRIVER'),
+    'UNIVERSAL_AUTOMATION_WEBDRIVER',
+  );
+  final endpoints = <AutomationTransport, Uri>{
+    if (envCdp != null) AutomationTransport.cdp: envCdp,
+    if (envWebdriver != null)
+      AutomationTransport.webdriver: envWebdriver,
+    if (webdriver != null) AutomationTransport.webdriver: webdriver,
+    if (cdp != null) AutomationTransport.cdp: cdp,
+  };
+  final defaultTransport = os
+      ? AutomationTransport.osAccessibility
+      : endpoints.containsKey(AutomationTransport.cdp)
+      ? AutomationTransport.cdp
+      : endpoints.containsKey(AutomationTransport.webdriver)
+      ? AutomationTransport.webdriver
+      : AutomationTransport.cdp;
+  return (defaultTransport, endpoints);
 }
 
 Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
-  final (transport, endpoint) = _defaultSurface(options);
+  final (transport, endpoints) = _serveTierConfig(options);
   final registry = SessionRegistry(bindings: const {});
   final appSpec = options['app'] as String?;
   if (appSpec != null) {
@@ -123,6 +145,7 @@ Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
       registry,
     );
   }
+  final endpoint = endpoints[transport];
   if (endpoint == null) {
     if (transport == AutomationTransport.osAccessibility) {
       return _DetachingSession(
@@ -132,7 +155,8 @@ Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
     }
     throw const UsageException(
       'choose a transport: --cdp <http-base>, --webdriver <http-base>, '
-      'or --os (the desktop accessibility tier of this host)',
+      'or --os (the desktop accessibility tier of this host); env '
+      'UNIVERSAL_AUTOMATION_CDP also configures the browser tier',
     );
   }
   return _DetachingSession(
@@ -175,7 +199,10 @@ Future<int> _dispatch(List<String> arguments) async {
     ..addOption('cdp', help: 'CDP HTTP base (e.g. http://127.0.0.1:9222).')
     ..addOption(
       'webdriver',
-      help: 'WebDriver (grid) HTTP base; mutually exclusive with --cdp/--os.',
+      help:
+          'WebDriver (grid) HTTP base; combinable with --cdp/--os (ADR '
+          '0003 tier registry). Env fallback: '
+          'UNIVERSAL_AUTOMATION_WEBDRIVER.',
     )
     ..addFlag(
       'os',
@@ -316,6 +343,23 @@ Future<int> _dispatch(List<String> arguments) async {
       help:
           'Directory for background job receipts (ADR 0064; default '
           '~/.uatk/jobs).',
+    )
+    ..addOption(
+      'handles-dir',
+      help:
+          'Directory of handle artifacts (endpoint URIs) for '
+          '--browser-handle (ADR 0003; e.g. oka-published sessions).',
+    )
+    ..addOption(
+      'browser-handle',
+      help:
+          'Handle name backing the browser tier when no --cdp endpoint '
+          'is configured — the artifact <handles-dir>/<name> holds an '
+          'absolute URI (e.g. a moli serve CDP endpoint).',
+    )
+    ..addMultiOption(
+      'set',
+      help: 'handle=uri session override for plans (repeatable).',
     );
 
   if (arguments.isEmpty ||
@@ -347,9 +391,24 @@ Future<int> _dispatch(List<String> arguments) async {
 
   switch (command.name) {
     case 'serve':
-      final (defaultTransport, defaultEndpoint) = _defaultSurface(options);
+      final (defaultTransport, endpoints) = _serveTierConfig(options);
       final httpPort = command['http'] as String?;
       final jobsDir = command['jobs-dir'] as String?;
+      final handlesDir = command['handles-dir'] as String?;
+      final browserHandle = command['browser-handle'] as String?;
+      if (browserHandle != null && browserHandle.isEmpty) {
+        throw const UsageException('--browser-handle must not be empty');
+      }
+      if (browserHandle != null && handlesDir == null) {
+        throw const UsageException(
+          '--browser-handle needs --handles-dir (the artifact '
+          '<handles-dir>/<browser-handle> holds the endpoint URI)',
+        );
+      }
+      final overrides = {
+        for (final entry in command['set'] as List<String>)
+          if (entry.contains('=')) entry.split('=')[0]: entry.split('=')[1],
+      };
       if (httpPort != null) {
         final port = int.tryParse(httpPort);
         if (port == null || port < 0 || port > 65535) {
@@ -357,9 +416,12 @@ Future<int> _dispatch(List<String> arguments) async {
         }
         final httpServer = await mcp.startMcpHttp(
           port: port,
-          defaultEndpoint: defaultEndpoint,
+          endpoints: endpoints,
           defaultTransport: defaultTransport,
+          overrides: overrides,
           jobsDirectory: jobsDir,
+          handlesDirectory: handlesDir,
+          browserHandle: browserHandle,
         );
         stderr.writeln(
           jsonEncode({
@@ -372,9 +434,12 @@ Future<int> _dispatch(List<String> arguments) async {
         await Completer<void>().future;
       }
       await mcp.serveMcpStdio(
-        defaultEndpoint: defaultEndpoint,
+        endpoints: endpoints,
         defaultTransport: defaultTransport,
+        overrides: overrides,
         jobsDirectory: jobsDir,
+        handlesDirectory: handlesDir,
+        browserHandle: browserHandle,
       );
       return exitOk;
     case 'validate':

@@ -5,11 +5,16 @@ import 'package:universal_driver_linux/testing.dart';
 
 void main() {
   late FakeAtspiBus bus;
+  late List<Uri> openedUrls;
   late AtspiDriver driver;
 
   setUp(() {
     bus = FakeAtspiBus();
-    driver = AtspiDriver(bus);
+    openedUrls = [];
+    driver = AtspiDriver(
+      bus,
+      openUrl: (url) async => openedUrls.add(url),
+    );
   });
 
   test('maps the AT-SPI tree onto the family snapshot model', () async {
@@ -26,11 +31,19 @@ void main() {
     expect(bus.invoked, ['${bus.rootRef.path}/1#0']);
   });
 
-  test('refuses navigation loudly', () async {
+  test('navigates through the system-browser seam (ADR 0003)', () async {
+    final url = Uri.parse('https://example.test');
+    await driver.perform(NavigateAction(url));
+    expect(openedUrls, [url]);
+    expect(driver.capabilities.navigate, isTrue);
+  });
+
+  test('refuses non-allowlisted URL schemes loudly', () async {
     await expectLater(
-      driver.perform(NavigateAction(Uri.parse('https://example.test'))),
+      driver.perform(NavigateAction(Uri.parse('javascript:alert(1)'))),
       throwsA(isA<DriverUnsupportedException>()),
     );
+    expect(openedUrls, isEmpty);
   });
 
   test('declares honest capabilities', () {

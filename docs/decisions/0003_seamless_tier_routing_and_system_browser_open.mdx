@@ -1,0 +1,130 @@
+# ADR 0003 — Seamless tier routing, optional browser config, and system-browser navigation
+
+**Status:** Accepted (2026-10-17)  
+**Amends:** the serve/tier contract surface (one-default-tier serve, `NavigateAction`
+refusal on desktop drivers); extends the ADR 0046 vocabulary and the ADR 0064
+focus contract without changing either.
+
+## Context
+
+A cold-starting agent session mounted the plugin (`serve --os`, the template
+default) and asked the only universal verb for "go to a URL": `automation_act
+navigate`. The macOS AX driver refused — correctly, per the conformance
+contract "navigation either works or refuses loudly" — but the refusal was a
+dead end: the agent had no way to discover that (a) the server was
+desktop-only, (b) a browser tier is reachable per call via `transport` +
+`endpoint` only if something is already listening, and (c) what to configure
+to make `navigate` work. Two errors later the toolkit dropped out of the
+session. Capability discovery by trial-and-error is not a discovery surface.
+
+Three product asks came out of that failure:
+
+1. Refusals must name the route out (remedy), and structured error details
+   must survive the MCP boundary.
+2. An optional browser tier must be **configurable at the MCP server level**
+   (flags, env, or a published oka session handle — e.g. a moli `serve` CDP
+   endpoint), not per call.
+3. With no drivable browser configured, `navigate` on the desktop tier should
+   still **open the system browser** (Safari/Chrome/whatever is default)
+   instead of refusing.
+
+## Decision
+
+### 1. Tier registry replaces the single default endpoint
+
+`serve` accepts `--cdp`, `--webdriver`, and `--os` **together** (they are no
+longer mutually exclusive). The server holds a per-transport endpoint map:
+
+    endpoint(transport) = CLI flag > env (UNIVERSAL_AUTOMATION_CDP /
+    UNIVERSAL_AUTOMATION_WEBDRIVER) > handle artifact
+    (--handles-dir <dir> + --browser-handle <name>, same artifact
+    convention as the plan runner: the file named <handle> holds an
+    absolute URI)
+
+The default transport (used when a call passes neither `transport` nor
+`endpoint`) is `osAccessibility` when `--os` is given, else `cdp` when a cdp
+endpoint resolves, else `webdriver` when configured, else `cdp` (endpoint
+null — today's behavior, with per-call errors as guidance). Desktop-first
+preserves every existing mount; the browser tier is additive.
+
+`serve` also accepts repeatable `--set <handle>=<uri>` (previously only
+`run` did), feeding the same override map plans use.
+
+### 2. Affinity routing for instrumented-only verbs
+
+`navigate`, `evaluate`, and `invoke` have no desktop-tier meaning. When a
+call specifies none of `transport`/`endpoint`, the default transport is the
+desktop tier, and a browser endpoint is configured (cdp preferred over
+webdriver), those three verbs attach to the browser tier instead — and the
+tool result says so (`routedTo: {transport, endpoint}`). Explicit caller
+arguments always win; routing is narrow, reported, and never overrides an
+explicit tier. Evaluate/invoke with no browser configured still refuse, now
+with a remedy.
+
+### 3. `NavigateAction` on desktop drivers opens the system browser
+
+With no drivable browser tier to route to, desktop drivers lower
+`NavigateAction` to "ask the OS shell to open the URL": `open` (macOS),
+`xdg-open` (Linux), `cmd /c start` (Windows). This **amends the attach-only
+house rule deliberately and narrowly**: the driver does not spawn or own an
+automation target; it hands a URI to the OS handler, exactly like a deep
+link. The opened browser is an *untracked surface*: the tool result states
+`surface: systemBrowser`, `drivable: false`, and the two routes to a
+drivable/observable surface (anchor the browser app for AX observation;
+attach a CDP endpoint for driving).
+
+Guardrails: the opener is an injected seam (tests pass a recording no-op —
+conformance stays side-effect-free); the scheme allowlist (http, https,
+file, mailto — `javascript:` and friends refuse loudly) binds
+`NavigateAction` **universally**, desktop tiers before the opener seam and
+protocol tiers (CDP, WebDriver) before the navigation command, so the
+conformance suite enforces one contract everywhere; `DriverCapabilities`
+gains a `navigate` flag so conformance and the capabilities tool can declare
+the behavior instead of agents probing for it.
+
+### 4. Remedies and structured errors across the MCP boundary
+
+`DriverUnsupportedException` carries optional structured `details`, and
+refusal messages name the concrete next move (configure a browser endpoint:
+flag/env/handle; or use semantic verbs on this tier). `McpToolError` carries
+`details`; the `AutomationException` → MCP boundary no longer drops them —
+an `isError` result carries the prose block plus a JSON block
+(`{kind, details}`). `ForegroundRequiredException` was already the model to
+follow.
+
+### 5. `automation_capabilities` — the self-description surface
+
+One read-only tool that attaches nothing and prompts no TCC consent:
+default transport, per-tier endpoints with source and a 2 s reachability
+probe (cdp `/json/version`, webdriver `/status`), the affinity verb set,
+system-browser-open support and its scheme allowlist, handle configuration,
+and the per-tier verb matrix. Capability discovery becomes one call instead
+of two failed calls.
+
+## Alternatives considered
+
+- **Two server entries in `plugin/mcp.json` (desktop + browser).** Works
+  today without code, but doubles processes, needs the browser endpoint at
+  config-write time, and still teaches nothing to the agent that picked the
+  wrong server. The tier registry subsumes it.
+- **Auto-spawn a managed browser (oka/moli device) on demand.** Rejected for
+  this ADR: spawning lifecycle belongs to oka (ADR 0037 house rule 2). The
+  handle-artifact config is the seam: oka (or a user shell script) starts
+  moli/Chrome with a debug port and publishes the handle; the toolkit
+  attaches. Auto-spawn can layer on top later without contract change.
+- **Keep `navigate` refusing on desktop, remedy text only.** Smallest
+  change, but the most common cold-start verb stays a dead end for the
+  default mount; opening the system browser is what a human would do.
+
+## Consequences
+
+- `--cdp/--webdriver/--os` mutual exclusion is gone; `_defaultSurface` is
+  replaced by a tier-config resolver. `ToolkitMcpServer` constructors take an
+  `endpoints` map (+ `handlesDirectory`, `browserHandle`) instead of a single
+  `defaultEndpoint`.
+- Conformance: navigation "works or refuses loudly" becomes "drives, opens
+  the system browser (when `capabilities.navigate`), or refuses loudly".
+- The desktop tier's `navigate` is honest fire-and-forget: no URL bar
+  ownership, no load-event wait. `waitFor`/`verify` need a drivable tier.
+- moli (CDP/WebDriver/BiDi endpoints, oka-managed profile lifecycle) fits the
+  handle config as-is: `--handles-dir ~/.oka/handles --browser-handle moli`.

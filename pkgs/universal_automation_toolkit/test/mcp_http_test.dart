@@ -68,7 +68,7 @@ void main() {
     });
     expect(
       (tools!['result'] as Map<String, Object?>)['tools'],
-      hasLength(9),
+      hasLength(10),
     );
 
     final call = await post(client, port, {

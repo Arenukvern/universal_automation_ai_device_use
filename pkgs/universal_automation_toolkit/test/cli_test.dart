@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:test/test.dart';
@@ -239,5 +240,132 @@ scenarios:
       'session-browser-handle=$endpoint',
     ]);
     expect(code, exitOk);
+  });
+
+  test('serve --browser-handle without --handles-dir is a usage error',
+      () async {
+    final code = await runToolkitCli([
+      'serve',
+      '--browser-handle',
+      'moli',
+    ]);
+    expect(code, exitUsage);
+  });
+
+  // Boots `serve` with the given flags/env in a child process and
+  // returns the capabilities payload from the loopback HTTP face.
+  Future<Map<String, Object?>> serveCapabilities({
+    List<String> flags = const ['--os'],
+    Map<String, String> env = const {},
+  }) async {
+    final script =
+        File('${Directory.current.path}/.dart_tool/uat_tier_probe.dart');
+    await script.parent.create(recursive: true);
+    final flagArgs = flags.map((f) => "'$f'").join(', ');
+    await script.writeAsString('''
+import 'dart:io';
+import 'package:universal_automation_toolkit/src/cli/toolkit_cli.dart';
+Future<void> main() async {
+  await runToolkitCli(['serve', '--http', '0', $flagArgs]);
+}
+''');
+    addTearDown(() {
+      if (script.existsSync()) script.deleteSync();
+    });
+    final process = await Process.start('/usr/bin/env', [
+      'dart',
+      script.path,
+    ], environment: env);
+    addTearDown(process.kill);
+    final banner = await process.stderr
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .first;
+    final url =
+        (jsonDecode(banner) as Map<String, Object?>)['url'] as String;
+    final port = Uri.parse(url).port;
+    final client = HttpClient();
+    addTearDown(client.close);
+    final request = await client.post('127.0.0.1', port, '/mcp')
+      ..headers.contentType = ContentType.json
+      ..write(jsonEncode({
+        'jsonrpc': '2.0',
+        'id': 1,
+        'method': 'tools/call',
+        'params': {
+          'name': 'automation_capabilities',
+          'arguments': {},
+        },
+      }));
+    final response = await request.close();
+    final body = await utf8.decoder.bind(response).join();
+    final result =
+        (jsonDecode(body) as Map<Object?, Object?>)['result']!
+            as Map<Object?, Object?>;
+    final block =
+        (result['content']! as List<Object?>).first! as Map<Object?, Object?>;
+    return jsonDecode(block['text']! as String) as Map<String, Object?>;
+  }
+
+  test('serve --os --cdp configures both tiers; the desktop default '
+      'affinity-routes navigate (process-level proof)', () async {
+    final payload = await serveCapabilities(
+      flags: ['--os', '--cdp', '$endpoint'],
+    );
+    expect(
+      (payload['serve'] as Map)['defaultTransport'],
+      'osAccessibility',
+    );
+    expect(
+      ((payload['tiers'] as Map)['cdp'] as Map)['configured'],
+      true,
+    );
+    expect(
+      (payload['routing'] as Map)['browserTierConfigured'],
+      true,
+    );
+  });
+
+  test('env UNIVERSAL_AUTOMATION_CDP configures the browser tier without '
+      'flags (the MCP-config env route, ADR 0003)', () async {
+    final payload = await serveCapabilities(
+      flags: ['--os'],
+      env: {'UNIVERSAL_AUTOMATION_CDP': '$endpoint'},
+    );
+    expect(
+      ((payload['tiers'] as Map)['cdp'] as Map)['configured'],
+      true,
+    );
+    expect(
+      ((payload['tiers'] as Map)['cdp'] as Map)['endpoint'],
+      '$endpoint',
+    );
+    expect(
+      (payload['routing'] as Map)['browserTierConfigured'],
+      true,
+    );
+  });
+
+  test('serve --handles-dir + --browser-handle resolves the published '
+      'browser artifact (process-level proof)', () async {
+    final handlesDir = await Directory.systemTemp.createTemp('uat-handles');
+    addTearDown(() => handlesDir.delete(recursive: true));
+    await File('${handlesDir.path}/moli').writeAsString('$endpoint');
+    final payload = await serveCapabilities(
+      flags: [
+        '--os',
+        '--handles-dir',
+        handlesDir.path,
+        '--browser-handle',
+        'moli',
+      ],
+    );
+    final handles = payload['handles'] as Map;
+    expect(handles['browserHandle'], 'moli');
+    expect(handles['resolvedEndpoint'], '$endpoint');
+    expect(
+      (payload['routing'] as Map)['browserTierConfigured'],
+      true,
+    );
   });
 }

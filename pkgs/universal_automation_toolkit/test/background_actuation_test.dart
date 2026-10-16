@@ -221,11 +221,12 @@ const _finderJson =
     '{"pid":42,"bundleId":"com.apple.finder","name":"Finder",'
     '"active":false,"hidden":false}';
 
-/// The plain text content of an isError tool result (not JSON).
+/// The plain text content of an isError tool result (not JSON) — the
+/// prose block; structured details ride as a second block (ADR 0003).
 String errorTextOf(Map<String, Object?>? response) =>
     (((response!['result'] as Map<String, Object?>)['content']
                 as List<Object?>)
-            .single as Map<String, Object?>)['text'] as String;
+            .first as Map<String, Object?>)['text'] as String;
 
 void main() {
   group('SessionRegistry.attachApp (ADR 0064 anchoring)', () {

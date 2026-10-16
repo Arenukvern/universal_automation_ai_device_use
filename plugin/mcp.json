@@ -6,7 +6,10 @@
         "serve",
         "--os"
       ],
-      "env": {}
+      "env": {
+        "UNIVERSAL_AUTOMATION_CDP": "",
+        "UNIVERSAL_AUTOMATION_WEBDRIVER": ""
+      }
     }
   }
 }

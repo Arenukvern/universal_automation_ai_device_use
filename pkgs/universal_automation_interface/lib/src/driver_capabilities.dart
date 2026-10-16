@@ -16,6 +16,7 @@ class DriverCapabilities {
     this.pointerCoordinates = false,
     this.semanticWrite = false,
     this.pidScopedEvents = false,
+    this.navigate = false,
   });
 
   /// The canonical all-features set.
@@ -29,6 +30,7 @@ class DriverCapabilities {
     pointerCoordinates: true,
     semanticWrite: true,
     pidScopedEvents: true,
+    navigate: true,
   );
 
   /// Attaching to an existing target is supported.
@@ -68,6 +70,11 @@ class DriverCapabilities {
   /// covered: they carry global screen coordinates.
   final bool pidScopedEvents;
 
+  /// `NavigateAction` succeeds: either the driver drives an instrumented
+  /// navigation surface, or it opens the URL in the system browser (an
+  /// untracked surface — ADR 0003). False means navigate refuses loudly.
+  final bool navigate;
+
   /// Serializes the capability set.
   Map<String, Object?> toJson() => {
     'attach': attach,
@@ -80,6 +87,7 @@ class DriverCapabilities {
     'pointerCoordinates': pointerCoordinates,
     'semanticWrite': semanticWrite,
     'pidScopedEvents': pidScopedEvents,
+    'navigate': navigate,
   };
 
   @override

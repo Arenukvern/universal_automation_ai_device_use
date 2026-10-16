@@ -43,31 +43,57 @@ final class ToolkitMcpServer {
     return copy;
   }
 
-  /// Creates a server; [defaultEndpoint] backs ad-hoc verbs when a tool
-  /// call carries no explicit endpoint, and [defaultTransport] selects
-  /// the tier those verbs attach to (`--os` serve flag → the desktop
-  /// accessibility tier). [factories] extends or replaces the built-in
+  /// Creates a server. [endpoints] is the per-transport endpoint
+  /// registry backing ad-hoc verbs (ADR 0003): explicit per-call
+  /// arguments win, then this registry, then [handlesDirectory] +
+  /// [browserHandle] (an oka-published handle artifact holding an
+  /// absolute URI — e.g. a moli `serve` CDP endpoint). [defaultEndpoint]
+  /// is the pre-ADR 0003 convenience: it seeds the cdp tier when
+  /// [endpoints] carries none. [defaultTransport] selects the tier
+  /// verbs attach to when a call passes neither `transport` nor
+  /// `endpoint`. [factories] extends or replaces the built-in
   /// per-transport drivers (the composition-root seam, e.g. the
   /// instrumented Flutter tier registered by mcp_flutter).
   /// [jobsDirectory] hosts the resident job plane's receipts (ADR 0064);
   /// `null` defaults to `~/.uatk/jobs`.
   ToolkitMcpServer({
     Uri? defaultEndpoint,
+    Map<AutomationTransport, Uri> endpoints = const {},
     AutomationTransport defaultTransport = AutomationTransport.cdp,
     Map<String, String> overrides = const {},
     Map<AutomationTransport, DriverFactory>? factories,
     String? jobsDirectory,
+    this.handlesDirectory,
+    this.browserHandle,
     PermissionGate? consentGate,
     this.consentOrigin = 'universal-automation-mcp',
-  }) : _defaultEndpoint = defaultEndpoint,
-       _defaultTransport = defaultTransport,
+  }) : _defaultTransport = defaultTransport,
+       _endpoints = {
+         if (defaultEndpoint != null)
+           AutomationTransport.cdp: defaultEndpoint,
+         ...endpoints,
+       },
        _overrides = overrides,
        _extraFactories = factories,
        _consentGate = consentGate,
        _jobsDirectory = jobsDirectory ?? _defaultJobsDirectory();
 
-  final Uri? _defaultEndpoint;
+  /// The tier a call attaches to when it names neither `transport` nor
+  /// `endpoint` (ADR 0003).
   final AutomationTransport _defaultTransport;
+
+  /// Per-transport endpoints: CLI flags > env > handle artifacts,
+  /// resolved by the composition root before the server exists.
+  final Map<AutomationTransport, Uri> _endpoints;
+
+  /// Directory of handle artifacts (`<handle>` files holding an
+  /// absolute endpoint URI), published by oka or any lifecycle owner.
+  final String? handlesDirectory;
+
+  /// Handle name backing the browser tier when no `--cdp` endpoint is
+  /// configured (ADR 0003's optional browser, e.g. a moli serve).
+  final String? browserHandle;
+
   final Map<String, String> _overrides;
   final Map<AutomationTransport, DriverFactory>? _extraFactories;
 
@@ -96,6 +122,7 @@ final class ToolkitMcpServer {
   JobQueue get _jobs => _jobQueue ??= JobQueue(
     directory: _jobsDirectory,
     factories: _extraFactories,
+    handlesDirectory: handlesDirectory,
   );
 
   SessionRegistry get _sessions {
@@ -165,6 +192,8 @@ final class ToolkitMcpServer {
           : _result(id, {
               'content': [
                 {'type': 'text', 'text': error.message},
+                if (error.details != null && error.details!.isNotEmpty)
+                  {'type': 'text', 'text': jsonEncode(error.details)},
               ],
               'isError': true,
             });
@@ -190,7 +219,14 @@ final class ToolkitMcpServer {
         'prompts': {'listChanged': true},
       },
       'serverInfo': mcpServerInfo,
-      'instructions': 'Universal automation toolkit. Honor list-changed notices and call tools/list, resources/list, and prompts/list again.',
+      'instructions':
+          'Universal automation toolkit (observe/act/verify). Call '
+          'automation_capabilities first: it reports which tiers this '
+          'server has configured, which verbs work where, and how the '
+          'browser tier is wired. Desktop tier (osAccessibility) works '
+          'immediately; navigate opens the system browser there. Honor '
+          'list-changed notices and call tools/list, resources/list, and '
+          'prompts/list again.',
     };
   }
 
@@ -216,14 +252,20 @@ final class ToolkitMcpServer {
         'automation_run_plan' => _runPlan(arguments),
         'automation_run_background' => _runBackground(arguments),
         'automation_job' => _jobStatus(arguments),
+        'automation_capabilities' => _capabilities(),
         _ => throw McpToolError('unknown tool: $name'),
       };
     } on FormatException catch (error) {
       throw McpToolError(error.message);
     } on AutomationException catch (error) {
       // Tool-level automation failures are results with isError, not
-      // protocol errors (MCP contract).
-      throw McpToolError('${error.kind}: ${error.message}');
+      // protocol errors (MCP contract). Details survive the boundary
+      // (ADR 0003): the prose block stays first, a JSON block carries
+      // kind + structured details (remedies, pids, violations).
+      throw McpToolError(
+        '${error.kind}: ${error.message}',
+        details: {'kind': error.kind, ...error.details},
+      );
     }
     // A screenshot with `image: true` rides as a second content block;
     // the reserved key never reaches the JSON text.
@@ -255,8 +297,11 @@ final class ToolkitMcpServer {
     return transport;
   }
 
-  Future<ResolvedSession> _session(Map<String, Object?> arguments) async {
-    final session = await _attachSession(arguments);
+  Future<ResolvedSession> _session(
+    Map<String, Object?> arguments, {
+    String? affinityVerb,
+  }) async {
+    final session = await _attachSession(arguments, affinityVerb: affinityVerb);
     final gate = _consentGate;
     if (gate == null) return session;
     return _ConsentSession(
@@ -270,17 +315,75 @@ final class ToolkitMcpServer {
     );
   }
 
-  Future<ResolvedSession> _attachSession(Map<String, Object?> arguments) async {
-    final transport =
-        parseTransport(arguments['transport']) ?? _defaultTransport;
+  /// The verbs that have no desktop-tier meaning (ADR 0003): when the
+  /// caller names none of `transport`/`endpoint`, the default tier is
+  /// the desktop, and a browser tier is configured, these attach to the
+  /// browser instead — and the tool result reports `routedTo`.
+  static const instrumentedAffinityVerbs = {'navigate', 'evaluate', 'invoke'};
+
+  /// The configured browser tier, cdp preferred (ADR 0003): the
+  /// endpoint registry first, then the `browserHandle` artifact under
+  /// [handlesDirectory] (an oka-published handle — the file holds an
+  /// absolute URI; the cdp tier is the default reading, matching moli
+  /// and debug-port endpoints).
+  ({AutomationTransport transport, Uri endpoint})? _configuredBrowser() {
+    final cdp = _endpoints[AutomationTransport.cdp];
+    if (cdp != null) return (transport: AutomationTransport.cdp, endpoint: cdp);
+    final handle = browserHandle;
+    final dir = handlesDirectory;
+    if (handle != null && dir != null) {
+      final artifact = File('$dir/$handle');
+      if (artifact.existsSync()) {
+        final value = artifact.readAsStringSync().trim();
+        final uri = value.isEmpty ? null : Uri.tryParse(value);
+        if (uri != null && uri.hasScheme) {
+          return (transport: AutomationTransport.cdp, endpoint: uri);
+        }
+      }
+    }
+    final webdriver = _endpoints[AutomationTransport.webdriver];
+    if (webdriver != null) {
+      return (transport: AutomationTransport.webdriver, endpoint: webdriver);
+    }
+    return null;
+  }
+
+  /// True when this call's arguments would affinity-route to the
+  /// browser tier (the same predicate [_attachSession] applies).
+  bool _willRouteToBrowser(Map<String, Object?> arguments, String? verb) =>
+      verb != null &&
+      instrumentedAffinityVerbs.contains(verb) &&
+      parseTransport(arguments['transport']) == null &&
+      arguments['endpoint'] == null &&
+      _defaultTransport == AutomationTransport.osAccessibility &&
+      _configuredBrowser() != null;
+
+  Future<ResolvedSession> _attachSession(
+    Map<String, Object?> arguments, {
+    String? affinityVerb,
+  }) async {
+    final transport = parseTransport(arguments['transport']);
     final endpointValue = arguments['endpoint'];
-    if (transport == AutomationTransport.osAccessibility) {
+    if (transport == null &&
+        endpointValue == null &&
+        affinityVerb != null &&
+        instrumentedAffinityVerbs.contains(affinityVerb) &&
+        _defaultTransport == AutomationTransport.osAccessibility) {
+      // ADR 0003 affinity routing: an instrumented-only verb on a
+      // desktop-default server follows the configured browser tier.
+      final browser = _configuredBrowser();
+      if (browser != null) {
+        return _sessions.attachUri(browser.endpoint, browser.transport);
+      }
+    }
+    final resolvedTransport = transport ?? _defaultTransport;
+    if (resolvedTransport == AutomationTransport.osAccessibility) {
       final app = arguments['app'];
       if (app is Map<Object?, Object?>) {
         // The ADR 0064 anchor: bind the named application, not focus.
         final pid = app['pid'];
         return _sessions.attachApp(
-          transport,
+          resolvedTransport,
           pid: pid is int ? pid : (pid is num ? pid.toInt() : null),
           bundleId: app['bundleId'] is String
               ? app['bundleId'] as String
@@ -290,7 +393,7 @@ final class ToolkitMcpServer {
       }
       if (endpointValue == null) {
         // No anchor: the desktop tier binds the focused application.
-        return _sessions.attachFocused(transport);
+        return _sessions.attachFocused(resolvedTransport);
       }
     }
     Uri? uri;
@@ -300,14 +403,21 @@ final class ToolkitMcpServer {
         throw McpToolError('endpoint must be an absolute URI: $endpointValue');
       }
     }
-    uri ??= _defaultEndpoint;
+    uri ??= _endpoints[resolvedTransport];
     if (uri == null) {
-      throw const McpToolError(
-        'no endpoint: start serve with --cdp <uri> or --os (desktop '
-        'tier), or pass "endpoint"/"transport" per call',
+      throw McpToolError(
+        'no endpoint for transport "${resolvedTransport.name}": start '
+        'serve with --cdp/--webdriver/--os, set env '
+        'UNIVERSAL_AUTOMATION_CDP (or --browser-handle for an '
+        'oka-published browser), or pass "endpoint"/"transport" per '
+        'call — automation_capabilities reports what this server sees',
+        details: {
+          'transport': resolvedTransport.name,
+          'remedy': 'configure the tier or pass endpoint per call',
+        },
       );
     }
-    return _sessions.attachUri(uri, transport);
+    return _sessions.attachUri(uri, resolvedTransport);
   }
 
   Future<Map<String, Object?>> _observe(Map<String, Object?> arguments) async {
@@ -315,7 +425,7 @@ final class ToolkitMcpServer {
     final snapshot = await session.driver.snapshot();
     final base = {
       'endpoint':
-          '${session.binding.resolveUri(_overrides) ?? _defaultEndpoint}',
+          '${session.binding.resolveUri(_overrides) ?? _endpoints[session.binding.transport]}',
       'transport': session.binding.transport.name,
       'url': session.url?.toString(),
     };
@@ -452,13 +562,39 @@ final class ToolkitMcpServer {
         throw McpToolError('unknown action: $action');
     }
     final automationAction = ActStep.actionFromJson(actionBody);
-    final session = await _session(arguments);
+    // Affinity routing receipt (ADR 0003): computed before attach so
+    // the payload can name the reroute honestly.
+    final routedBrowser = _willRouteToBrowser(arguments, action)
+        ? _configuredBrowser()
+        : null;
+    final session = await _session(arguments, affinityVerb: action);
     final profileName = arguments['profile'];
     Map<String, Object?> payload;
     if (profileName == null) {
       payload = {
         ...await _performWithLadder(session, automationAction, arguments),
         'action': action,
+        if (routedBrowser != null)
+          'routedTo': {
+            'transport': routedBrowser.transport.name,
+            'endpoint': '${routedBrowser.endpoint}',
+            'reason':
+                '"$action" has no desktop-tier surface; attached the '
+                'configured browser tier (override per call with '
+                '"transport"/"endpoint")',
+          },
+        if (action == 'navigate' &&
+            session.binding.transport == AutomationTransport.osAccessibility)
+          'navigate': {
+            'surface': 'systemBrowser',
+            'drivable': false,
+            'hint':
+                'the URL opened in the OS default browser — an untracked '
+                'surface. Observe it: automation_list_apps + app:{pid} '
+                'anchor. Drive it: attach a browser tier (serve --cdp, '
+                'env UNIVERSAL_AUTOMATION_CDP, or --browser-handle) and '
+                'navigate routes there automatically.',
+          },
       };
     } else {
       final behavioral = session.asBehavioral();
@@ -748,6 +884,134 @@ final class ToolkitMcpServer {
     return job.toJson();
   }
 
+  /// The self-description surface (ADR 0003): what tiers this server
+  /// sees, which verbs work where, how the browser tier is configured.
+  /// Read-only, attaches nothing, prompts no TCC consent. The one call
+  /// that replaces capability discovery by trial-and-error.
+  Future<Map<String, Object?>> _capabilities() async {
+    final browser = _configuredBrowser();
+    final cdp = _endpoints[AutomationTransport.cdp];
+    String? handleEndpoint;
+    if (cdp == null && browserHandle != null && handlesDirectory != null) {
+      handleEndpoint = browser?.endpoint.toString();
+    }
+    return {
+      'serve': {
+        'defaultTransport': _defaultTransport.name,
+        'platform': Platform.operatingSystem,
+        'affinity':
+            'instrumented-only verbs (${instrumentedAffinityVerbs.join(", ")}) '
+            'attach to the configured browser tier when the default is '
+            'the desktop tier; override per call with transport/endpoint',
+      },
+      'tiers': {
+        'cdp': await _tierRecord(
+          AutomationTransport.cdp,
+          probePath: '/json/version',
+          browserField: 'Browser',
+        ),
+        'webdriver': await _tierRecord(
+          AutomationTransport.webdriver,
+          probePath: '/status',
+        ),
+        'osAccessibility': {
+          'endpointFree': true,
+          'verbs': [
+            'observe',
+            'click',
+            'setValue',
+            'elementAction',
+            'clickAt',
+            'moveTo',
+            'drag',
+            'type',
+            'key',
+            'scroll',
+            'navigate (opens the system browser — untracked)',
+            'screenshot',
+            'listApps',
+            'listWindows',
+          ],
+          'refuses': ['evaluate', 'invoke'],
+        },
+      },
+      'routing': {
+        'instrumentedAffinityVerbs': instrumentedAffinityVerbs.toList(),
+        'browserTierConfigured': browser != null,
+        if (browser != null)
+          'browserTier': {
+            'transport': browser.transport.name,
+            'endpoint': '${browser.endpoint}',
+          },
+      },
+      'openUrl': {
+        'supported': Platform.isMacOS || Platform.isLinux || Platform.isWindows,
+        'schemes': systemOpenUrlSchemes.toList(),
+      },
+      if (browserHandle != null || handlesDirectory != null)
+        'handles': {
+          if (handlesDirectory != null) 'dir': handlesDirectory,
+          if (browserHandle != null) 'browserHandle': browserHandle,
+          if (handleEndpoint != null) 'resolvedEndpoint': handleEndpoint,
+        },
+      'coldStart':
+          'Desktop tier works immediately (macOS AX needs the '
+          'Accessibility TCC grant for the host process). For a drivable '
+          'browser: start one with a debug port (e.g. chromium '
+          '--remote-debugging-port=9222, or moli serve) and configure '
+          'it via --cdp, env UNIVERSAL_AUTOMATION_CDP, or '
+          '--handles-dir + --browser-handle.',
+    };
+  }
+
+  /// One tier's configuration + liveness record. The probe is a single
+  /// short GET (2 s); an unreachable endpoint is an honest fact, not an
+  /// error — the tier simply cannot be attached until it answers.
+  Future<Map<String, Object?>> _tierRecord(
+    AutomationTransport transport, {
+    required String probePath,
+    String? browserField,
+  }) async {
+    final endpoint = _endpoints[transport];
+    if (endpoint == null) return {'configured': false};
+    Map<String, Object?> probe;
+    try {
+      final client = HttpClient()..connectionTimeout = const Duration(
+        seconds: 2,
+      );
+      try {
+        final request = await client
+            .getUrl(endpoint.replace(path: probePath))
+            .timeout(const Duration(seconds: 2));
+        final response = await request.close().timeout(
+          const Duration(seconds: 2),
+        );
+        final body = await utf8.decoder.bind(response).join();
+        probe = {
+          'reachable': response.statusCode == 200,
+          'status': response.statusCode,
+          if (response.statusCode == 200 && browserField != null)
+            ...() {
+              try {
+                final decoded = jsonDecode(body);
+                final browserName = decoded is Map<Object?, Object?>
+                    ? decoded[browserField]
+                    : null;
+                return {if (browserName != null) 'browser': '$browserName'};
+              } on FormatException {
+                return const <String, Object?>{};
+              }
+            }(),
+        };
+      } finally {
+        client.close(force: true);
+      }
+    } on Object catch (error) {
+      probe = {'reachable': false, 'error': '$error'};
+    }
+    return {'configured': true, 'endpoint': '$endpoint', 'probe': probe};
+  }
+
   /// The tool descriptors (name, description, JSON Schema input).
   static List<Map<String, Object?>> toolDescriptors() {
     final transportOverride = {
@@ -837,10 +1101,15 @@ final class ToolkitMcpServer {
             'background applications — prefer them over type/key for text '
             'and confirmations. Global-event verbs on a background target '
             'refuse with foregroundRequired unless foreground: true (then '
-            'the anchor is activated and the retry recorded). Optional '
-            'behavior profile dispatches with ADR 0044 dynamics (event-stream '
-            'verbs only). returnState attaches the post-action state render '
-            '— the act loop\'s closing read in one call.',
+            'the anchor is activated and the retry recorded). Tier notes: '
+            'navigate/evaluate/invoke have no desktop-tier surface — on an '
+            'osAccessibility server they affinity-route to a configured '
+            'browser tier (routedTo says so); with none configured navigate '
+            'opens the OS default browser (untracked surface) and '
+            'evaluate/invoke refuse. Optional behavior profile dispatches '
+            'with ADR 0044 dynamics (event-stream verbs only). returnState '
+            'attaches the post-action state render — the act loop\'s '
+            'closing read in one call.',
         {
           'type': 'object',
           'required': ['action'],
@@ -862,7 +1131,12 @@ final class ToolkitMcpServer {
                 'invoke',
               ],
             },
-            'url': {'type': 'string'},
+            'url': {
+              'type': 'string',
+              'description':
+                  'navigate: absolute URL (desktop tier opens it in the '
+                  'system browser; schemes http/https/file/mailto only)',
+            },
             'css': {'type': 'string'},
             'role': {'type': 'string'},
             'text': {'type': 'string'},
@@ -1068,6 +1342,18 @@ final class ToolkitMcpServer {
         },
       ),
       tool(
+        'automation_capabilities',
+        'Report what this server can reach before any attach: the default '
+            'transport, per-tier endpoints with a short reachability probe '
+            '(cdp /json/version, webdriver /status), the desktop tier\'s '
+            'verb set (navigate opens the system browser there), the '
+            'instrumented-affinity routing set (navigate/evaluate/invoke '
+            'follow a configured browser tier), open-url scheme allowlist, '
+            'and handle configuration. Read-only; call this first when '
+            'unsure which tier a verb will take.',
+        {'type': 'object', 'properties': <String, Object?>{}},
+      ),
+      tool(
         'automation_job',
         'One background job\'s record: status (queued|running|succeeded|'
             'failed) while in flight, the full run report when done. Reads '
@@ -1098,11 +1384,15 @@ final class ToolkitMcpServer {
 
 /// A tool-level failure surfaced as an MCP result with `isError: true`.
 class McpToolError implements Exception {
-  /// Creates the error.
-  const McpToolError(this.message);
+  /// Creates the error. [details] rides as a second JSON content block
+  /// (ADR 0003) so agents get machine-readable remedies, not just prose.
+  const McpToolError(this.message, {this.details});
 
   /// Human-readable message.
   final String message;
+
+  /// Structured details (kind, remedy, locator, …); may be empty.
+  final Map<String, Object?>? details;
 
   @override
   String toString() => message;
@@ -1112,15 +1402,21 @@ class McpToolError implements Exception {
 /// writes responses to [stdout]. Returns when stdin closes.
 Future<void> serveMcpStdio({
   Uri? defaultEndpoint,
+  Map<AutomationTransport, Uri> endpoints = const {},
   AutomationTransport defaultTransport = AutomationTransport.cdp,
   Map<String, String> overrides = const {},
   String? jobsDirectory,
+  String? handlesDirectory,
+  String? browserHandle,
 }) async {
   final server = ToolkitMcpServer(
     defaultEndpoint: defaultEndpoint,
+    endpoints: endpoints,
     defaultTransport: defaultTransport,
     overrides: overrides,
     jobsDirectory: jobsDirectory,
+    handlesDirectory: handlesDirectory,
+    browserHandle: browserHandle,
   );
   final lines = stdin.transform(utf8.decoder).transform(const LineSplitter());
   await for (final line in lines) {
@@ -1173,15 +1469,21 @@ Future<void> serveMcpStdio({
 Future<HttpServer> startMcpHttp({
   required int port,
   Uri? defaultEndpoint,
+  Map<AutomationTransport, Uri> endpoints = const {},
   AutomationTransport defaultTransport = AutomationTransport.cdp,
   Map<String, String> overrides = const {},
   String? jobsDirectory,
+  String? handlesDirectory,
+  String? browserHandle,
 }) async {
   final server = ToolkitMcpServer(
     defaultEndpoint: defaultEndpoint,
+    endpoints: endpoints,
     defaultTransport: defaultTransport,
     overrides: overrides,
     jobsDirectory: jobsDirectory,
+    handlesDirectory: handlesDirectory,
+    browserHandle: browserHandle,
   );
   final httpServer = await HttpServer.bind(InternetAddress.loopbackIPv4, port);
   httpServer.listen((request) => _handleHttpMessage(server, request));

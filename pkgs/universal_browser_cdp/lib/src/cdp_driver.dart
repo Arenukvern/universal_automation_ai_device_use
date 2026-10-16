@@ -39,6 +39,7 @@ class CdpDriver
     evaluate: true,
     pointerCoordinates: true,
     semanticWrite: true,
+    navigate: true,
   );
 
   /// The underlying page facade (screencast sources attach through it).
@@ -66,6 +67,9 @@ class CdpDriver
   Future<void> perform(AutomationAction action) async {
     switch (action) {
       case NavigateAction(:final url):
+        // ADR 0003: the scheme allowlist binds NavigateAction on every
+        // tier, protocol ones included.
+        validateOpenableUrl(url);
         await _page.navigate(url);
       case ClickAction(:final css, :final role, :final name):
         if (css != null) {

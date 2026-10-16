@@ -17,8 +17,11 @@ import 'uia_sidecar_client.dart';
 /// (typed exception, no dlopen attempt), matching the family rule that
 /// unsupported surfaces fail loudly, never silently.
 class UiaDriver implements AutomationDriver {
-  /// Creates a driver over a connected [client].
-  UiaDriver(this.client);
+  /// Creates a driver over a connected [client]. [openUrl] is the
+  /// system-browser navigation seam (ADR 0003); tests inject a
+  /// recording no-op.
+  UiaDriver(this.client, {Future<void> Function(Uri url)? openUrl})
+    : _openUrl = openUrl ?? openUrlViaSystem;
 
   /// Convenience: connects to the sidecar [binary] (or `XS_UIA_SIDECAR`)
   /// and hands back a ready driver. Refuses off Windows.
@@ -39,12 +42,16 @@ class UiaDriver implements AutomationDriver {
 
   /// The underlying sidecar client.
   final UiaSidecarClient client;
+
+  /// The system-browser navigation seam (ADR 0003).
+  final Future<void> Function(Uri url) _openUrl;
   bool _closed = false;
 
   @override
   DriverCapabilities get capabilities => const DriverCapabilities(
         a11yTree: true,
         inputSynthesis: true,
+        navigate: true,
       );
 
   @override
@@ -75,9 +82,10 @@ class UiaDriver implements AutomationDriver {
         }
         await client.request('invoke', {'name': name});
       case NavigateAction(:final url):
-        throw DriverUnsupportedException(
-          'UIA has no navigation surface (target: $url)',
-        );
+        // ADR 0003: hand the URL to the OS default handler (untracked
+        // surface) instead of refusing.
+        validateOpenableUrl(url);
+        await _openUrl(url);
       case TypeAction(:final text):
         throw DriverUnsupportedException(
           'typing ${text.length} chars needs ValuePattern support, '

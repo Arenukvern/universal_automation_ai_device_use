@@ -43,8 +43,10 @@ class SpecViolationException extends AutomationException {
 /// A driver was asked to perform something its capability set excludes.
 @immutable
 class DriverUnsupportedException extends AutomationException {
-  /// Creates the exception.
-  const DriverUnsupportedException(super.message);
+  /// Creates the exception. [details] should carry a machine-readable
+  /// `remedy` when one exists (ADR 0003): refusals name the route out
+  /// (configure a tier, use another verb) instead of dead-ending.
+  const DriverUnsupportedException(super.message, {super.details});
 
   @override
   String get kind => 'driverUnsupported';

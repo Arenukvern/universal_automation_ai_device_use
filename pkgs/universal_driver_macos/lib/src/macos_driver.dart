@@ -81,16 +81,23 @@ class MacosDriver implements AutomationDriver {
     this.targetPid,
     this.snapshotDepth = 12,
     this.snapshotMaxNodes = 600,
+    Future<void> Function(Uri url)? openUrl,
   }) : bridge = bridge ?? NativeAxDriverBridge(),
        // An anchored session observes its target by construction — the
        // focus contract has a reference point before the first walk.
-       _observedPid = targetPid;
+       _observedPid = targetPid,
+       _openUrl = openUrl ?? openUrlViaSystem;
 
   /// The native bridge seam.
   final AxDriverBridge bridge;
 
   /// The application every observation binds (`null` = focused app).
   final int? targetPid;
+
+  /// The system-browser navigation seam (ADR 0003): `NavigateAction`
+  /// hands the URL to the OS handler — an untracked surface. Tests
+  /// inject a recording no-op; production uses [openUrlViaSystem].
+  final Future<void> Function(Uri url) _openUrl;
 
   /// Maximum tree depth per snapshot.
   final int snapshotDepth;
@@ -155,6 +162,7 @@ class MacosDriver implements AutomationDriver {
     pointerCoordinates: true,
     semanticWrite: true,
     pidScopedEvents: true,
+    navigate: true,
   );
 
   /// When the last snapshot was taken — the reference point for the
@@ -428,19 +436,31 @@ class MacosDriver implements AutomationDriver {
         await ensureForeground(action);
         await _scroll(direction, distance);
       case NavigateAction(:final url):
-        throw DriverUnsupportedException(
-          'AX has no navigation surface (target: $url); navigation is a '
-          'browser-protocol capability',
-        );
+        // ADR 0003: no AX navigation surface exists, so navigate hands
+        // the URL to the OS default handler instead of refusing. The
+        // opened browser is untracked — observe it by anchoring the
+        // browser app, drive it through a CDP session.
+        validateOpenableUrl(url);
+        await _openUrl(url);
       case EvaluateAction(:final expression):
         throw DriverUnsupportedException(
           'AX cannot evaluate expressions (${expression.length} chars); '
           'evaluation is an instrumented-tier capability',
+          details: const {
+            'remedy': 'configure a browser tier (serve --cdp, env '
+                'UNIVERSAL_AUTOMATION_CDP, or --browser-handle) and '
+                're-send with transport "cdp"',
+          },
         );
       case InvokeAction(:final name):
         throw DriverUnsupportedException(
           'the AX tier has no surface action registry; '
           'InvokeAction("$name") needs the instrumented or CDP tier',
+          details: const {
+            'remedy': 'use elementAction for AX-advertised actions, or '
+                'configure a browser tier (serve --cdp, env '
+                'UNIVERSAL_AUTOMATION_CDP, or --browser-handle)',
+          },
         );
       case SetValueAction(:final value, :final css, :final role, :final name):
         if (css != null) {
