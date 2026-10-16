@@ -3,7 +3,7 @@
 Visual identity for **universal automation device use**: multiple device classes
 (desktop, mobile, embedded) unified by composable blocks, with warm dawn tones
 and abstract **human + agent** figures collaborating (hopeful, not dystopian).
-Aligns with [VISION.md](../VISION.md).
+Aligns with [NORTH_STAR.mdx](../NORTH_STAR.mdx). Horizon easter egg: fellow travelers in `assets/svg/banner.svg`.
 
 | Asset | Path |
 | --- | --- |

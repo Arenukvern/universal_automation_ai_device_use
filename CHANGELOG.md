@@ -6,7 +6,7 @@ Workspace-level notes. Per-package changelogs live under `pkgs/*/CHANGELOG.md`.
 
 - Scrubbed maintainer paths from `pkgs/universal_driver_macos/validation/**`
   (neutral `REPO_ROOT` / `DOGFOOD_*` placeholders).
-- Added brand banner and icon under `docs/brand/` and [docs/VISION.md](docs/VISION.md).
+- Added brand banner and icon under `docs/brand/` and charter [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx).
 - **OSS release prep:** repository renamed to
   `Arenukvern/universal_automation_ai_device_use`; README, CONTRIBUTING,
   CODE_OF_CONDUCT, GitHub Actions validate workflow, and package metadata

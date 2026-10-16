@@ -4,7 +4,7 @@ Thanks for helping improve **universal automation** device-use packages. This
 repository follows the same stewardship pattern as
 [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) and
 [`skill_steward`](https://github.com/Arenukvern/skill_steward): charter in
-[AGENTS.md](AGENTS.md), durable decisions in [docs/decisions/](docs/decisions/),
+[docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) and [AGENTS.md](AGENTS.md), durable decisions in [docs/decisions/](docs/decisions/),
 and a native validation gate in [steward.yaml](steward.yaml).
 
 ## Local loop

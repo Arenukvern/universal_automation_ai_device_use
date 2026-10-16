@@ -15,11 +15,7 @@ with **consent, receipts, and honest proof** — not unattended takeover of user
 devices. Dart contracts, platform drivers, capture/WebRTC plumbing, lexicon
 packs, plus an MCP + CLI toolkit.
 
-## Vision and principles
-
-Short orientation (sourced from this repo, SECURITY, and sibling stewardship
-repos): [docs/VISION.md](docs/VISION.md). Brand assets:
-[docs/brand/](docs/brand/).
+**Charter:** [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) · **Decisions:** [docs/decisions/](docs/decisions/) · [AGENTS.md](AGENTS.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) · **Brand:** [docs/brand/](docs/brand/)
 
 **Repository:** https://github.com/Arenukvern/universal_automation_ai_device_use  
 **Sibling storage product:** [`universal_storage`](https://github.com/Arenukvern/universal_storage)  

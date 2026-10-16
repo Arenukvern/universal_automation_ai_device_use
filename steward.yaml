@@ -44,7 +44,7 @@ stewardship:
   review_handoff:
     moe_required_for_architecture: true
   strategic_alignment:
-    vision_source: AGENTS.md
+    vision_source: docs/NORTH_STAR.mdx
     success_evidence: required
   security:
     action_effects: required
@@ -54,7 +54,7 @@ stewardship:
 
 docs:
   "ADR index": docs/decisions/README.md
-  "Vision": docs/VISION.md
+  "North Star": docs/NORTH_STAR.mdx
   "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.md
   "Contributing": CONTRIBUTING.md
   "Security": SECURITY.md
