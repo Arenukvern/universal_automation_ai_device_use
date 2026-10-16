@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Universal automation icon">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a5f"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <linearGradient id="warm" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#fbbf24"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="48" fill="url(#bg)"/>
+  <circle cx="200" cy="56" r="28" fill="#fbbf24" opacity="0.4"/>
+  <g fill="none" stroke="url(#warm)" stroke-width="2.5">
+    <rect x="40" y="48" width="44" height="44" rx="8"/>
+    <rect x="92" y="48" width="44" height="44" rx="8"/>
+    <rect x="144" y="48" width="44" height="44" rx="8"/>
+    <rect x="66" y="100" width="96" height="44" rx="8"/>
+  </g>
+  <g>
+    <circle cx="88" cy="168" r="14" fill="#fde68a"/>
+    <circle cx="128" cy="168" r="12" fill="#bae6fd" stroke="#38bdf8" stroke-width="2"/>
+    <path d="M102 168h14" stroke="#f8fafc" stroke-width="2" stroke-linecap="round"/>
+  </g>
+  <g fill="#e2e8f0" opacity="0.9">
+    <rect x="168" y="152" width="48" height="32" rx="4"/>
+    <rect x="176" y="192" width="20" height="36" rx="4"/>
+  </g>
+</svg>

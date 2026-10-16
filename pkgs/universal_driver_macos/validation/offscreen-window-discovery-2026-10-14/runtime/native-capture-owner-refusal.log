@@ -1,7 +1,7 @@
 
 Running build hooks...Running build hooks...Unhandled exception:
 Bad state: Expected one addressed normal window for PID 38673 (windowId=2318); got []; observed windows: []
-#0      captureOwnedNativeWindow (file:///Users/antonio/xs/ecsly/tool/visualization_dogfood/native_capture/bin/native_window_capture.dart:25:7)
+#0      captureOwnedNativeWindow (file://DOGFOOD_WORKSPACE/visualization_dogfood/native_capture/bin/native_window_capture.dart:25:7)
 <asynchronous suspension>
-#1      main (file:///Users/antonio/xs/ecsly/tool/visualization_dogfood/native_capture/bin/native_capture.dart:10:17)
+#1      main (file://DOGFOOD_WORKSPACE/visualization_dogfood/native_capture/bin/native_capture.dart:10:17)
 <asynchronous suspension>

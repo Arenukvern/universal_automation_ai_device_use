@@ -54,6 +54,7 @@ stewardship:
 
 docs:
   "ADR index": docs/decisions/README.md
+  "Vision": docs/VISION.md
   "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.md
   "Contributing": CONTRIBUTING.md
   "Security": SECURITY.md

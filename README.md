@@ -1,11 +1,24 @@
 # universal_automation_ai_device_use
 
-**Observe / act / verify automation for AI agents** — Dart contracts, OS and browser
-drivers, capture/WebRTC plumbing, lexicon packs, plus an MCP + CLI toolkit.
-
 [![maintained with Skill Steward](https://raw.githubusercontent.com/Arenukvern/skill_steward/main/docs/brand/assets/svg/badge-light.svg)](https://github.com/Arenukvern/skill_steward)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Validate](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml)
+
+![Open devices to people and agents with care — composable automation across device classes](docs/brand/assets/png/banner-16x9.png)
+
+**Make every device class legible to humans and AI agents** through one
+**declarative, compositional** observe / act / verify surface — desktop and
+laptop, phones and tablets, browsers, and the tiers you add next. The aim is an
+**optimistic, humane** future: people and agents collaborating on real software
+with **consent, receipts, and honest proof** — not unattended takeover of user
+devices. Dart contracts, platform drivers, capture/WebRTC plumbing, lexicon
+packs, plus an MCP + CLI toolkit.
+
+## Vision and principles
+
+Short orientation (sourced from this repo, SECURITY, and sibling stewardship
+repos): [docs/VISION.md](docs/VISION.md). Brand assets:
+[docs/brand/](docs/brand/).
 
 **Repository:** https://github.com/Arenukvern/universal_automation_ai_device_use  
 **Sibling storage product:** [`universal_storage`](https://github.com/Arenukvern/universal_storage)  

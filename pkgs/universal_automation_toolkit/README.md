@@ -119,8 +119,8 @@ it; the refusal names the rung. `serve` also hosts the resident job
 plane: `automation_run_background` submits a plan and detaches, and
 `automation_job` polls the durable receipt (default `~/.uatk/jobs`,
 `--jobs-dir` to move it). Residency is deployment, not protocol: the
-serve is kept up by oka supervisor convergence — the harness lane exe
-(`~/xs/ecsai_harness/.dart_tool/uatk/serve-lane.exe`, built by
+serve is kept up by oka supervisor convergence — a deployment-specific
+serve-lane executable (built by your harness checkout’s
 `tool/build_uatk_lane.dart`) spawns this AOT bundle on converge,
 restarts it within budget, does nothing when already converged, and
 `--reload` rebuilds + replaces it (the AOT live-reload verb). Clients

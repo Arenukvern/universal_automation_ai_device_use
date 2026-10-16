@@ -67,7 +67,7 @@ Skills are installed locally under `.agents/skills/`. You can view them using:
 - `steward list`
 
 For more information on the project charter and decisions:
-- Read [NORTH_STAR.mdx](docs/NORTH_STAR.mdx) (if present)
+- Read [docs/VISION.md](docs/VISION.md) (vision and ethics orientation)
 - Read [ADR Index](docs/decisions/README) (if present)
 
 <!-- codemap-index:start -->

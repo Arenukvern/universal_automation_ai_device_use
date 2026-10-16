@@ -3,7 +3,7 @@
 
   ],
   "afterPid" : 22839,
-  "appPath" : "\/Users\/antonio\/xs\/ecsly\/tool\/visualization_dogfood\/output\/canvas-native-toolkit-consumer-2026-10-13\/build\/macos\/Build\/Products\/Debug\/ecsly_visualization_studio.app",
+  "appPath" : "DOGFOOD_APP_PATH/ExampleConsumer.app",
   "baselinePid" : 22839,
   "completed" : true,
   "desktopReady" : true,
