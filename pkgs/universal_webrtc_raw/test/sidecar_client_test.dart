@@ -9,7 +9,6 @@ import 'package:universal_webrtc_raw/universal_webrtc_raw.dart';
 class FakeSidecarTransport implements SidecarTransport {
   final _controller = StreamController<String>.broadcast();
   final List<String> written = [];
-  int _id = 0;
 
   /// When set, the next request is answered with this error text.
   String? failNext;
@@ -35,7 +34,6 @@ class FakeSidecarTransport implements SidecarTransport {
     }
     switch (op) {
       case 'send_frame':
-        _id++;
         emitLine(
           jsonEncode({
             'event': 'frame',
@@ -52,7 +50,6 @@ class FakeSidecarTransport implements SidecarTransport {
           }),
         );
       default:
-        _id++;
         emitLine(
           jsonEncode({
             'id': id,
