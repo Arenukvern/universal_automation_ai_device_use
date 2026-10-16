@@ -1,0 +1,22 @@
+# Universal Automation Device Use
+
+> Composable observe/act/verify automation for people and agents across device tiers.
+
+## Docs (docs.page)
+
+- https://docs.page/arenukvern/universal_automation_ai_device_use
+- https://docs.page/arenukvern/universal_automation_ai_device_use/NORTH_STAR
+- https://docs.page/arenukvern/universal_automation_ai_device_use/start_here/docs_map
+- https://docs.page/arenukvern/universal_automation_ai_device_use/contributing/contribution_guide
+
+## GitHub
+
+- https://github.com/Arenukvern/universal_automation_ai_device_use
+- https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md
+- https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md
+- https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_automation_toolkit
+
+## Siblings
+
+- https://github.com/Arenukvern/mcp_flutter
+- https://github.com/Arenukvern/skill_steward

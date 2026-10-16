@@ -1,6 +1,6 @@
 schema: steward/v1
 repo:
-  id: ai_computer_use_universal_automation
+  id: universal_automation_ai_device_use
   archetype: library
   archetype_detection:
     confidence: 1.0
@@ -15,7 +15,7 @@ harness:
 
 adoption:
   status: adopting
-  owner: ai_computer_use_universal_automation
+  owner: universal_automation_ai_device_use
   gate:
     pillar: quality
 
@@ -44,7 +44,7 @@ stewardship:
   review_handoff:
     moe_required_for_architecture: true
   strategic_alignment:
-    vision_source: AGENTS.md
+    vision_source: docs/NORTH_STAR.mdx
     success_evidence: required
   security:
     action_effects: required
@@ -54,7 +54,9 @@ stewardship:
 
 docs:
   "ADR index": docs/decisions/README.md
-  "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.md
+  "North Star": docs/NORTH_STAR.mdx
+  "Docs (docs.page)": docs/contributing/enable_docs_page.mdx
+  "Drivers extract": docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx
   "Contributing": CONTRIBUTING.md
   "Security": SECURITY.md
 

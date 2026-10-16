@@ -20,7 +20,7 @@ void main() {
       const {'hello': 0.7, 'help': 0.75, 'here': 0.8},
     );
     final lexicon = LexiconPack(bytes).toLexicon();
-    expect(lexicon.prefixCandidates('he').map((final m) => m.word), [
+    expect(lexicon.prefixCandidates('he').map((m) => m.word), [
       'here',
       'help',
       'hello',

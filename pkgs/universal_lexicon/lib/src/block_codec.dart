@@ -6,6 +6,6 @@
 /// [BlockCodec] into both the builder and the reader, as long as both
 /// sides agree.
 abstract interface class BlockCodec {
-  List<int> encode(final List<int> bytes);
-  List<int> decode(final List<int> bytes);
+  List<int> encode(List<int> bytes);
+  List<int> decode(List<int> bytes);
 }

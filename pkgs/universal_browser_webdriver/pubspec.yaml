@@ -3,10 +3,10 @@ description: >-
   Pure-Dart W3C WebDriver client with a safaridriver endpoint adapter for
   Safari automation. No Java, no Node, no Selenium grid.
 version: 0.1.1
-homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
-repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
-issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
-documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_browser_webdriver
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_browser_webdriver
 
 environment:
   sdk: ^3.13.0

@@ -29,7 +29,7 @@ const int definitionPackHeaderLength = 24;
 const int definitionPackEntriesPerBlock = 64;
 
 /// FNV-1a 32-bit over the UTF-8 bytes of the lowercased word.
-int definitionWordHash(final String word) {
+int definitionWordHash(String word) {
   var hash = 0x811C9DC5;
   for (final byte in utf8.encode(word.toLowerCase())) {
     hash ^= byte;
@@ -42,9 +42,9 @@ int definitionWordHash(final String word) {
 /// the caller can patch `indexOffset` (u64 at byte 16) once the data
 /// section length is known.
 ByteData writeDefinitionPackHeader(
-  final BytesBuilder sink, {
-  required final int blockCount,
-  required final int entryCount,
+  BytesBuilder sink, {
+  required int blockCount,
+  required int entryCount,
 }) {
   final header = ByteData(definitionPackHeaderLength)
     ..setUint8(0, definitionPackMagic[0])

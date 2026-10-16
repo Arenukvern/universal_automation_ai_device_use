@@ -10,15 +10,15 @@ import 'lexicon.dart';
 /// deduplicated on construction; missing frequencies rank as 0.
 final class ListLexicon implements Lexicon {
   ListLexicon({
-    required final Iterable<String> words,
-    final Map<String, double> frequencies = const <String, double>{},
+    required Iterable<String> words,
+    Map<String, double> frequencies = const <String, double>{},
   }) : _words = _normalize(words),
        _frequencies = Map<String, double>.of(frequencies);
 
   final List<String> _words;
   final Map<String, double> _frequencies;
 
-  static List<String> _normalize(final Iterable<String> input) {
+  static List<String> _normalize(Iterable<String> input) {
     final set = <String>{for (final word in input) word.toLowerCase()};
     final list = set.toList(growable: false)..sort();
     return list;
@@ -31,7 +31,7 @@ final class ListLexicon implements Lexicon {
   int get wordCount => _words.length;
 
   @override
-  bool contains(final String word) {
+  bool contains(String word) {
     final probe = word.toLowerCase();
     var lo = 0;
     var hi = _words.length - 1;
@@ -49,13 +49,12 @@ final class ListLexicon implements Lexicon {
   }
 
   @override
-  double frequencyOf(final String word) =>
+  double frequencyOf(String word) =>
       _frequencies[word.toLowerCase()] ?? 0.0;
 
   @override
   List<LexiconMatch> prefixCandidates(
-    final String prefix, {
-    final int limit = 3,
+    String prefix, {int limit = 3,
   }) {
     if (limit <= 0) return const <LexiconMatch>[];
     final probe = prefix.toLowerCase();
@@ -78,9 +77,8 @@ final class ListLexicon implements Lexicon {
 
   @override
   List<LexiconMatch> fuzzyPrefixCandidates(
-    final String prefix, {
-    final int limit = 3,
-    final int maxDistance = 1,
+    String prefix, {int limit = 3,
+    int maxDistance = 1,
   }) {
     if (limit <= 0 || prefix.isEmpty) return const <LexiconMatch>[];
     final probe = prefix.toLowerCase();
@@ -100,14 +98,14 @@ final class ListLexicon implements Lexicon {
     if (scored.isEmpty) return const <LexiconMatch>[];
     // Distance first (a near-exact head outranks a rough one), then the
     // family's frequency ranking.
-    scored.sort((final a, final b) {
+    scored.sort((a, b) {
       final byDistance = a.$1.compareTo(b.$1);
       if (byDistance != 0) return byDistance;
       final byFrequency = b.$2.frequency.compareTo(a.$2.frequency);
       if (byFrequency != 0) return byFrequency;
       return a.$2.word.length.compareTo(b.$2.word.length);
     });
-    return scored.take(limit).map((final entry) => entry.$2).toList(
+    return scored.take(limit).map((entry) => entry.$2).toList(
       growable: false,
     );
   }
@@ -116,12 +114,12 @@ final class ListLexicon implements Lexicon {
   /// exceeds [cap] — the scan runs over the whole dictionary, so the
   /// bound is what keeps a 50k-word commit at one-shot latency.
   static int _boundedEditDistance(
-    final String a,
-    final String b,
-    final int cap,
+    String a,
+    String b,
+    int cap,
   ) {
     if (a == b) return 0;
-    var previous = List<int>.generate(b.length + 1, (final i) => i);
+    var previous = List<int>.generate(b.length + 1, (i) => i);
     for (var i = 1; i <= a.length; i++) {
       final current = List<int>.filled(b.length + 1, i);
       for (var j = 1; j <= b.length; j++) {
@@ -139,7 +137,7 @@ final class ListLexicon implements Lexicon {
   }
 
   /// First index whose word is >= [probe] (classic lower bound).
-  int _lowerBound(final String probe) {
+  int _lowerBound(String probe) {
     var lo = 0;
     var hi = _words.length;
     while (lo < hi) {
@@ -153,7 +151,7 @@ final class ListLexicon implements Lexicon {
     return lo;
   }
 
-  static int _rankOrder(final LexiconMatch a, final LexiconMatch b) {
+  static int _rankOrder(LexiconMatch a, LexiconMatch b) {
     final byFrequency = b.frequency.compareTo(a.frequency);
     if (byFrequency != 0) return byFrequency;
     final byLength = a.word.length.compareTo(b.word.length);

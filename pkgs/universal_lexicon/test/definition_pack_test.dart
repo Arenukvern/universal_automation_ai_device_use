@@ -4,9 +4,8 @@ import 'package:test/test.dart';
 import 'package:universal_lexicon/universal_lexicon.dart';
 
 DefinitionPack packOf(
-  final List<DefinitionEntry> entries, {
-  final int perBlock = 2,
-  final int maxCachedBlocks = 4,
+  List<DefinitionEntry> entries, {int perBlock = 2,
+  int maxCachedBlocks = 4,
 }) => DefinitionPack(
   DefinitionPackBuilder(entriesPerBlock: perBlock).build(entries),
   maxCachedBlocks: maxCachedBlocks,

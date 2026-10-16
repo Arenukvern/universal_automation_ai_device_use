@@ -21,7 +21,7 @@ import 'dart:io';
 /// CC-BY-SA), WordNet 3.1 glosses (en, permissive license), English
 /// Wiktionary wikitext glosses (all other languages, CC-BY-SA —
 /// English glosses in v1; native Wiktionaries are the upgrade path).
-Future<void> main(final List<String> args) async {
+Future<void> main(List<String> args) async {
   var sources = '';
   var work = '';
   for (var i = 0; i < args.length - 1; i++) {
@@ -56,19 +56,19 @@ Future<void> main(final List<String> args) async {
     }
     final words = readFreq(freqPath);
     await File('$work/${lang}_freq.tsv').writeAsString(
-      words.map((final e) => '${e.$1}\t${e.$2}').join('\n'),
+      words.map((e) => '${e.$1}\t${e.$2}').join('\n'),
     );
     stderr.writeln('$lang: ${words.length} freq words');
 
     final section = spec.section;
-    final wanted = words.map((final e) => e.$1).toList();
+    final wanted = words.map((e) => e.$1).toList();
     // Definitions only for the TOP slice (3000) — the slice a keyboard's
     // chips/commit can actually reach; also the difference between a
     // polite 60-request fetch and a rate-limited 200-request one.
     final defTargets = wanted.take(defsTopWords).toList();
     final existing = _readExistingDefs('$work/${lang}_defs.tsv');
     final missing = defTargets
-        .where((final word) => !existing.containsKey(word))
+        .where((word) => !existing.containsKey(word))
         .toList();
     final fetched = section == null
         ? glossesFor(wordNet, defTargets.toSet())
@@ -79,7 +79,7 @@ Future<void> main(final List<String> args) async {
     };
     await File('$work/${lang}_defs.tsv').writeAsString(
       defs.entries
-          .map((final e) => '${e.key}\t${e.value.$1 ?? ''}\t${e.value.$2}')
+          .map((e) => '${e.key}\t${e.value.$1 ?? ''}\t${e.value.$2}')
           .join('\n'),
     );
     await File('$work/${lang}_source.json').writeAsString(
@@ -114,7 +114,7 @@ const defsTopWords = 3000;
 
 /// Already-fetched `word\tpos\tgloss` rows survive a re-run (the merge
 /// makes the fetch resumable across rate-limit windows).
-Map<String, (String?, String)> _readExistingDefs(final String path) {
+Map<String, (String?, String)> _readExistingDefs(String path) {
   final file = File(path);
   if (!file.existsSync()) return <String, (String?, String)>{};
   final defs = <String, (String?, String)>{};
@@ -127,7 +127,7 @@ Map<String, (String?, String)> _readExistingDefs(final String path) {
 }
 
 /// `word count` lines → filtered, lowercased, capped at [topWords].
-List<(String, int)> readFreq(final String path) {
+List<(String, int)> readFreq(String path) {
   final isCJK = path.contains('/zh_') || path.contains('/ja_');
   final pattern = isCJK
       ? RegExp(r'^[⼀-鿿぀-ヿー・々]{1,12}$')
@@ -147,8 +147,8 @@ List<(String, int)> readFreq(final String path) {
 
 /// English Wiktionary glosses for [words], batched 50 titles/request.
 Future<Map<String, (String?, String)>> wiktionaryGlosses(
-  final List<String> words,
-  final String section,
+  List<String> words,
+  String section,
 ) async {
   final glosses = <String, (String?, String)>{};
   final client = HttpClient()..userAgent = 'universal_lexicon-builder';
@@ -191,9 +191,9 @@ Future<Map<String, (String?, String)>> wiktionaryGlosses(
 }
 
 void _collect(
-  final String body,
-  final String section,
-  final Map<String, (String?, String)> glosses,
+  String body,
+  String section,
+  Map<String, (String?, String)> glosses,
 ) {
   final page = jsonDecode(body) as Map<String, dynamic>;
   final query = page['query'] as Map<String, dynamic>?;
@@ -213,7 +213,7 @@ void _collect(
 }
 
 /// The first definition lines under `==[section]==`.
-(String?, String)? firstGloss(final String wikitext, final String section) {
+(String?, String)? firstGloss(String wikitext, String section) {
   final pattern = RegExp('^==\\s*$section\\s*==\\s*\$', multiLine: true);
   final header = pattern.firstMatch(wikitext);
   if (header == null) return null;
@@ -241,11 +241,11 @@ void _collect(
   return (pos, gloss.substring(0, gloss.length > 140 ? 140 : gloss.length));
 }
 
-String cleanWikitext(final String raw) {
+String cleanWikitext(String raw) {
   var text = stripTemplates(raw);
   text = text.replaceAllMapped(
     RegExp(r'\[\[(?:[^\]|]*\|)?([^\]]+)\]\]'),
-    (final match) => match.group(1)!,
+    (match) => match.group(1)!,
   );
   return text
       .replaceAll(RegExp("''+"), '')
@@ -254,7 +254,7 @@ String cleanWikitext(final String raw) {
       .trim();
 }
 
-String stripTemplates(final String input) {
+String stripTemplates(String input) {
   final out = StringBuffer();
   var depth = 0;
   for (var i = 0; i < input.length; i++) {
@@ -273,7 +273,7 @@ String stripTemplates(final String input) {
   return out.toString();
 }
 
-String? posTag(final String header) => <String, String>{
+String? posTag(String header) => <String, String>{
       'noun': 'noun',
       'verb': 'verb',
       'adjective': 'adj',
@@ -290,8 +290,8 @@ String? posTag(final String header) => <String, String>{
 
 /// WordNet glosses restricted to the wanted words.
 Map<String, (String?, String)> glossesFor(
-  final Map<String, (String?, String)> wordNet,
-  final Set<String> words,
+  Map<String, (String?, String)> wordNet,
+  Set<String> words,
 ) => <String, (String?, String)>{
       for (final word in words)
         if (wordNet[word] != null) word: wordNet[word]!,
@@ -299,7 +299,7 @@ Map<String, (String?, String)> glossesFor(
 
 /// WordNet 3.1 (the nltk_data wordnet.zip, extracted to
 /// `<sources>/wordnet/dict`): lemma → first-synset gloss.
-Map<String, (String?, String)> parseWordNet(final String sources) {
+Map<String, (String?, String)> parseWordNet(String sources) {
   final dict = Directory('$sources/wordnet/dict');
   if (!dict.existsSync()) {
     stderr.writeln('wordnet: $sources/wordnet/dict missing — en defs skip');

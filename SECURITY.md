@@ -3,6 +3,8 @@
 Computer-use automation can observe and act on the local OS, browsers, and
 apps. Treat this toolkit like a privileged developer agent surface.
 
+See also [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community expectations.
+
 ## Reporting A Vulnerability
 
 Report privately to anton@xsoulspace.dev. Include affected package, steps,

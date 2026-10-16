@@ -18,7 +18,7 @@ void main() {
 
   test('cross-compat: native zlib bytes decode (packs built on native '
       'must read on web)', () {
-    final nativeEncoded = ZLibCodec().encode(payload);
+        final nativeEncoded = ZLibCodec().encode(payload);
     expect(codec.decode(nativeEncoded), payload);
   });
 

@@ -16,7 +16,7 @@ import 'package:universal_lexicon/universal_lexicon.dart';
 /// - `<lang>.lxlex` — LexiconPack (top words + normalized frequencies)
 /// - `<lang>.lxdef` — DefinitionPack (glosses for the top words)
 /// - `<lang>.json`  — provenance (copied from the fetch sidecar)
-void main(final List<String> args) {
+void main(List<String> args) {
   var work = '';
   var out = 'assets';
   for (var i = 0; i < args.length - 1; i++) {
@@ -51,7 +51,7 @@ void main(final List<String> args) {
     final defsFile = File('$work/${lang}_defs.tsv');
     if (!defsFile.existsSync()) continue;
     final byCount = counts.entries.toList()
-      ..sort((final a, final b) => b.value.compareTo(a.value));
+      ..sort((a, b) => b.value.compareTo(a.value));
     final rank = <String, int>{};
     for (var i = 0; i < byCount.length; i++) {
       rank[byCount[i].key] = i;

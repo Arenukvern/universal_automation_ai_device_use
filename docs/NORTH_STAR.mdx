@@ -1,0 +1,97 @@
+# Universal automation device use — North Star
+
+**Status:** active · **Audience:** humans and agents
+
+## What we are
+
+**Universal automation device use** is a **composable observe / act / verify
+family** for real devices and apps: Dart contracts (`universal_automation_*`),
+platform drivers (OS, browser, capture, WebRTC), lexicon packs, and an agent-facing
+**MCP + CLI toolkit** (`universal_automation_toolkit`).
+
+The north star is an **optimistic, humane** future where **people and AI agents**
+can work with desktop, mobile, browser, and future tiers through the same
+**declarative, compositional** surface — with **consent, receipts, and honest
+proof**, not opaque takeover of user machines.
+
+Innovation here is **legible automation**: smaller, inspectable routes for the
+next human or agent. That aligns with the wider automation chain in
+[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) (Flutter app harness)
+while this repo owns **cross-tier contracts and drivers**.
+
+Stewardship follows the
+[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) /
+[`skill_steward`](https://github.com/Arenukvern/skill_steward) OSS pattern:
+charter, ADRs, `steward.yaml` validation, CONTRIBUTING, and SECURITY. Broader
+author principles: [Principles at work (credo)](https://dev.to/arenukvern/my-principles-at-work-credo-182c).
+
+We are **not** a generic domain tutorial catalog. We are **not** the Flutter
+in-app runtime harness (see `mcp_flutter`). We are **not** claiming every OS
+driver tier is production-ready without platform-specific proof.
+
+## Current proof
+
+| Status | Evidence | Do not overclaim |
+| --- | --- | --- |
+| Proven | Published-style package layout, MIT licenses, `dart analyze` gate in CI (`steward.yaml`), conformance package, toolkit CLI/MCP | Unattended production agent control of end-user devices |
+| Emerging | Native driver validation artifacts under `pkgs/universal_driver_macos/validation/`, plugin bundle, MCP `server.json` draft | Every platform tier live-proven in CI |
+| Not owned | `universal_storage_*` (sibling repo), Flutter JIT debug harness (consumer + `mcp_flutter`) | Replacing OS security prompts or consent models |
+
+## What we own
+
+| Own | Do not own |
+| --- | --- |
+| `AutomationDriver` contracts, semantics, conformance | End-user app product logic in consumer repos |
+| OS/browser/capture/WebRTC driver packages | Universal storage product family |
+| Toolkit: plans, runner, MCP server, plugin/skills | Official MCP registry approval (submission is separate) |
+| ADRs, SECURITY, consent-gated composition patterns | Silent bypass of accessibility / screen-recording consent |
+| Release/changelog intent per package | Hidden automation without receipts or fail-closed refusal |
+
+## Care, consent, and evidence
+
+| Principle | Where it comes from | What it means here |
+| --- | --- | --- |
+| **Consent and least privilege** | [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md), toolkit README | Prefer `ConsentGatedDriver` / OS permission flows before accessibility or screen-recording effects; run only on machines and apps you control. |
+| **Privileged surface, fail-closed plans** | [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md), toolkit README | Treat MCP/CLI like a developer agent capability; refuse loudly when a tier or permission is missing. |
+| **Honest claims and evidence** | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md), [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/steward.yaml) | Name the exact claim, prove the weakest bar, record non-claims; ADRs gate durable changes. |
+| **Action effects and provenance** | [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/steward.yaml) | `security.action_effects`, `release.artifact_provenance` — automation that changes the world stays explicit and traceable. |
+| **Community conduct** | [CODE_OF_CONDUCT.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CODE_OF_CONDUCT.md) | Contributor Covenant; security reports to anton@xsoulspace.dev per SECURITY.md. |
+| **Engineering stewardship** | [Skill Steward North Star](https://github.com/Arenukvern/skill_steward/blob/main/docs/NORTH_STAR.mdx) | Shared map for humans and agents: doctor → map → validate → handoff. |
+
+## North star impact habit
+
+Before durable structural changes, classify `north_star_impact`: `none`, `applies`,
+`clarifies`, `sub_star`, `amends`, or `conflicts`. `amends` / `conflicts` require
+ADR work before the repo center moves. See [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md).
+
+## Boundaries (non-negotiable)
+
+- Behavior SSOT is **code and schemas**; docs link inward.
+- New strategic **why** → ADR in [docs/decisions/](https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/docs/decisions).
+- Domain tutorials and app-specific harnesses stay in their product repos.
+- No public issue for unpatched security vulnerabilities ([SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)).
+
+## Success looks like
+
+- Humans and agents share one compositional automation vocabulary across device classes.
+- Drivers and toolkit **refuse** rather than guess when consent or capability is missing.
+- Claims stay proportional to evidence (validation gate, per-package tests, platform proofs).
+- Fresh contributors find charter, ADRs, and native validation without hidden local paths.
+- Packages publish in dependency order with legible changelogs ([ADR 0001](/decisions/0001_drivers_into_ua_private_oss_ready)).
+
+## References
+
+- [ADR index](/decisions)
+- [ADR 0002 — public GitHub home and rename](/decisions/0002_public_github_rename)
+- [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)
+- [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)
+- [mcp_flutter — automation chain sibling](https://github.com/Arenukvern/mcp_flutter)
+- [skill_steward — stewardship patterns](https://github.com/Arenukvern/skill_steward)
+
+---
+
+<sup>*</sup> *Quiet aside:* contracts are written for whoever needs legible
+device access next — today humans and agents; tomorrow maybe someone with fins,
+a star chart, or a handshake we have not imagined yet. That is curiosity, not a
+roadmap; see the [banner horizon](/brand) if you
+like scavenger hunts.

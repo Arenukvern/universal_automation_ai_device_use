@@ -34,7 +34,7 @@ final class LexiconPackBuilder {
 
   final BlockCodec codec;
 
-  Uint8List build(final Map<String, double> frequencies) {
+  Uint8List build(Map<String, double> frequencies) {
     if (frequencies.isEmpty) {
       throw ArgumentError.value(
         frequencies,
@@ -113,7 +113,7 @@ final class LexiconPack {
     frequencies: _frequencies,
   );
 
-  Map<String, double> _parse(final String text) {
+  Map<String, double> _parse(String text) {
     final frequencies = <String, double>{};
     for (final line in text.split('\n')) {
       if (line.isEmpty) continue;

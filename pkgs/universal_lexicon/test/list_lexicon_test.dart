@@ -30,7 +30,7 @@ void main() {
 
   test('prefix candidates rank by frequency, length breaks ties', () {
     final matches = lexiconOf().prefixCandidates('he');
-    expect(matches.map((final m) => m.word).toList(), [
+    expect(matches.map((m) => m.word).toList(), [
       'here',
       'help',
       'hello',
@@ -48,7 +48,7 @@ void main() {
       words: const ['bolt', 'bolster', 'bolero'],
       frequencies: const {'bolt': 0.5, 'bolster': 0.5, 'bolero': 0.5},
     );
-    expect(lexicon.prefixCandidates('bol').map((final m) => m.word), [
+    expect(lexicon.prefixCandidates('bol').map((m) => m.word), [
       'bolt',
       'bolero',
       'bolster',
@@ -59,7 +59,7 @@ void main() {
     final lexicon = lexiconOf();
     expect(lexicon.prefixCandidates('zz'), isEmpty);
     expect(
-      lexicon.prefixCandidates('w').map((final m) => m.word),
+      lexicon.prefixCandidates('w').map((m) => m.word),
       containsAll(['world', 'wide', 'web']),
     );
   });

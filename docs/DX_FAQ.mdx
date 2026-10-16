@@ -1,0 +1,45 @@
+# DX FAQ — Universal Automation Device Use
+
+Concise **how** answers for contributors and integrators. Charter and ethics live in [North Star](/NORTH_STAR); durable **why** lives in [ADRs](/decisions).
+
+## Router
+
+| Need | Go to |
+| --- | --- |
+| Charter, consent, proof habits | [North Star](/NORTH_STAR) · [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md) |
+| Agent map & validation gate | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) · `steward.yaml` |
+| Toolkit CLI / MCP / plans | [toolkit README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/README.md) |
+| Usage questions (not bugs) | [GitHub Discussions](https://github.com/Arenukvern/universal_automation_ai_device_use/discussions) |
+| Sibling storage product | [universal_storage](https://github.com/Arenukvern/universal_storage) |
+
+## Packages & pub.dev
+
+**Q: Which packages are on pub.dev?**  
+A: Core contracts, semantics, conformance, toolkit, browser drivers, screencast, WebRTC helpers, OS drivers, and capture packages are published. **`universal_lexicon` is repo-only today** — consume it via path/git until a publish cut.
+
+**Q: How do I depend on a package while hacking this monorepo?**  
+A: Use a `dependency_overrides` path to `pkgs/<name>` (see [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)). External apps should use pub.dev version constraints when available.
+
+**Q: What is the publish order?**  
+A: [ADR 0001](/decisions/0001_drivers_into_ua_private_oss_ready) — contracts and semantics before drivers and toolkit.
+
+## Validate before you PR
+
+**Q: What is the CI analyze gate?**  
+A: The command in `steward.yaml` → `stewardship.quality.validate` (same list as README **Develop / validate**). Run it locally before pushing.
+
+**Q: What about docs?**  
+A: `docs.page` check runs in CI on `docs.json` and linked MDX; external links warn, not fail.
+
+## Issues vs Discussions
+
+**Q: Where do I ask "how do I…"?**  
+A: [GitHub Discussions](https://github.com/Arenukvern/universal_automation_ai_device_use/discussions). Issues are for **bugs** and **feature requests** (templates).
+
+**Q: Where do I report security problems?**  
+A: Follow [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md) — no public issue.
+
+## North Star impact (structural changes)
+
+**Q: When do I stop and write an ADR?**  
+A: When `north_star_impact` is `amends` or `conflicts` with the charter — see [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md). For `clarifies`, update this FAQ, docs map, or a skill instead of expanding scope silently.

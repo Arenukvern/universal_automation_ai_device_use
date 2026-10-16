@@ -1,11 +1,11 @@
 {
   "file_system": [
     {
-      "path": "/Users/antonio/xs/storage_problem/dart_flutter_packages/pkgs/universal_driver_macos/bridge/src/driver_bridge.swift",
+      "path": "REPO_ROOT/pkgs/universal_driver_macos/bridge/src/driver_bridge.swift",
       "hash": -1491024864080190107
     },
     {
-      "path": "/Users/antonio/xs/ecsly/tool/visualization_dogfood/native_capture/.dart_tool/hooks_runner/shared/universal_driver_macos/build/9fb02c5622/libxs_ax_driver.dylib",
+      "path": "DOGFOOD_WORKSPACE/visualization_dogfood/native_capture/.dart_tool/hooks_runner/shared/universal_driver_macos/build/9fb02c5622/libxs_ax_driver.dylib",
       "hash": -3646197809699439534
     }
   ],

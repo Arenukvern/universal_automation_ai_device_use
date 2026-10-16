@@ -4,10 +4,10 @@ description: >-
   JSON-RPC, accessibility snapshots, input synthesis, screenshots, and a
   fake CDP server for tests. No Flutter, no Node.
 version: 0.3.0
-homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
-repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
-issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
-documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_browser_cdp
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_browser_cdp
 
 environment:
   sdk: ^3.13.0

@@ -86,7 +86,7 @@ final class DefinitionPack implements DefinitionStore {
       LinkedHashMap<int, List<String>>();
 
   @override
-  List<DefinitionEntry> lookup(final String word) {
+  List<DefinitionEntry> lookup(String word) {
     final probe = word.toLowerCase();
     final hash = definitionWordHash(probe);
     // Hash collisions are legal: gather every index entry with this
@@ -114,14 +114,14 @@ final class DefinitionPack implements DefinitionStore {
       }
     }
     matches.sort(
-      (final a, final b) =>
+      (a, b) =>
           (a.partOfSpeech ?? '').compareTo(b.partOfSpeech ?? ''),
     );
     return matches;
   }
 
   @override
-  String? definition(final String word) {
+  String? definition(String word) {
     final matches = lookup(word);
     return matches.isEmpty ? null : matches.first.definition;
   }
@@ -150,7 +150,7 @@ final class DefinitionPack implements DefinitionStore {
   @visibleForTesting
   int get cachedBlockCount => _blockCache.length;
 
-  List<String> _block(final int blockId) {
+  List<String> _block(int blockId) {
     final cached = _blockCache.remove(blockId);
     if (cached != null) {
       _blockCache[blockId] = cached; // touch = move to most-recent
@@ -168,7 +168,7 @@ final class DefinitionPack implements DefinitionStore {
     return lines;
   }
 
-  int _lowerBound(final int hash) {
+  int _lowerBound(int hash) {
     var lo = 0;
     var hi = _hashIndex.length;
     while (lo < hi) {

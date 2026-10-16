@@ -1,0 +1,20 @@
+name: Docs
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  docs-page:
+    name: docs.page check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate docs.json and links
+        run: npx --yes @docs.page/cli check --external-links warn

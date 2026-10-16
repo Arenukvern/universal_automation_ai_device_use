@@ -7,7 +7,7 @@ import 'package:universal_lexicon/universal_lexicon.dart';
 /// ```sh
 /// dart run example/definition_pack_smoke.dart definitions.lxdef panda zzz
 /// ```
-void main(final List<String> args) {
+void main(List<String> args) {
   if (args.isEmpty) {
     stderr.writeln('usage: dart run example/definition_pack_smoke.dart '
         '<pack.lxdef> [words...]');

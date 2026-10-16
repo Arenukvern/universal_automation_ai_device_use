@@ -22,9 +22,9 @@ final class DefinitionPackBuilder {
   final int entriesPerBlock;
   final BlockCodec codec;
 
-  Uint8List build(final Iterable<DefinitionEntry> entries) {
+  Uint8List build(Iterable<DefinitionEntry> entries) {
     final sorted = entries.toList(growable: false)
-      ..sort((final a, final b) => a.word.compareTo(b.word));
+      ..sort((a, b) => a.word.compareTo(b.word));
     if (sorted.isEmpty) {
       throw ArgumentError.value(entries, 'entries', 'must not be empty');
     }
@@ -67,7 +67,7 @@ final class DefinitionPackBuilder {
         hashIndex.add((definitionWordHash(entry.word), blockId));
       }
     }
-    hashIndex.sort((final a, final b) => a.$1.compareTo(b.$1));
+    hashIndex.sort((a, b) => a.$1.compareTo(b.$1));
     final indexOffset = sink.length;
     final index = ByteData((blockSpans.length + hashIndex.length * 2) * 4);
     for (var i = 0; i < blockSpans.length; i++) {
