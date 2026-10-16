@@ -4,8 +4,7 @@ import 'package:test/test.dart';
 import 'package:universal_lexicon/universal_lexicon.dart';
 
 void main() {
-  test('roundtrip: words + frequencies survive the bytes', () {
-    final bytes = LexiconPackBuilder().build(
+  test('roundtrip: words + frequencies survive the bytes', () {bytes = LexiconPackBuilder().build(
       const {'hello': 0.7, 'help': 0.75, 'here': 0.8},
     );
     final pack = LexiconPack(bytes);
@@ -15,20 +14,18 @@ void main() {
     expect(pack.frequencies['here'], closeTo(0.8, 0.001));
   });
 
-  test('toLexicon answers ranked prefix queries', () {
-    final bytes = LexiconPackBuilder().build(
+  test('toLexicon answers ranked prefix queries', () {bytes = LexiconPackBuilder().build(
       const {'hello': 0.7, 'help': 0.75, 'here': 0.8},
     );
     final lexicon = LexiconPack(bytes).toLexicon();
-    expect(lexicon.prefixCandidates('he').map((final m) => m.word), [
+    expect(lexicon.prefixCandidates('he').map((m) => m.word), [
       'here',
       'help',
       'hello',
     ]);
   });
 
-  test('quantization is fine enough to preserve ranking', () {
-    final bytes = LexiconPackBuilder().build(
+  test('quantization is fine enough to preserve ranking', () {bytes = LexiconPackBuilder().build(
       const {'a': 0.1234, 'b': 0.1236, 'c': 0.9},
     );
     final frequencies = LexiconPack(bytes).frequencies;

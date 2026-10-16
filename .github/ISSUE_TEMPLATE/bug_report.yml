@@ -1,0 +1,62 @@
+name: Bug report
+description: Something broke or behaves incorrectly
+title: "[bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. Include the smallest repro you can; automation issues often need OS, driver tier, and consent/TCC context.
+
+  - type: input
+    id: package
+    attributes:
+      label: Package or area
+      placeholder: e.g. universal_automation_toolkit, universal_driver_macos
+    validations:
+      required: true
+
+  - type: dropdown
+    id: tier
+    attributes:
+      label: Automation tier
+      options:
+        - CLI / plans
+        - MCP server
+        - Browser (CDP)
+        - Browser (WebDriver)
+        - macOS driver
+        - Linux driver
+        - Windows driver
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: Commands, plan snippet, or MCP tool sequence
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Dart SDK / package version (if known)
+      placeholder: e.g. Dart 3.13, universal_automation_toolkit 0.2.0

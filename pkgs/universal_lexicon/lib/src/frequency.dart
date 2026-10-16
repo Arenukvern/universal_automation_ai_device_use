@@ -9,8 +9,7 @@ import 'dart:math' as math;
 /// signal. The most frequent word maps to 1.0, the least frequent to
 /// [floor], everything between by log interpolation.
 Map<String, double> normalizeCounts(
-  final Map<String, int> counts, {
-  final double floor = 0.05,
+  final Map<String, int> counts, {double floor = 0.05,
 }) {
   if (counts.isEmpty) return const <String, double>{};
   var minLog = double.infinity;

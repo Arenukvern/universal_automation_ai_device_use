@@ -4,10 +4,10 @@ description: >-
   UI Automation (UIA) driver over a Rust sidecar, mapping the Windows
   control tree onto the family's semantic snapshot model.
 version: 0.1.1
-homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
-repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
-issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
-documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_driver_windows
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_driver_windows
 topics:
   - automation
   - windows

@@ -1,7 +1,7 @@
-name: ai_computer_use_universal_automation
+name: universal_automation_ai_device_use
 description: >-
-  Private workspace: computer-use automation family + lexicon.
-  Storage lives in sibling ~/xs/universal_storage.
+  Open-source monorepo: universal automation contracts, drivers, capture,
+  WebRTC, lexicon, and the agent toolkit (MCP + CLI).
 publish_to: none
 
 environment:
@@ -12,8 +12,3 @@ workspace:
 
 dependency_overrides:
   meta: 1.19.0
-  test_api: 0.7.13
-  xsoulspace_permission_core:
-    path: ../storage_problem/dart_flutter_packages/pkgs/xsoulspace_permission_core
-  xsoulspace_lints:
-    path: ../storage_problem/dart_flutter_packages/pkgs/xsoulspace_lints

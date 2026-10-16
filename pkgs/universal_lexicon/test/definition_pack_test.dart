@@ -4,8 +4,7 @@ import 'package:test/test.dart';
 import 'package:universal_lexicon/universal_lexicon.dart';
 
 DefinitionPack packOf(
-  final List<DefinitionEntry> entries, {
-  final int perBlock = 2,
+  final List<DefinitionEntry> entries, {int perBlock = 2,
   final int maxCachedBlocks = 4,
 }) => DefinitionPack(
   DefinitionPackBuilder(entriesPerBlock: perBlock).build(entries),
@@ -37,8 +36,7 @@ const sample = <DefinitionEntry>[
 ];
 
 void main() {
-  test('roundtrip: every entry looks up through the pack', () {
-    final pack = packOf(sample);
+  test('roundtrip: every entry looks up through the pack', () {pack = packOf(sample);
     expect(pack.entryCount, sample.length);
     expect(pack.blockCount, 3);
 
@@ -48,8 +46,7 @@ void main() {
     expect(pack.definition('glide'), 'to move smoothly and continuously');
   });
 
-  test('multi-sense words share one block (grouped by word)', () {
-    final pack = packOf(sample);
+  test('multi-sense words share one block (grouped by word)', () {pack = packOf(sample);
     // First panda lookup caches exactly ONE block; if the two senses
     // lived in different blocks the cache would hold two.
     final senses = pack.lookup('panda');
@@ -60,24 +57,20 @@ void main() {
     expect(pack.cachedBlockCount, 1);
   });
 
-  test('unknown word returns empty, not an error', () {
-    final pack = packOf(sample);
+  test('unknown word returns empty, not an error', () {pack = packOf(sample);
     expect(pack.lookup('zebra'), isEmpty);
     expect(pack.definition('zebra'), isNull);
   });
 
-  test('unicode headwords and definitions survive the bytes', () {
-    final pack = packOf(sample);
+  test('unicode headwords and definitions survive the bytes', () {pack = packOf(sample);
     expect(pack.definition('héllo'), contains('приветствие'));
   });
 
-  test('definitions containing TABs round-trip', () {
-    final pack = packOf(sample);
+  test('definitions containing TABs round-trip', () {pack = packOf(sample);
     expect(pack.definition('tab'), 'the character U+0009');
   });
 
-  test('LRU bound holds under a wide lookup pattern', () {
-    final entries = <DefinitionEntry>[
+  test('LRU bound holds under a wide lookup pattern', () {entries = <DefinitionEntry>[
       for (var i = 0; i < 100; i++)
         DefinitionEntry(word: 'w${i.toString().padLeft(3, '0')}',
             definition: 'def $i'),
@@ -107,8 +100,7 @@ void main() {
     expect(pack.definition('bb'), 'second');
   });
 
-  test('case-insensitive lookup; pack rejects foreign bytes', () {
-    final pack = packOf(sample);
+  test('case-insensitive lookup; pack rejects foreign bytes', () {pack = packOf(sample);
     expect(pack.definition('PANDA'), isNotNull);
 
     expect(

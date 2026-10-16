@@ -34,7 +34,7 @@ final class LexiconPackBuilder {
 
   final BlockCodec codec;
 
-  Uint8List build(final Map<String, double> frequencies) {
+  Uint8List build(Map<String, double> frequencies) {
     if (frequencies.isEmpty) {
       throw ArgumentError.value(
         frequencies,
@@ -44,8 +44,7 @@ final class LexiconPackBuilder {
     }
     final words = frequencies.keys.toList()..sort();
     final payload = StringBuffer();
-    for (final word in words) {
-      final frequency = (frequencies[word] ?? 0.0).clamp(0.0, 1.0);
+    for (final word in words) {frequency = (frequencies[word] ?? 0.0).clamp(0.0, 1.0);
       payload
         ..write(word)
         ..write('\t')
@@ -113,8 +112,7 @@ final class LexiconPack {
     frequencies: _frequencies,
   );
 
-  Map<String, double> _parse(final String text) {
-    final frequencies = <String, double>{};
+  Map<String, double> _parse(String text) {frequencies = <String, double>{};
     for (final line in text.split('\n')) {
       if (line.isEmpty) continue;
       final tab = line.indexOf('\t');

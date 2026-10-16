@@ -7,7 +7,7 @@ import 'package:universal_lexicon/universal_lexicon.dart';
 /// ```sh
 /// dart run example/definition_pack_smoke.dart definitions.lxdef panda zzz
 /// ```
-void main(final List<String> args) {
+void main(List<String> args) {
   if (args.isEmpty) {
     stderr.writeln('usage: dart run example/definition_pack_smoke.dart '
         '<pack.lxdef> [words...]');
@@ -21,8 +21,7 @@ void main(final List<String> args) {
     'file: ${bytes.length} B, resident cache: ≤${pack.maxCachedBlocks} '
     'blocks',
   );
-  for (final word in args.skip(1)) {
-    final definition = pack.definition(word);
+  for (final word in args.skip(1)) {definition = pack.definition(word);
     stdout.writeln(
       definition == null ? '$word → (unknown)' : '$word → $definition',
     );

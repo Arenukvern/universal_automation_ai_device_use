@@ -4,10 +4,10 @@ description: >-
   supervision, JSON-lines request correlation, and event stream for the
   webrtc-rs engine sidecar.
 version: 0.1.0
-homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
-repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
-issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
-documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation/tree/main/pkgs/universal_webrtc_raw
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_webrtc_raw
 
 environment:
   sdk: ^3.13.0

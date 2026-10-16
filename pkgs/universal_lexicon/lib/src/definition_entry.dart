@@ -23,7 +23,7 @@ final class DefinitionEntry {
       'DefinitionEntry($word, ${partOfSpeech ?? '-'}, $definition)';
 
   @override
-  bool operator ==(final Object other) =>
+  bool operator ==(Object other) =>
       other is DefinitionEntry &&
       other.word == word &&
       other.partOfSpeech == partOfSpeech &&

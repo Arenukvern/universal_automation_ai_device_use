@@ -2,8 +2,7 @@ import 'package:test/test.dart';
 import 'package:universal_lexicon/universal_lexicon.dart';
 
 void main() {
-  test('log scale keeps orders of magnitude comparable', () {
-    final normalized = normalizeCounts(const {
+  test('log scale keeps orders of magnitude comparable', () {normalized = normalizeCounts(const {
       'the': 1000000,
       'house': 10000,
       'marble': 100,

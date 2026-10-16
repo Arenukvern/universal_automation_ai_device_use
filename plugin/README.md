@@ -5,13 +5,7 @@ and the AOT binary installer for `pkgs/universal_automation_toolkit`.
 
 ## Install (local checkout)
 
-From any workspace (e.g. `ecsai_harness`):
-
-```sh
-/Users/antonio/xs/ecsai_harness/tool/install_universal_automation_plugin.sh
-```
-
-Or from this repo:
+From this repository:
 
 ```sh
 ./plugin/install.sh

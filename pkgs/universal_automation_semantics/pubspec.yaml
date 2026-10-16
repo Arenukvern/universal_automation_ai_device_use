@@ -6,10 +6,10 @@ description: >-
   Dart, no Flutter, no protocol clients — every tier projects its tree
   into the family Snapshot and shares this layer.
 version: 0.1.0
-homepage: https://github.com/Arenukvern/ai_computer_use_universal_automation
-repository: https://github.com/Arenukvern/ai_computer_use_universal_automation
-issue_tracker: https://github.com/Arenukvern/ai_computer_use_universal_automation/issues
-documentation: https://github.com/Arenukvern/ai_computer_use_universal_automation
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use
 
 environment:
   sdk: ^3.13.0

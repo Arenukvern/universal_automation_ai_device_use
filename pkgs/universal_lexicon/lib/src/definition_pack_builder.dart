@@ -22,9 +22,8 @@ final class DefinitionPackBuilder {
   final int entriesPerBlock;
   final BlockCodec codec;
 
-  Uint8List build(final Iterable<DefinitionEntry> entries) {
-    final sorted = entries.toList(growable: false)
-      ..sort((final a, final b) => a.word.compareTo(b.word));
+  Uint8List build(Iterable<DefinitionEntry> entries) {sorted = entries.toList(growable: false)
+      ..sort((a, b) => a.word.compareTo(b.word));
     if (sorted.isEmpty) {
       throw ArgumentError.value(entries, 'entries', 'must not be empty');
     }
@@ -46,8 +45,7 @@ final class DefinitionPackBuilder {
     final blockSpans = <int>[]; // offset, length pairs
     final hashIndex = <(int, int)>[]; // (wordHash, blockId)
 
-    for (var start = 0; start < sorted.length; start += entriesPerBlock) {
-      final end = math.min(start + entriesPerBlock, sorted.length);
+    for (var start = 0; start < sorted.length; start += entriesPerBlock) {end = math.min(start + entriesPerBlock, sorted.length);
       final chunk = sorted.sublist(start, end);
       final payload = StringBuffer();
       for (final entry in chunk) {
@@ -67,7 +65,7 @@ final class DefinitionPackBuilder {
         hashIndex.add((definitionWordHash(entry.word), blockId));
       }
     }
-    hashIndex.sort((final a, final b) => a.$1.compareTo(b.$1));
+    hashIndex.sort((a, b) => a.$1.compareTo(b.$1));
     final indexOffset = sink.length;
     final index = ByteData((blockSpans.length + hashIndex.length * 2) * 4);
     for (var i = 0; i < blockSpans.length; i++) {

@@ -4,10 +4,13 @@ Welcome. This project uses **Skill Steward** to make repository purpose, validat
 
 Computer-use / agent observe–act–verify automation family. Contracts +
 OS/browser/capture/WebRTC drivers + `universal_lexicon` live here.
-`universal_storage_*` is a sibling product (`~/xs/universal_storage`).
-GitHub remote stays **private** until an explicit public cut; packages are
-MIT and pub.dev-ready (ADR 0001). Stewardship follows the mcp_flutter OSS
-pattern (doctor → map → validate → CONTRIBUTING/SECURITY).
+`universal_storage_*` is a sibling product
+([`universal_storage`](https://github.com/Arenukvern/universal_storage)).
+Public GitHub home:
+[`universal_automation_ai_device_use`](https://github.com/Arenukvern/universal_automation_ai_device_use);
+packages are MIT and pub.dev-ready (ADR 0001, amended by ADR 0002). Stewardship
+follows the mcp_flutter OSS pattern (doctor → map → validate →
+CONTRIBUTING/SECURITY).
 
 ## Operational Desk
 
@@ -24,7 +27,7 @@ Run the following commands to interact with the project's agentic tools:
 | Know why drivers left DFP | `docs/decisions/0001_drivers_into_ua_private_oss_ready.md` |
 | Publish packages | README → Publish order; `dart pub publish --dry-run` per package |
 | Wire a consumer | path override to `pkgs/<name>` (not DFP) |
-| Install MCP + skill plugin | `plugin/install.sh`; harness shim `../ecsai_harness/tool/install_universal_automation_plugin.sh` |
+| Install MCP + skill plugin | `plugin/install.sh` (see [plugin/README.md](plugin/README.md)) |
 
 ## North Star Impact
 
@@ -74,9 +77,9 @@ Discover once per session: `resources/read` `codemap://surface/v1`, or `map_surf
 Then call `map_index` with `operation=`. The transport refuses retired names
 (`map_index_search`, `map_index_query`, `map_index_build`, and the other `map_index_*` tools).
 
-Pass `"root": "/Users/antonio/xs/ai_computer_use_universal_automation"` when the client cwd is not this repo.
+Pass `"root": "<absolute-path-to-this-checkout>"` when the client cwd is not this repo.
 
-1. **Start** — `map_doctor`, then `map_index` `{"operation":"build","root":"/Users/antonio/xs/ai_computer_use_universal_automation","ignore_prefixes":["build/","dist/",".dart_tool/","target/"]}`, then `map_index` `{"operation":"context_map","root":"/Users/antonio/xs/ai_computer_use_universal_automation","limit":24}`.
+1. **Start** — `map_doctor`, then `map_index` `{"operation":"build","root":"<absolute-path-to-this-checkout>","ignore_prefixes":["build/","dist/",".dart_tool/","target/"]}`, then `map_index` `{"operation":"context_map","root":"<absolute-path-to-this-checkout>","limit":24}`.
 2. **Find** — `operation=search` and `query`. Concept-shaped queries add `"mode":"bm25"`.
 3. **Before an edit** — `operation=query`, `kind=impact`, `symbol` = `rel/path.ext::unit.name` from search. `kind=context` returns the node and its edges. `kind=trace` also needs `target`.
 4. **One evidence packet** — `operation=evidence` with `purpose` (`understand`, `impact`, or `trace`) and `budget_bytes`. Open the exact original with `operation=expand` and the handle in `meta.expansion`.
@@ -85,7 +88,8 @@ Pass `"root": "/Users/antonio/xs/ai_computer_use_universal_automation"` when the
 
 CLI, from the codemap checkout:
 
-`~/xs/codemap/.venv/bin/python ~/xs/codemap/engines/versions/py_engine/codemap_cli.py --json exec <index_command> --args '{"root":"/Users/antonio/xs/ai_computer_use_universal_automation",...}'`
+Use your local [codemap](https://github.com/Arenukvern/codemap) checkout CLI with
+`"root"` set to this repository's absolute path in `--args`.
 
 Parser edges only. Unresolved calls stay in the payload.
 <!-- codemap-index:end -->

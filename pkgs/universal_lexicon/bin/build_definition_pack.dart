@@ -14,7 +14,7 @@ import 'package:universal_lexicon/universal_lexicon.dart';
 /// Data sources and license notes live in the package README; the
 /// provenance (source, extraction date, commit) belongs in a
 /// sidecar `*.json` next to the pack — the pack itself stays data-only.
-void main(final List<String> args) {
+void main(List<String> args) {
   if (args.length < 2) {
     stderr.writeln(
       'usage: dart run universal_lexicon:build_definition_pack '

@@ -15,10 +15,10 @@ final class ZLibBlockCodec implements BlockCodec {
   const ZLibBlockCodec();
 
   @override
-  List<int> encode(final List<int> bytes) =>
+  List<int> encode(List<int> bytes) =>
       const archive.ZLibEncoder().encodeBytes(bytes);
 
   @override
-  List<int> decode(final List<int> bytes) =>
+  List<int> decode(List<int> bytes) =>
       const archive.ZLibDecoder().decodeBytes(bytes);
 }

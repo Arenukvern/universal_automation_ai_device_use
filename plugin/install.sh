@@ -8,11 +8,11 @@ PKG_DIR="$(cd "$SCRIPT_DIR/../pkgs/universal_automation_toolkit" && pwd)"
 if command -v dart >/dev/null 2>&1; then
   DART_BIN="$(command -v dart)"
 else
-  DART_BIN="${DART_BIN:-/Users/antonio/fvm/default/bin/dart}"
+  DART_BIN="${DART_BIN:-}"
 fi
 
-if [[ ! -x "$DART_BIN" ]]; then
-  echo "Dart SDK not found; install Dart or set DART_BIN." >&2
+if [[ -z "$DART_BIN" || ! -x "$DART_BIN" ]]; then
+  echo "Dart SDK not found; install Dart (https://dart.dev/get-dart) or set DART_BIN." >&2
   exit 1
 fi
 

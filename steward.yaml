@@ -1,6 +1,6 @@
 schema: steward/v1
 repo:
-  id: ai_computer_use_universal_automation
+  id: universal_automation_ai_device_use
   archetype: library
   archetype_detection:
     confidence: 1.0
@@ -15,7 +15,7 @@ harness:
 
 adoption:
   status: adopting
-  owner: ai_computer_use_universal_automation
+  owner: universal_automation_ai_device_use
   gate:
     pillar: quality
 

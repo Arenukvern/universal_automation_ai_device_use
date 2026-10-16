@@ -16,7 +16,7 @@ import 'package:universal_lexicon/universal_lexicon.dart';
 /// - `<lang>.lxlex` — LexiconPack (top words + normalized frequencies)
 /// - `<lang>.lxdef` — DefinitionPack (glosses for the top words)
 /// - `<lang>.json`  — provenance (copied from the fetch sidecar)
-void main(final List<String> args) {
+void main(List<String> args) {
   var work = '';
   var out = 'assets';
   for (var i = 0; i < args.length - 1; i++) {
@@ -37,8 +37,7 @@ void main(final List<String> args) {
     if (entity is! File || !entity.path.endsWith('_freq.tsv')) continue;
     final lang = entity.path.split('/').last.replaceAll('_freq.tsv', '');
     final counts = <String, int>{};
-    for (final line in entity.readAsLinesSync()) {
-      final tab = line.indexOf('\t');
+    for (final line in entity.readAsLinesSync()) {tab = line.indexOf('\t');
       if (tab <= 0) continue;
       counts[line.substring(0, tab)] = int.parse(line.substring(tab + 1));
     }
@@ -51,14 +50,13 @@ void main(final List<String> args) {
     final defsFile = File('$work/${lang}_defs.tsv');
     if (!defsFile.existsSync()) continue;
     final byCount = counts.entries.toList()
-      ..sort((final a, final b) => b.value.compareTo(a.value));
+      ..sort((a, b) => b.value.compareTo(a.value));
     final rank = <String, int>{};
     for (var i = 0; i < byCount.length; i++) {
       rank[byCount[i].key] = i;
     }
     final defs = <DefinitionEntry>[];
-    for (final line in defsFile.readAsLinesSync()) {
-      final fields = line.split('\t');
+    for (final line in defsFile.readAsLinesSync()) {fields = line.split('\t');
       if (fields.length < 3) continue;
       final word = fields[0];
       // Keep definitions only for words the lexicon actually carries,

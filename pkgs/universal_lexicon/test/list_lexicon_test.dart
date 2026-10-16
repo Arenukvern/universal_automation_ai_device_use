@@ -14,58 +14,51 @@ void main() {
     },
   );
 
-  test('contains and frequencyOf are case-insensitive', () {
-    final lexicon = lexiconOf();
+  test('contains and frequencyOf are case-insensitive', () {lexicon = lexiconOf();
     expect(lexicon.contains('HELLO'), isTrue);
     expect(lexicon.contains('helio'), isFalse);
     expect(lexicon.frequencyOf('World'), 0.9);
     expect(lexicon.frequencyOf('unknown'), 0.0);
   });
 
-  test('words are lowercased and deduplicated', () {
-    final lexicon = ListLexicon(words: const ['Ab', 'ab', 'CD']);
+  test('words are lowercased and deduplicated', () {lexicon = ListLexicon(words: const ['Ab', 'ab', 'CD']);
     expect(lexicon.wordCount, 2);
     expect(lexicon.contains('cd'), isTrue);
   });
 
-  test('prefix candidates rank by frequency, length breaks ties', () {
-    final matches = lexiconOf().prefixCandidates('he');
-    expect(matches.map((final m) => m.word).toList(), [
+  test('prefix candidates rank by frequency, length breaks ties', () {matches = lexiconOf().prefixCandidates('he');
+    expect(matches.map((m) => m.word).toList(), [
       'here',
       'help',
       'hello',
     ]);
   });
 
-  test('limit caps the results', () {
-    final matches = lexiconOf().prefixCandidates('he', limit: 2);
+  test('limit caps the results', () {matches = lexiconOf().prefixCandidates('he', limit: 2);
     expect(matches, hasLength(2));
     expect(matches.first.word, 'here');
   });
 
-  test('equal frequency falls back to shorter then lexicographic', () {
-    final lexicon = ListLexicon(
+  test('equal frequency falls back to shorter then lexicographic', () {lexicon = ListLexicon(
       words: const ['bolt', 'bolster', 'bolero'],
       frequencies: const {'bolt': 0.5, 'bolster': 0.5, 'bolero': 0.5},
     );
-    expect(lexicon.prefixCandidates('bol').map((final m) => m.word), [
+    expect(lexicon.prefixCandidates('bol').map((m) => m.word), [
       'bolt',
       'bolero',
       'bolster',
     ]);
   });
 
-  test('unknown prefix returns empty; unknown words rank as 0', () {
-    final lexicon = lexiconOf();
+  test('unknown prefix returns empty; unknown words rank as 0', () {lexicon = lexiconOf();
     expect(lexicon.prefixCandidates('zz'), isEmpty);
     expect(
-      lexicon.prefixCandidates('w').map((final m) => m.word),
+      lexicon.prefixCandidates('w').map((m) => m.word),
       containsAll(['world', 'wide', 'web']),
     );
   });
 
-  test('missing frequency map is legal (pure word list)', () {
-    final lexicon = ListLexicon(words: const ['alpha', 'also']);
+  test('missing frequency map is legal (pure word list)', () {lexicon = ListLexicon(words: const ['alpha', 'also']);
     // Zero-frequency tie → shorter word first.
     expect(lexicon.prefixCandidates('al').first.word, 'also');
   });
@@ -89,19 +82,16 @@ void fuzzyPrefixTests() {
     );
   });
 
-  test('fuzzy prefix: an extra letter still finds the word', () {
-    final matches = lexicon.fuzzyPrefixCandidates('helo');
+  test('fuzzy prefix: an extra letter still finds the word', () {matches = lexicon.fuzzyPrefixCandidates('helo');
     expect(matches.first.word, 'hello', reason: 'frequency breaks near-ties');
     expect(matches, contains(isA<LexiconMatch>()));
   });
 
-  test('fuzzy prefix: a missing letter still finds the word', () {
-    final matches = lexicon.fuzzyPrefixCandidates('hell');
+  test('fuzzy prefix: a missing letter still finds the word', () {matches = lexicon.fuzzyPrefixCandidates('hell');
     expect(matches.map((m) => m.word), contains('hello'));
   });
 
-  test('fuzzy prefix: exact prefixes rank first (distance order)', () {
-    final matches = lexicon.fuzzyPrefixCandidates('hel', limit: 5);
+  test('fuzzy prefix: exact prefixes rank first (distance order)', () {matches = lexicon.fuzzyPrefixCandidates('hel', limit: 5);
     expect(matches.first.word, 'hello',
         reason: 'distance-0 head AND the highest frequency');
     expect(
@@ -121,8 +111,7 @@ void fuzzyPrefixTests() {
     );
   });
 
-  test('fuzzy prefix: a short probe matches longer heads', () {
-    final matches = lexicon.fuzzyPrefixCandidates('na');
+  test('fuzzy prefix: a short probe matches longer heads', () {matches = lexicon.fuzzyPrefixCandidates('na');
     expect(matches.map((m) => m.word), contains('name'));
   });
 }
