@@ -19,6 +19,15 @@
   <rect width="1600" height="400" fill="url(#sky)"/>
   <rect width="1600" height="400" fill="url(#dawn)"/>
   <circle cx="1320" cy="72" r="48" fill="#fbbf24" opacity="0.35"/>
+  <!-- easter-egg: fellow travelers (intentionally tiny; not product scope) -->
+  <g opacity="0.22" aria-hidden="true">
+    <path fill="#7dd3fc" d="M1088 248c-12-6-22-4-28 2-4 4-6 10-4 16 3 8 14 12 26 10 8-1 14-5 18-10 2-3 2-7-1-10-3-4-8-6-11-8z"/>
+    <circle cx="1078" cy="252" r="1.5" fill="#0f172a"/>
+    <path fill="#c4b5fd" d="M1456 92l3 8 8 1-6 5 2 8-7-4-7 4 2-8-6-5 8-1z"/>
+    <ellipse cx="1478" cy="98" rx="5" ry="7" fill="#a5b4fc" opacity="0.85"/>
+    <circle cx="1476" cy="95" r="1.2" fill="#0f172a"/>
+    <circle cx="1481" cy="95" r="1.2" fill="#0f172a"/>
+  </g>
   <!-- composable blocks -->
   <g fill="none" stroke="url(#accent)" stroke-width="2.5" opacity="0.9">
     <rect x="96" y="88" width="72" height="72" rx="12"/>

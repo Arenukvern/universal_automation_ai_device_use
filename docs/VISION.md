@@ -53,3 +53,10 @@ mission. See [AGENTS.md](../AGENTS.md).
 - That agents may operate user devices without explicit consent and security review
 
 Durable decisions live in [docs/decisions/](decisions/).
+
+---
+
+<sup>*</sup> *Quiet aside:* contracts are written for whoever needs legible
+device access next — today humans and agents; tomorrow maybe someone with fins,
+a star chart, or a handshake we have not imagined yet. That is curiosity, not a
+roadmap; see the banner horizon if you like scavenger hunts.

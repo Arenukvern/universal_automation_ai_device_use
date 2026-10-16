@@ -5,6 +5,7 @@
 [![Validate](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml/badge.svg?branch=main)](https://github.com/Arenukvern/universal_automation_ai_device_use/actions/workflows/validate.yml)
 
 ![Open devices to people and agents with care — composable automation across device classes](docs/brand/assets/png/banner-16x9.png)
+<!-- banner easter-egg: squint at the SVG/PNG horizon for other curious users -->
 
 **Make every device class legible to humans and AI agents** through one
 **declarative, compositional** observe / act / verify surface — desktop and

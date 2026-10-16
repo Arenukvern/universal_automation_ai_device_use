@@ -27,4 +27,8 @@
     <rect x="168" y="152" width="48" height="32" rx="4"/>
     <rect x="176" y="192" width="20" height="36" rx="4"/>
   </g>
+  <g opacity="0.2" aria-hidden="true">
+    <path fill="#7dd3fc" d="M218 198c-6-3-11-2-14 1-2 2-3 5-2 8 2 4 7 6 13 5 4-1 7-3 9-5 1-2 1-4-1-5-2-2-4-3-5-4z"/>
+    <circle cx="148" cy="52" r="2" fill="#c4b5fd"/>
+  </g>
 </svg>
