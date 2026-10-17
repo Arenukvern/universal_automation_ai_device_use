@@ -15,7 +15,7 @@ environment:
 resolution: workspace
 
 dependencies:
-  universal_automation_interface: ^0.2.0
+  universal_automation_interface: ^0.3.0
 
 dev_dependencies:
   test: ^1.31.2

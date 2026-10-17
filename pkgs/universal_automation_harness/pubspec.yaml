@@ -16,7 +16,7 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  universal_automation_interface: ^0.2.0
+  universal_automation_interface: ^0.3.0
   universal_automation_semantics: ^0.1.0
   universal_automation_toolkit: ^0.1.1
 

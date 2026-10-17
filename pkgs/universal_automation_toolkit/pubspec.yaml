@@ -17,7 +17,7 @@ resolution: workspace
 dependencies:
   args: ^2.7.0
   meta: ^1.19.0
-  universal_automation_interface: ^0.2.0
+  universal_automation_interface: ^0.3.0
   universal_automation_semantics: ^0.1.0
   universal_browser_cdp: ^0.3.0
   universal_browser_webdriver: ^0.1.1

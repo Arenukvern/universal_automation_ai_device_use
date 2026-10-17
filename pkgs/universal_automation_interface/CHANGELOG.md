@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.3.0
+
+- **Coordinate-tier actions join the sealed action set**: `ClickAtAction`,
+  `MoveAction`, `DragAction` (ADR 0053), plus `SetValueAction` and
+  `ElementAction` (ADR 0064) — the semantic-write path. Breaking for
+  exhaustive switches over `AutomationAction` (hence the minor bump in
+  the 0.x range), which is why `flutter_mcp_harness` 7.0.0 — published
+  against this revision — failed to compile against pub.dev's 0.2.0.
+- **Harness-facing contract promotions (ADR 0004)**: `SessionBinding`,
+  `ResolvedSession`, and the `DriverFactory` typedef move here so
+  embedders bind sessions and register drivers against the interface
+  alone; `SessionBinding.fromJson` gains a transport-name parser.
+- **Capability-granular OS facades**: `OsAppCatalog`, `OsActivator`,
+  `OsWindowCapture`, `OsDisplayCapture` with neutral `OsAppRecord` /
+  `OsWindowRecord` types — compositions cast to contracts, never to
+  concrete drivers.
+- `DriverUnsupportedException` carries optional structured `details`.
+
 ## 0.2.0
 
 - **Surface action catalog (the `InvokeAction` tier)**: the
