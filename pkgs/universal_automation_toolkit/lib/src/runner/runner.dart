@@ -159,11 +159,17 @@ final class PlanRunner {
 
   /// Runs [scenarioName] (default: the plan's only scenario) and returns
   /// the structured report.
+  ///
+  /// When [deadline] is set, the run stops at the next step boundary once
+  /// it passes: the pending step is recorded as a `budget` failure and the
+  /// rest skip (a single long step can overshoot; steps carry their own
+  /// timeouts for the interior). The harness guard supplies it (ADR 0004).
   Future<RunReport> run(
     AutomationPlan plan, {
     String? scenarioName,
     Map<String, String> sessionOverrides = const {},
     String? outDir,
+    DateTime? deadline,
   }) async {
     final violations = plan.validate();
     if (violations.isNotEmpty) {
@@ -188,11 +194,34 @@ final class PlanRunner {
     final results = <StepResult>[];
     final receipts = <String>[];
     var ok = true;
+    var budgetBreached = false;
     try {
       for (var i = 0; i < steps.length; i++) {
         final step = steps[i];
         if (!ok && !step.continueOnFailure) {
           results.add(StepResult.skipped(index: i, kind: step.kind));
+          continue;
+        }
+        if (deadline != null && DateTime.now().isAfter(deadline)) {
+          if (budgetBreached) {
+            results.add(StepResult.skipped(index: i, kind: step.kind));
+            continue;
+          }
+          budgetBreached = true;
+          results.add(
+            StepResult._(
+              index: i,
+              kind: step.kind,
+              session: step.session,
+              ok: false,
+              durationMs: 0,
+              errorKind: 'budget',
+              errorMessage:
+                  'run exceeded its deadline budget before this step; '
+                  'remaining steps skipped',
+            ),
+          );
+          if (!step.continueOnFailure) ok = false;
           continue;
         }
         final result = await _runStep(

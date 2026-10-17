@@ -70,7 +70,13 @@ final class ScreenRecordingPermissionRequiredException
 /// Element handles cached by the native bridge are invalidated by every
 /// new observation; a click on a stale handle transparently re-observes
 /// once before giving up.
-class MacosDriver implements AutomationDriver {
+class MacosDriver
+    implements
+        AutomationDriver,
+        OsAppCatalog,
+        OsActivator,
+        OsWindowCapture,
+        OsDisplayCapture {
   /// Creates a driver. [snapshotDepth] and [snapshotMaxNodes] bound the
   /// tree walk (AX trees of real apps can be enormous; hover needs only
   /// the visible surface). [targetPid] anchors every observation to that
@@ -187,6 +193,7 @@ class MacosDriver implements AutomationDriver {
 
   /// The running, Dock-able applications — the discovery record every
   /// app-targeted call consumes.
+  @override
   Future<List<MacosApp>> runningApps() async {
     _ensureOpen();
     final result = bridge.appsJson();
@@ -214,6 +221,7 @@ class MacosDriver implements AutomationDriver {
   }
 
   /// Brings the application with [pid] to the front.
+  @override
   Future<void> activate(int pid) async {
     _ensureOpen();
     final code = bridge.activateApp(pid);
@@ -256,6 +264,7 @@ class MacosDriver implements AutomationDriver {
   /// capture consumes.
   /// Set [onScreenOnly] to false for other Spaces and hidden helper windows.
   /// Custom bridges without that optional capability refuse this mode.
+  @override
   Future<List<MacosWindow>> windows({
     int pid = 0,
     bool onScreenOnly = true,
@@ -280,6 +289,7 @@ class MacosDriver implements AutomationDriver {
   /// Captures one window's PNG (occlusion included, exact window
   /// bounds); [maxPx] caps the long side when set. Needs Screen
   /// Recording consent, not Accessibility.
+  @override
   Future<Uint8List> windowScreenshot(int windowId, {int? maxPx}) async {
     _ensureOpen();
     final result = bridge.screenshotWindowPng(

@@ -6,7 +6,7 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 /// app-management surface (`MacosDriver.runningApps` / `frontmost`)
 /// returns and every targeting call (`activate`, `terminate`, per-app
 /// `snapshot`) consumes.
-final class MacosApp {
+final class MacosApp implements OsAppRecord {
   /// Creates a record.
   const MacosApp({
     required this.pid,
@@ -29,18 +29,23 @@ final class MacosApp {
   );
 
   /// Process id — the handle every app-targeted bridge call takes.
+  @override
   final int pid;
 
   /// Bundle identifier (`com.apple.Safari`), when the app has one.
+  @override
   final String? bundleId;
 
   /// Display name (`localizedName`).
+  @override
   final String name;
 
   /// Whether the app currently owns the frontmost, key window.
+  @override
   final bool active;
 
   /// Whether the app is hidden.
+  @override
   final bool hidden;
 
   /// Decodes a bridge JSON array.
@@ -65,7 +70,7 @@ final class MacosApp {
 
 /// One on-screen window of a running application — the discovery record
 /// for window-scoped capture.
-final class MacosWindow {
+final class MacosWindow implements OsWindowRecord {
   /// Creates a window record.
   const MacosWindow({
     required this.windowId,
@@ -95,15 +100,19 @@ final class MacosWindow {
   }
 
   /// The CGWindow number capture addresses.
+  @override
   final int windowId;
 
   /// Owning application pid.
+  @override
   final int pid;
 
   /// Window title; may be empty without Screen Recording consent.
+  @override
   final String name;
 
   /// Global bounds, when the window list published them.
+  @override
   final AxBounds? bounds;
 
   /// OS visibility when published; absent metadata remains unknown.

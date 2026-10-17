@@ -1,0 +1,134 @@
+# ADR 0004 — Harness layer and packaging boundaries
+
+**Status:** Accepted (2026-10-17)
+**Amends:** the package map (interface / toolkit responsibilities); builds on
+[ADR 0003](0003_seamless_tier_routing_and_system_browser_open.mdx).
+**North-star impact:** `amends` — changes the repo center (new layer, new
+package, publish list); recorded here before any harness code exists.
+
+## Context
+
+Three pending consumers need the same thing — a composition root for
+automation: the oka-supervised serve (budgets, restart policy), a mobile
+Flutter embed (in-process MCP + instrumented driver, Last-Answer style), and
+the desktop agent. Today composition is scattered: the CLI assembles drivers
+ad hoc, the toolkit's registry hard-imports all three native OS drivers
+(which makes the toolkit un-embeddable in a Flutter app), and `DriverFactory`
++ `ResolvedSession` — the vocabulary an embedder must speak — are
+toolkit-private (`runner/registry.dart`), while `AutomationDriver`,
+`AutomationTransport`, and the oka-aligned session ownership vocabulary
+(`LeaseOwnership.borrowed`) already live in `universal_automation_interface`.
+
+The oka repo already ships the composition contracts this layer needs:
+`resource_composition` (zero-dependency, typed `Component` with
+`requires`/`provides`, sealed `Readiness`, lifecycle events) and the
+supervisor's declarative specs (ADR 0040/0041). The mcp_toolkit → mcp_flutter
+precedent names the split: primitives vs. the harness that composes them.
+
+**De-duplication rule (the user's constraint): one vocabulary, no parallel
+Darts.** The harness reuses oka's composition contracts rather than
+redefining them; the instrumented Flutter tier (mcp_toolkit/mcp_flutter)
+becomes harness components by *implementing the interface contracts*, not by
+importing this repo's toolkit.
+
+## Decision
+
+### 1. Layering
+
+    universal_automation_interface   pure contracts (drivers speak it)
+    universal_automation_toolkit     plan model, registry, runner, MCP face
+                                     — transport-agnostic, no native imports
+                                     in the embeddable core
+    universal_automation_harness     composition-root SDK (new package):
+                                     component trees over steps, commands as
+                                     versioned specs, budgets, supervision
+                                     mapping; compiles TO AutomationPlan —
+                                     one artifact, Dart is the source of truth
+    composition roots                toolkit_cli (desktop binary), plugin
+                                     serve, mobile embed (harness-assembled):
+                                     each registers concrete drivers via
+                                     `factories`
+
+### 2. Interface promotions (the harness-facing contracts)
+
+`ResolvedSession`, `DriverFactory`, and the OS capability facades move into
+`universal_automation_interface`:
+
+- `ResolvedSession` (binding / driver / url / detach / asBehavioral) — an
+  embedder implements drivers against the interface alone.
+- `DriverFactory` typedef — the registration seam.
+- `OsAppCatalog` (`runningApps`), `OsWindowCapture` (`windows`,
+  `windowScreenshot`), `OsActivator` (`activate`) — capability-granular OS
+  facades with neutral record types. macOS implements all three; Android AX
+  (future) implements catalog + activator; UIA implements window capture.
+  The MCP server casts to these, never to a concrete driver.
+
+### 3. Toolkit de-nativization
+
+The registry's built-in factories keep only pure-Dart tiers (CDP, WebDriver).
+The OS attach (macOS AX anchors, AT-SPI bus, UIA sidecar) moves to a desktop
+composition module imported *only* by the CLI root; a missing OS factory is
+the existing loud `TransportNotLinkedException`. After this cut, the
+toolkit's embeddable core imports no native driver package — a Flutter app
+can embed the MCP face and register its own factories (the instrumented
+Flutter tier via mcp_toolkit, the self-widget-tree driver, the in-app
+WebView tier).
+
+### 4. Harness scope (built after this foundation, gated on ≥2 consumers)
+
+Status (amended when the package landed): `universal_automation_harness`
+v0.1.0 exists — the operator committed to it as the second consumer, so the
+gate is satisfied. It depends on the interface and the toolkit only; the
+oka relation is the flip point below, not a fork.
+
+- Component trees over plan steps: `AutomationAssembly` + `Flow` compile
+  to one `AutomationPlan` (fail closed, every violation at once; command
+  references expand at compile time so CLI, serve, and an in-app agent
+  execute identical steps). The toolkit owns chain semantics
+  (`effectiveSteps`); the harness expands only a flow's own steps — one
+  source of truth, never a parallel vocabulary.
+- Relation to oka `resource_composition`: structurally compatible, NOT
+  depended on yet. This package's vocabulary (flows, commands, budgets,
+  envelopes) is automation-specific, so nothing forks; when
+  `resource_composition` publishes to pub.dev, the embedding adapter
+  (assembly ⇄ `Component`) lands at composition roots, and the harness
+  takes the hosted dependency then. Recorded here so the dependency is a
+  decision, not a drift.
+- Commands as versioned specs (codec + revision identity + revision
+  hash, supervisor ADR 0041 pattern), executed identically by CLI, serve,
+  and in-app agent. Nested command references are refused: cycles must be
+  undecidable-proof at compile.
+- Budgets as components (max-jobs, job timeout, idle-exit, session
+  runtime — the self-bounding serve): `ServeBudgets` declares,
+  `BudgetGuard` enforces (admission, deadlines, exit signals),
+  `HarnessRunner` wraps the toolkit `PlanRunner`, which gained a `deadline`
+  seam enforced at step boundaries. The oka supervisor owns the process
+  (converge + budgeted restarts); the budgets own the inside. Supervisor
+  plan mapping stays a composition-root concern.
+- Rule/guide envelope typed here; rule *content* stays world data (commons
+  / memory tiers) — loaded in like `IntentRegistry.fromFiles`, never baked
+  in.
+
+### 5. Cross-repo changes (each needs its own repo's ADR)
+
+- **oka**: publish `resource_composition` (zero-dep, versioned 0.6.0,
+  workspace-only today) so the harness depends on it hosted, not forked;
+  consider a readiness/handles declaration for the supervisor `process`
+  provider (serve readiness = an MCP `initialize` probe).
+- **mcp_flutter / mcp_toolkit**: implement `AutomationDriver` +
+  `DriverFactory` from this interface (the documented composition seam,
+  ADR 0036 direction preserved); its components then compose into the
+  harness without importing the toolkit.
+- **universal_capture_flutter**: expose a `DriverFactory` over the
+  mcp_toolkit instrumented tier so the harness can compose it as a provider.
+
+## Consequences
+
+- The toolkit becomes embeddable; the desktop binary changes nothing
+  user-visible (the CLI registers the same drivers, now explicitly).
+- One vocabulary across desktop, mobile, and oka: drivers, harness
+  components, and supervisor specs all speak interface + oka contracts.
+- The harness package exists (v0.1.0) with the automation-specific
+  vocabulary; it does not yet depend on `resource_composition` — the
+  hosted-dependency flip and the embedding adapter wait on that package's
+  publish (§5).

@@ -3,41 +3,10 @@ import 'dart:io';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_browser_cdp/universal_browser_cdp.dart';
 import 'package:universal_browser_webdriver/universal_browser_webdriver.dart';
-import 'package:universal_driver_linux/universal_driver_linux.dart';
-import 'package:universal_driver_macos/universal_driver_macos.dart';
-import 'package:universal_driver_windows/universal_driver_windows.dart';
 
-import '../plan/plan.dart';
 
-/// Builds a live session over one resolved endpoint — the extension seam
-/// of the registry. Composition roots (e.g. the instrumented Flutter
-/// tier, which lives in mcp_flutter per ADR 0038's dependency direction)
-/// register additional factories here without touching this package.
-typedef DriverFactory = Future<ResolvedSession> Function(
-  SessionBinding binding,
-  Uri endpoint,
-  Duration attachTimeout,
-);
-
-/// A resolved, live session: a driver over an attached endpoint.
-abstract interface class ResolvedSession {
-  /// The binding this session resolved.
-  SessionBinding get binding;
-
-  /// The attached driver.
-  AutomationDriver get driver;
-
-  /// The surface URL, when the transport exposes one.
-  Uri? get url;
-
-  /// The behavioral face of the driver, when the tier can honor ADR 0044
-  /// profiles; `null` means profiled dispatches must fail loudly.
-  BehavioralDriver? asBehavioral();
-
-  /// Detaches: drops this client's connection, never stops the process
-  /// behind it (attach-only teardown).
-  Future<void> detach();
-}
+export 'package:universal_automation_interface/universal_automation_interface.dart'
+show DriverFactory, ResolvedSession;
 
 /// A transport named in a plan has no linked driver binding in this
 /// build — loud, per the family refuse-not-degrade rule.
@@ -244,11 +213,15 @@ final class SessionRegistry {
     return value.isEmpty ? null : Uri.tryParse(value);
   }
 
+  /// The built-in factories: the pure-Dart protocol tiers only (ADR
+  /// 0004). The desktop OS tier is registered by the composition root
+  /// (`desktopOsAccessibilityFactory`) — or replaced by an embedder's
+  /// own tier; an unregistered transport is the loud
+  /// [TransportNotLinkedException], never a silent fallback.
   DriverFactory? _builtinFactory(AutomationTransport transport) =>
       switch (transport) {
         AutomationTransport.cdp => _attachCdp,
         AutomationTransport.webdriver => _attachWebdriver,
-        AutomationTransport.osAccessibility => _attachOsAccessibility,
         _ => null,
       };
 
@@ -271,105 +244,6 @@ final class SessionRegistry {
     return _WebdriverResolvedSession(binding, client);
   }
 
-  static Future<ResolvedSession> _attachOsAccessibility(
-    SessionBinding binding,
-    Uri endpoint,
-    Duration timeout,
-  ) async {
-    if (Platform.isMacOS) {
-      return _attachMacos(binding, endpoint);
-    }
-    if (Platform.isLinux) {
-      final bus = DBusAtspiBus(
-        a11yAddress: endpoint.scheme == 'unix'
-            ? endpoint.path
-            : null,
-      );
-      return _SimpleResolvedSession(binding, AtspiDriver(bus));
-    }
-    if (Platform.isWindows) {
-      return _SimpleResolvedSession(
-        binding,
-        await UiaDriver.connect(
-          binary: endpoint.scheme == 'file' ? endpoint.toFilePath() : null,
-        ),
-      );
-    }
-    throw TransportNotLinkedException(
-      '${binding.transport.name} on ${Platform.operatingSystem}',
-      sessionName: binding.name,
-    );
-  }
-
-  /// The macOS attach: focused by default, or anchored to one running
-  /// application through an `ax://` URI (ADR 0064). Bundle/name anchors
-  /// resolve through the running-apps record at attach; an unknown
-  /// target is a loud element-not-found naming the search key.
-  static Future<ResolvedSession> _attachMacos(
-    SessionBinding binding,
-    Uri endpoint,
-  ) async {
-    final anchor = _parseAxAnchor(endpoint);
-    if (anchor == null) {
-      return _MacosResolvedSession(binding, BehavioralMacosDriver());
-    }
-    final (kind, value) = anchor;
-    var pid = switch (kind) {
-      'pid' => int.tryParse(value),
-      _ => null,
-    };
-    if (kind != 'pid') {
-      final probe = MacosDriver();
-      try {
-        final apps = await probe.runningApps();
-        MacosApp? match;
-        switch (kind) {
-          case 'bundle':
-            match = apps.where((app) => app.bundleId == value).firstOrNull;
-          case 'name':
-            match = apps.where((app) => app.name == value).firstOrNull;
-        }
-        if (match == null) {
-          throw ElementNotFoundException(
-            'application',
-            '$kind "$value" (running: '
-            '${apps.map((app) => app.name).join(", ")})',
-          );
-        }
-        pid = match.pid;
-      } finally {
-        await probe.close();
-      }
-    }
-    if (pid == null || pid <= 0) {
-      throw ElementNotFoundException('application', 'pid "$value"');
-    }
-    // Attaching an assistive client must enable the target's native tree.
-    // Flutter creates that tree lazily; merely enumerating AXWindows can
-    // otherwise return a window with no product controls. This request is
-    // scoped to the explicit app anchor and never activates the application.
-    requestAppAccessibility(pid);
-    return _MacosResolvedSession(binding, BehavioralMacosDriver(targetPid: pid));
-  }
-
-  /// `(kind, value)` from an `ax://<kind>/<value>` anchor URI; `null`
-  /// for any other shape (the focused sentinel, a11y refinements). The
-  /// value percent-decodes (URIs encode spaces: `ax://name/Text%20Edit`).
-  static (String, String)? _parseAxAnchor(Uri endpoint) {
-    if (endpoint.scheme != 'ax') return null;
-    final kind = endpoint.host;
-    final raw = endpoint.path.startsWith('/')
-        ? endpoint.path.substring(1)
-        : endpoint.path;
-    if (raw.isEmpty || !const {'pid', 'bundle', 'name'}.contains(kind)) {
-      throw SpecViolationException([
-        'ax:// anchors are ax://pid/<pid>, ax://bundle/<bundleId>, or '
-        'ax://name/<name> (got $endpoint)',
-      ]);
-    }
-    return (kind, Uri.decodeComponent(raw));
-  }
-
   /// Detaches every session this registry opened. Idempotent.
   Future<void> detachAll() async {
     for (final session in [
@@ -383,25 +257,6 @@ final class SessionRegistry {
   }
 }
 
-/// Driver-only resolved session (no behavioral face, no URL).
-final class _SimpleResolvedSession implements ResolvedSession {
-  _SimpleResolvedSession(this.binding, this.driver);
-
-  @override
-  final SessionBinding binding;
-
-  @override
-  final AutomationDriver driver;
-
-  @override
-  Uri? get url => null;
-
-  @override
-  BehavioralDriver? asBehavioral() => null;
-
-  @override
-  Future<void> detach() => driver.close();
-}
 
 final class _WebdriverResolvedSession implements ResolvedSession {
   _WebdriverResolvedSession(this.binding, this.client)
@@ -425,28 +280,6 @@ final class _WebdriverResolvedSession implements ResolvedSession {
   Future<void> detach() => client.deleteSession();
 }
 
-final class _MacosResolvedSession implements ResolvedSession {
-  _MacosResolvedSession(this.binding, BehavioralMacosDriver macosDriver)
-    : macosDriver = macosDriver,
-      driver = macosDriver;
-
-  @override
-  final SessionBinding binding;
-
-  final BehavioralMacosDriver macosDriver;
-
-  @override
-  final AutomationDriver driver;
-
-  @override
-  Uri? get url => null;
-
-  @override
-  BehavioralDriver? asBehavioral() => macosDriver;
-
-  @override
-  Future<void> detach() => driver.close();
-}
 
 final class _CdpResolvedSession implements ResolvedSession {
   _CdpResolvedSession(this.binding, this.session) {

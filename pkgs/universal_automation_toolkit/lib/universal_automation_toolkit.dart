@@ -11,6 +11,7 @@
 library;
 
 export 'src/cli/toolkit_cli.dart';
+export 'src/composition/desktop_os_factory.dart';
 export 'src/consent/consent_gated_driver.dart';
 export 'src/mcp/mcp_server.dart';
 export 'src/plan/checks.dart';

@@ -14,87 +14,12 @@ import 'steps.dart';
 /// a binding either points at a live [uri] or names a [handle]
 /// (`session-<name>`-style artifact) that the caller resolves via
 /// overrides. Borrowed sessions are detached from, never stopped.
-@immutable
-class SessionBinding {
-  /// Creates a binding; exactly one of [uri] / [handle] must be set.
-  const SessionBinding({
-    required this.name,
-    required this.transport,
-    this.uri,
-    this.handle,
-  }) : assert(uri != null || handle != null, 'uri or handle required');
-
-  /// Restores a binding from its plan shape.
-  factory SessionBinding.fromJson(String name, Object? json) {
-    if (json is! Map<Object?, Object?>) {
-      throw FormatException('session "$name" must be a map');
-    }
-    final transportName = json['transport'];
-    if (transportName is! String) {
-      throw FormatException('session "$name" needs a transport');
-    }
-    final AutomationTransport transport;
-    try {
-      transport = AutomationTransport.values.byName(transportName);
-    } on ArgumentError {
-      throw FormatException(
-        'session "$name" has unknown transport "$transportName"',
-      );
-    }
-    final uriValue = json['uri'];
-    final handleValue = json['handle'];
-    if ((uriValue == null) == (handleValue == null)) {
-      throw FormatException(
-        'session "$name" needs exactly one of uri or handle',
-      );
-    }
-    Uri? uri;
-    if (uriValue != null) {
-      if (uriValue is! String) {
-        throw FormatException('session "$name" uri must be a string');
-      }
-      uri = Uri.tryParse(uriValue);
-      if (uri == null) {
-        throw FormatException('session "$name" uri does not parse: $uriValue');
-      }
-    }
-    if (handleValue != null && handleValue is! String) {
-      throw FormatException('session "$name" handle must be a string');
-    }
-    return SessionBinding(
-      name: name,
-      transport: transport,
-      uri: uri,
-      handle: handleValue as String?,
-    );
-  }
-
-  /// Binding name (referenced by steps).
-  final String name;
-
-  /// Which protocol family speaks at the attach point.
-  final AutomationTransport transport;
-
-  /// Direct endpoint URI, when given.
-  final Uri? uri;
-
-  /// Handle-artifact name, when given (resolved by caller overrides).
-  final String? handle;
-
-  /// The effective attach URI, applying [overrides] (handle name → URI).
-  Uri? resolveUri(Map<String, String> overrides) {
-    if (uri != null) return uri;
-    final override = overrides[handle];
-    return override == null ? null : Uri.tryParse(override);
-  }
-
-  /// Canonical plan shape.
-  Map<String, Object?> toJson() => {
-    'transport': transport.name,
-    if (uri != null) 'uri': uri.toString(),
-    if (handle != null) 'handle': handle,
-  };
-}
+///
+/// Promoted to `universal_automation_interface` (ADR 0004) so embedders
+/// bind and resolve sessions against the interface alone; re-exported
+/// here to keep the toolkit API stable.
+export 'package:universal_automation_interface/universal_automation_interface.dart'
+    show SessionBinding;
 
 /// One named, composable scenario: an ordered step list.
 @immutable

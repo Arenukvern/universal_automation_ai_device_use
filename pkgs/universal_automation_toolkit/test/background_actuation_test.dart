@@ -286,7 +286,12 @@ void main() {
     });
 
     test('unknown bundle/name anchors fail at the macOS factory', () async {
-      final registry = SessionRegistry(bindings: const {});
+      final registry = SessionRegistry(
+        bindings: const {},
+        factories: {
+          AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+        },
+      );
       await expectLater(
         registry.attachApp(
           AutomationTransport.osAccessibility,
@@ -303,7 +308,12 @@ void main() {
     });
 
     test('a pid anchor attaches an anchored macOS driver', () async {
-      final registry = SessionRegistry(bindings: const {});
+      final registry = SessionRegistry(
+        bindings: const {},
+        factories: {
+          AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+        },
+      );
       final session = await registry.attachApp(
         AutomationTransport.osAccessibility,
         pid: 4242,

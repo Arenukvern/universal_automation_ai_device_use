@@ -6,7 +6,6 @@ import 'dart:io';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 
 import '../plan/plan.dart';
-import 'registry.dart';
 import 'runner.dart';
 
 /// Schema id of a persisted job record.

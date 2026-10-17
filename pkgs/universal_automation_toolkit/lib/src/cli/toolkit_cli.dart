@@ -7,11 +7,19 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
 import 'package:universal_driver_macos/universal_driver_macos.dart';
 
+import '../composition/desktop_os_factory.dart';
 import '../mcp/mcp_server.dart' as mcp;
 import '../plan/checks.dart';
 import '../plan/plan.dart';
 import '../runner/registry.dart';
 import '../runner/runner.dart';
+
+/// The composition root's driver registration (ADR 0004): the desktop
+/// OS tier is linked here — the only place in the binary — so the
+/// embeddable toolkit core stays native-import-free.
+final _desktopFactories = {
+  AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+};
 
 /// Exit code: every executed step passed.
 const exitOk = 0;
@@ -121,7 +129,7 @@ ServeTierConfig _serveTierConfig(ArgResults options) {
 
 Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
   final (transport, endpoints) = _serveTierConfig(options);
-  final registry = SessionRegistry(bindings: const {});
+  final registry = SessionRegistry(bindings: const {}, factories: _desktopFactories);
   final appSpec = options['app'] as String?;
   if (appSpec != null) {
     if (transport != AutomationTransport.osAccessibility) {
@@ -419,6 +427,7 @@ Future<int> _dispatch(List<String> arguments) async {
           endpoints: endpoints,
           defaultTransport: defaultTransport,
           overrides: overrides,
+          factories: _desktopFactories,
           jobsDirectory: jobsDir,
           handlesDirectory: handlesDir,
           browserHandle: browserHandle,
@@ -437,6 +446,7 @@ Future<int> _dispatch(List<String> arguments) async {
         endpoints: endpoints,
         defaultTransport: defaultTransport,
         overrides: overrides,
+        factories: _desktopFactories,
         jobsDirectory: jobsDir,
         handlesDirectory: handlesDir,
         browserHandle: browserHandle,
@@ -461,6 +471,7 @@ Future<int> _dispatch(List<String> arguments) async {
             attachTimeout: Duration(
               seconds: int.tryParse(options['timeout'] as String) ?? 10,
             ),
+            factories: _desktopFactories,
             handleBaseDirectory: command['handles-dir'] as String?,
           ).run(
             plan,

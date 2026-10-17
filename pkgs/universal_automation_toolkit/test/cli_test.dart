@@ -1,3 +1,9 @@
+// The process-level proofs in this suite spawn `dart` (native-assets
+// build hooks on first run); the default 30 s budget is too tight
+// for a cold build.
+@Timeout(Duration(minutes: 2))
+library;
+
 import 'dart:convert';
 import 'dart:io';
 

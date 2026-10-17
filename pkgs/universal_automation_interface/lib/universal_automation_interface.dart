@@ -19,6 +19,7 @@ export 'src/automation_action_catalog.dart';
 export 'src/automation_endpoint.dart';
 export 'src/automation_event.dart';
 export 'src/automation_exceptions.dart';
+export 'src/automation_os_driver.dart';
 export 'src/automation_session.dart';
 export 'src/automation_spec.dart';
 export 'src/behavior/behavior_audit.dart';

@@ -36,6 +36,9 @@ void main() {
     final anchored = SessionRegistry(
       bindings: plan.sessions,
       overrides: const {'app': 'ax://pid/999999999'},
+      factories: {
+        AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+      },
     );
     final session = await anchored.attach('app');
     // The pid anchor binds directly (no running-apps probe); the driver
@@ -47,7 +50,12 @@ void main() {
     );
     await session.detach();
 
-    final fallback = SessionRegistry(bindings: plan.sessions);
+    final fallback = SessionRegistry(
+      bindings: plan.sessions,
+      factories: {
+        AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+      },
+    );
     final unfocused = await fallback.attach('app');
     expect(
       (unfocused.asBehavioral()! as MacosDriver).targetPid,

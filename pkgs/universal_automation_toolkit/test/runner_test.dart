@@ -290,4 +290,28 @@ void main() {
     expect(report.ok, isTrue);
     expect(report.steps.single.ok, isTrue);
   });
+
+  test('an expired deadline fails the run at the step boundary, before '
+      'any attach', () async {
+    final plan = AutomationPlan(
+      sessions: [cdp('browser', handle: 'session-browser-handle')],
+      scenarios: [
+        scenario('s', steps: [
+          observe(),
+          waitFor([exists(role: 'button', name: 'Submit')]),
+        ]),
+      ],
+    );
+
+    final report = await PlanRunner().run(
+      plan,
+      deadline: DateTime.now().subtract(const Duration(hours: 1)),
+    );
+    expect(report.ok, isFalse);
+    expect(report.steps, hasLength(2));
+    expect(report.steps.first.errorKind, 'budget');
+    expect(report.steps.first.errorMessage, contains('deadline budget'));
+    expect(report.steps.last.skipped, isTrue);
+    expect(report.steps.last.errorKind, 'skipped');
+  });
 }

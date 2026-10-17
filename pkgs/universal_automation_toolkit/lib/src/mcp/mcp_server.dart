@@ -4,7 +4,6 @@ import 'dart:typed_data';
 
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
-import 'package:universal_driver_macos/universal_driver_macos.dart';
 import 'package:xsoulspace_permission_core/xsoulspace_permission_core.dart';
 
 import '../consent/consent_gated_driver.dart';
@@ -655,8 +654,8 @@ final class ToolkitMcpServer {
     } on ForegroundRequiredException catch (error) {
       if (arguments['foreground'] != true) rethrow;
       final driver = session.driver;
-      if (driver is! MacosDriver) rethrow;
-      await driver.activate(error.targetPid);
+      if (driver is! OsActivator) rethrow;
+      await (driver as OsActivator).activate(error.targetPid);
       await driver.perform(automationAction);
       return {'ok': true, 'focusContract': 'activated'};
     }
@@ -671,13 +670,13 @@ final class ToolkitMcpServer {
       'transport': 'osAccessibility',
     });
     final driver = session.driver;
-    if (driver is! MacosDriver) {
+    if (driver is! OsAppCatalog) {
       throw const McpToolError(
-        'automation_list_apps is the macOS tier (runningApps); other OS '
-        'transports do not expose an application record yet',
+        'automation_list_apps needs an OS app catalog (macOS AX today); '
+        'other OS transports do not expose an application record yet',
       );
     }
-    final apps = await driver.runningApps();
+    final apps = await (driver as OsAppCatalog).runningApps();
     return {
       'apps': [
         for (final app in apps)
@@ -721,13 +720,15 @@ final class ToolkitMcpServer {
     final imageBlocks = <Map<String, Object?>>[];
 
     if (arguments['listWindows'] == true) {
-      if (driver is! MacosDriver) {
+      if (driver is! OsWindowCapture) {
         throw const McpToolError(
           'listWindows needs the OS tier (transport "osAccessibility")',
         );
       }
       final pid = arguments['pid'] is int ? arguments['pid']! as int : 0;
-      final windows = await driver.windows(pid: pid);
+      final windows = await (driver as OsWindowCapture).windows(
+        pid: pid,
+      );
       return {
         'windows': [
           for (final window in windows)
@@ -753,7 +754,7 @@ final class ToolkitMcpServer {
       if (arguments['windowId'] is! int) {
         throw const McpToolError('windowId must be an integer');
       }
-      if (driver is! MacosDriver) {
+      if (driver is! OsWindowCapture) {
         throw const McpToolError(
           'windowId needs the OS tier (transport "osAccessibility")',
         );
@@ -761,7 +762,7 @@ final class ToolkitMcpServer {
       if (path is! String || path.isEmpty) {
         throw const McpToolError('automation_screenshot needs a path');
       }
-      bytes = await driver.windowScreenshot(
+      bytes = await (driver as OsWindowCapture).windowScreenshot(
         arguments['windowId']! as int,
         maxPx: maxPx,
       );
@@ -773,12 +774,14 @@ final class ToolkitMcpServer {
         throw const McpToolError('this transport cannot capture screenshots');
       }
       if (maxPx > 0) {
-        if (driver is! MacosDriver) {
+        if (driver is! OsDisplayCapture) {
           throw const McpToolError(
             'maxPx needs the OS tier; this transport cannot resize capture',
           );
         }
-        bytes = await driver.screenshot(maxPx: maxPx);
+        bytes = await (driver as OsDisplayCapture).screenshot(
+          maxPx: maxPx,
+        );
       } else {
         bytes = await driver.screenshot();
       }
@@ -1405,6 +1408,7 @@ Future<void> serveMcpStdio({
   Map<AutomationTransport, Uri> endpoints = const {},
   AutomationTransport defaultTransport = AutomationTransport.cdp,
   Map<String, String> overrides = const {},
+  Map<AutomationTransport, DriverFactory>? factories,
   String? jobsDirectory,
   String? handlesDirectory,
   String? browserHandle,
@@ -1414,6 +1418,7 @@ Future<void> serveMcpStdio({
     endpoints: endpoints,
     defaultTransport: defaultTransport,
     overrides: overrides,
+    factories: factories,
     jobsDirectory: jobsDirectory,
     handlesDirectory: handlesDirectory,
     browserHandle: browserHandle,
@@ -1472,6 +1477,7 @@ Future<HttpServer> startMcpHttp({
   Map<AutomationTransport, Uri> endpoints = const {},
   AutomationTransport defaultTransport = AutomationTransport.cdp,
   Map<String, String> overrides = const {},
+  Map<AutomationTransport, DriverFactory>? factories,
   String? jobsDirectory,
   String? handlesDirectory,
   String? browserHandle,
@@ -1481,6 +1487,7 @@ Future<HttpServer> startMcpHttp({
     endpoints: endpoints,
     defaultTransport: defaultTransport,
     overrides: overrides,
+    factories: factories,
     jobsDirectory: jobsDirectory,
     handlesDirectory: handlesDirectory,
     browserHandle: browserHandle,
