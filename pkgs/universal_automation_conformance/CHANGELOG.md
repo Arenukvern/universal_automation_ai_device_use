@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- `universal_screencast` constraint widens to `^0.2.0` (missed when the
+  family widened; 0.3.0 shipped with the stale pin).
+
 ## 0.3.0
 
 - Interface constraint moves to `^0.3.0` (coordinate-tier actions in the
