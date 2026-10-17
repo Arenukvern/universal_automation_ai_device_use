@@ -1,5 +1,9 @@
 # Changelog
 
+
+## 0.2.0
+
+- Family train: `universal_automation_interface` moves to `^0.3.0` (coordinate-tier actions join the sealed action set) and `universal_automation_conformance` to `^0.3.0`; dependency constraints widen accordingly (constraint-widening minor bump).
 ## 0.1.1
 
 - interface constraint bump only; no code changes.

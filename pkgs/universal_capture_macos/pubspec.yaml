@@ -3,7 +3,7 @@ description: >-
   macOS-native screen capture and accessibility checks for pure Dart,
   wired through Dart native-assets build hooks (swiftc-compiled code
   asset, @Native bindings). No Flutter, no plugin surface.
-version: 0.1.2
+version: 0.2.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -19,7 +19,7 @@ dependencies:
   ffi: ^2.2.0
   hooks: ^2.0.0
   universal_automation_interface: ^0.3.0
-  universal_screencast: ^0.1.0
+  universal_screencast: ^0.2.0
 
 dev_dependencies:
   test: ^1.31.2

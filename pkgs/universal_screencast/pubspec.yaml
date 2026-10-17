@@ -4,7 +4,7 @@ description: >-
   screencast, paced polling) to FrameSink (binary WebSocket, MJPEG HTTP,
   file recorder) with fail-closed composition validation and audience
   policies.
-version: 0.1.2
+version: 0.2.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -18,7 +18,7 @@ resolution: workspace
 dependencies:
   meta: ^1.19.0
   universal_automation_interface: ^0.3.0
-  universal_browser_cdp: ^0.3.0
+  universal_browser_cdp: ^0.4.0
 
 dev_dependencies:
   test: ^1.31.2
