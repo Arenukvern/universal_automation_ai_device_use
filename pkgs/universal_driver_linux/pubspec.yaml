@@ -16,7 +16,7 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  dbus: ^0.7.10
+  dbus: ^0.8.0
   universal_automation_interface: ^0.3.0
 
 dev_dependencies:
