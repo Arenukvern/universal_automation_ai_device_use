@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Interface constraint moves to `^0.3.0` (coordinate-tier actions in the
+  sealed set); the universal navigate conformance suite gains loud
+  scheme-allowlist refusals and the navigate-capability check.
+
 ## 0.2.0
 
 - Added `behaviorSynthesisConformanceTests()` — hermetic synthesis

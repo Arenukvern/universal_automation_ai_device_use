@@ -29,5 +29,5 @@ dependencies:
 
 dev_dependencies:
   test: ^1.31.2
-  universal_automation_conformance: ^0.2.0
+  universal_automation_conformance: ^0.3.0
   xsoulspace_lints: ^0.1.2

@@ -1,0 +1,85 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "pkgs/universal_automation_conformance": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_automation_harness": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_automation_interface": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_automation_semantics": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_automation_toolkit": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_browser_cdp": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_browser_webdriver": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_capture_flutter": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_capture_macos": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_driver_linux": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_driver_macos": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_driver_windows": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_lexicon": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_screencast": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_webrtc": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    },
+    "pkgs/universal_webrtc_raw": {
+      "release-type": "dart",
+      "changelog-path": "CHANGELOG.md",
+      "pull-request-title-pattern": "chore(pkgs/${package}): release ${version}"
+    }
+  }
+}
