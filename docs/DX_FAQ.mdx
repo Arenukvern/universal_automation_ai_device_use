@@ -18,7 +18,7 @@ Concise **how** answers for contributors and integrators. Charter and ethics liv
 A: Core contracts, semantics, conformance, toolkit, browser drivers, screencast, WebRTC helpers, OS drivers, and capture packages are published. **`universal_lexicon` is repo-only today** — consume it via path/git until a publish cut.
 
 **Q: How do I depend on a package while hacking this monorepo?**  
-A: Use a `dependency_overrides` path to `pkgs/<name>` (see [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)). External apps should use pub.dev version constraints when available.
+A: In-repo packages resolve via the root `workspace:` entry — no override needed for `pkgs/*`. For sibling checkouts (xsoulspace, another app repo), copy `pubspec_overrides.yaml.example` to gitignored `pubspec_overrides.yaml` or run `./tool/overrides.sh write` (see [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)). External apps should use pub.dev version constraints when available.
 
 **Q: What is the publish order?**  
 A: [ADR 0001](/decisions/0001_drivers_into_ua_private_oss_ready) — contracts and semantics before drivers and toolkit.

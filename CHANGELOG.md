@@ -4,6 +4,10 @@ Workspace-level notes. Per-package changelogs live under `pkgs/*/CHANGELOG.md`.
 
 ## Unreleased
 
+- **Pub resolution hygiene:** gitignore `pubspec_overrides.yaml`, add
+  `pubspec_overrides.yaml.example` and `tool/overrides.sh` for local sibling
+  `path:` overrides; CONTRIBUTING/DX FAQ point at overrides instead of
+  committing `dependency_overrides` paths in `pubspec.yaml`.
 - **`universal_automation_harness` v0.1.0 (ADR 0004 §4):** the
   composition-root SDK exists — `AutomationAssembly` + `Flow` compile to
   one `AutomationPlan` (fail closed, commands expand at compile time),
