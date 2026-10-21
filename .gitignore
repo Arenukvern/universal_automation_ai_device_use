@@ -12,3 +12,5 @@ pubspec.lock
 *.iml
 .DS_Store
 .steward/
+pubspec_overrides.yaml
+**/pubspec_overrides.yaml
