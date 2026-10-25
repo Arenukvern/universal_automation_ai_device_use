@@ -15,6 +15,23 @@ steward doctor --json   # optional; install via skill_steward install.sh
 steward map
 ```
 
+### Sibling-repo path overrides (local only)
+
+Committed `pubspec.yaml` files use pub.dev version constraints (and this
+repo’s Dart `workspace:` for `pkgs/*`). Do **not** commit `path:` or absolute
+overrides.
+
+For cross-repo hacking (for example `dart_flutter_packages` or a consumer app
+next to this checkout), use a gitignored `pubspec_overrides.yaml`:
+
+```sh
+./tool/overrides.sh write   # copies pubspec_overrides.yaml.example
+./tool/overrides.sh remove  # delete local overrides
+```
+
+Edit the generated file to uncomment the relative `path:` entries you need.
+See `pubspec_overrides.yaml.example` for the shared parent layout.
+
 Run the workspace validation command from `steward.yaml`:
 
 ```sh

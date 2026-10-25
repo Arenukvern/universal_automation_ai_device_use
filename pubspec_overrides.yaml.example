@@ -1,0 +1,41 @@
+# Copy to `pubspec_overrides.yaml` (gitignored) for local cross-repo hacking.
+# Committed `pubspec.yaml` files stay on pub.dev version constraints (or
+# workspace resolution inside this monorepo). Never commit absolute paths.
+#
+# Shared parent layout (sibling checkouts):
+#
+#   <parent>/
+#     universal_automation_ai_device_use/   # this repository
+#     dart_flutter_packages/                # xsoulspace_* (example name)
+#     vosges/                               # example consumer app
+#
+# Generate the local file:
+#   ./tool/overrides.sh write
+# Remove it:
+#   ./tool/overrides.sh remove
+#
+# Inside this monorepo, `workspace:` + `resolution: workspace` already resolve
+# `pkgs/*` to the checkout. Overrides are for unpublished siblings or for
+# pointing at another repo's `pkgs/<name>` while you develop.
+
+dependency_overrides:
+  # --- Optional: hack xsoulspace packages from a sibling checkout ---
+  # xsoulspace_permission_core:
+  #   path: ../dart_flutter_packages/xsoulspace_permission_core
+  # xsoulspace_lints:
+  #   path: ../dart_flutter_packages/xsoulspace_lints
+
+  # --- Example: consumer app (e.g. vosges) depending on this monorepo ---
+  # (place these lines in *that app's* pubspec_overrides.yaml, not here)
+  # universal_automation_toolkit:
+  #   path: ../universal_automation_ai_device_use/pkgs/universal_automation_toolkit
+  # universal_driver_macos:
+  #   path: ../universal_automation_ai_device_use/pkgs/universal_driver_macos
+
+  # --- Unpublished from this repo (class c): use path until pub.dev cut, or ---
+  # --- pinned git ref after a release tag exists: ---
+  # universal_lexicon:
+  #   git:
+  #     url: https://github.com/Arenukvern/universal_automation_ai_device_use.git
+  #     path: pkgs/universal_lexicon
+  #     ref: universal_lexicon-v0.1.0   # example tag — create before adopting
