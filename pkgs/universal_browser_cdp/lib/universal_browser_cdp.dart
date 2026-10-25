@@ -20,3 +20,4 @@ export 'src/cdp_driver.dart';
 export 'src/cdp_network.dart';
 export 'src/cdp_page.dart';
 export 'src/cdp_semantic_targeting.dart';
+export 'src/target_selection_exception.dart';

@@ -41,6 +41,59 @@ class FakeCdpServer {
   /// Payload returned by `Page.captureScreenshot`.
   String screenshotBase64 = fakePngBase64;
 
+  /// Params of every `Page.captureScreenshot` call, in order.
+  final List<Map<String, Object?>> screenshotParams = [];
+
+  /// The layout metrics `Page.getLayoutMetrics` reports.
+  ///
+  /// Defaults to a 800x600 viewport over a 800x600 document at a device
+  /// pixel ratio of 1.
+  Map<String, Object?> layoutMetrics = {
+    'layoutViewport': {
+      'pageX': 0,
+      'pageY': 0,
+      'clientWidth': 800,
+      'clientHeight': 600,
+    },
+    'visualViewport': {
+      'offsetX': 0,
+      'offsetY': 0,
+      'pageX': 0,
+      'pageY': 0,
+      'clientWidth': 800,
+      'clientHeight': 600,
+      'scale': 1,
+      'zoom': 1,
+    },
+    'contentSize': {'x': 0, 'y': 0, 'width': 800, 'height': 600},
+    'cssLayoutViewport': {
+      'pageX': 0,
+      'pageY': 0,
+      'clientWidth': 800,
+      'clientHeight': 600,
+    },
+    'cssVisualViewport': {
+      'offsetX': 0,
+      'offsetY': 0,
+      'pageX': 0,
+      'pageY': 0,
+      'clientWidth': 800,
+      'clientHeight': 600,
+      'scale': 1,
+      'zoom': 1,
+    },
+    'cssContentSize': {'x': 0, 'y': 0, 'width': 800, 'height': 600},
+  };
+
+  /// The page targets `/json/list` reports.
+  ///
+  /// A real browser exposes every open tab here, which is why attaching
+  /// to "the first page" is a guess.
+  List<Map<String, Object?>> pageTargets = [];
+
+  /// The target id `/json/list` reports as the current page.
+  String currentTargetId = 'page-1';
+
   /// JPEG payload per emitted screencast frame (4-byte SOI/EOI).
   String screencastFrameBase64 = base64Encode(const [0xFF, 0xD8, 0xFF, 0xD9]);
 
@@ -50,8 +103,7 @@ class FakeCdpServer {
   /// Value returned verbatim by `Runtime.evaluate` (default: the canned
   /// element rect JSON with a passing hit-target check, so clicks
   /// resolve).
-  String evaluateValue =
-      '{"x":40,"y":60,"width":200,"height":80,"hitOk":true}';
+  String evaluateValue = '{"x":40,"y":60,"width":200,"height":80,"hitOk":true}';
 
   /// When set, answers `Runtime.evaluate` instead of [evaluateValue]; a
   /// `null` result falls back to the default. Tests use this to script
@@ -106,6 +158,17 @@ class FakeCdpServer {
   Future<Uri> start() async {
     _server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     _server!.listen((request) => _handle(request).catchError((Object _) {}));
+    if (pageTargets.isEmpty) {
+      pageTargets = [
+        {
+          'id': 'page-1',
+          'type': 'page',
+          'url': currentUrl,
+          'title': 'Fake page',
+          'webSocketDebuggerUrl': wsPageUri.toString(),
+        },
+      ];
+    }
     return httpBase;
   }
 
@@ -154,13 +217,16 @@ class FakeCdpServer {
       });
     } else if (path == '/json/list') {
       await _respondJson(request, [
-        {
-          'id': 'page-1',
-          'type': 'page',
-          'url': currentUrl,
-          'title': 'Fake page',
-          'webSocketDebuggerUrl': wsPageUri.toString(),
-        },
+        for (final target in pageTargets)
+          {
+            'id': target['id'],
+            'type': target['type'] ?? 'page',
+            'url': target['url'] ?? '',
+            'title': target['title'] ?? '',
+            'webSocketDebuggerUrl':
+                target['webSocketDebuggerUrl'] ??
+                'ws://127.0.0.1:${_server!.port}/devtools/page/${target['id']}',
+          },
       ]);
     } else {
       request.response.statusCode = 404;
@@ -207,18 +273,17 @@ class FakeCdpServer {
         currentUrl = params['url'] as String? ?? currentUrl;
         respond({'frameId': 'frame-1', 'loaderId': 'loader-1'});
         emit('Page.frameNavigated', {
-          'frame': {
-            'id': 'frame-1',
-            'loaderId': 'loader-1',
-            'url': currentUrl,
-          },
+          'frame': {'id': 'frame-1', 'loaderId': 'loader-1', 'url': currentUrl},
         });
         if (emitLifecycleEvents) {
           emit('Page.domContentEventFired', const {});
           emit('Page.loadEventFired', const {});
         }
       case 'Page.captureScreenshot':
+        screenshotParams.add(Map.of(params));
         respond({'data': screenshotBase64});
+      case 'Page.getLayoutMetrics':
+        respond(layoutMetrics);
       case 'Page.startScreencast':
         screencastActive = true;
         respond(const {});
@@ -237,20 +302,14 @@ class FakeCdpServer {
             'result': const {'type': 'object'},
             'exceptionDetails': {
               'text': 'Uncaught',
-              'exception': {
-                'type': 'object',
-                'description': evaluateException,
-              },
+              'exception': {'type': 'object', 'description': evaluateException},
             },
           });
           break;
         }
         final scripted = evaluateHandler?.call(expression);
         respond({
-          'result': {
-            'type': 'string',
-            'value': scripted ?? evaluateValue,
-          },
+          'result': {'type': 'string', 'value': scripted ?? evaluateValue},
         });
       case 'Accessibility.getFullAXTree':
         respond({'nodes': axNodes});
@@ -284,7 +343,12 @@ class FakeCdpServer {
       case 'Target.getTargets':
         respond({
           'targetInfos': [
-            {'targetId': 'page-1', 'type': 'page', 'url': currentUrl},
+            for (final target in pageTargets)
+              {
+                'targetId': target['id'],
+                'type': target['type'] ?? 'page',
+                'url': target['url'] ?? '',
+              },
           ],
         });
       default:

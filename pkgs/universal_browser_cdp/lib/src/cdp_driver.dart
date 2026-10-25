@@ -7,6 +7,7 @@ import 'cdp_connection.dart';
 import 'cdp_discovery.dart';
 import 'cdp_page.dart';
 import 'cdp_semantic_targeting.dart';
+import 'target_selection_exception.dart';
 
 /// [AutomationDriver] over a CDP page: the observe/act/verify loop for
 /// Chromium-based browsers and webviews.
@@ -23,6 +24,7 @@ class CdpDriver
     implements
         AutomationDriver,
         AutomationActionCatalog,
+        ConfigurableCapture,
         TargetedAutomationDriver {
   /// Creates a driver over an attached [CdpPage].
   CdpDriver(this._page);
@@ -226,6 +228,14 @@ class CdpDriver
   @override
   Future<Uint8List> screenshot() => _page.screenshot();
 
+  /// Captures one frame honoring [options] — beyond the viewport, capped
+  /// to a size budget, and/or in a chosen encoding.
+  ///
+  /// The size cap is applied by the browser at capture time, so the
+  /// image is scaled once, not resampled from an oversized frame.
+  @override
+  Future<Uint8List> capture(CaptureOptions options) => _page.capture(options);
+
   @override
   Future<void> close() async {
     if (_closed) return;
@@ -250,23 +260,83 @@ class CdpBrowserSession {
   /// Probes [httpBase], picks the first target of [type], connects, and
   /// attaches. Refuses to attach when the endpoint does not answer —
   /// the borrowed-lease identity check.
+  ///
+  /// With a [selector], the target must *match* it: a browser with
+  /// several tabs open would otherwise attach to an arbitrary one. A
+  /// selector that matches nothing, or more than one target, refuses
+  /// loudly instead of guessing.
+  ///
+  /// When no selector is given, one is read from [httpBase]'s fragment
+  /// (see [CdpTargetSelector.fromUri]) — so the choice travels with the
+  /// address through every transport in the family, exactly like the OS
+  /// tier's `ax://pid/123` app anchor.
   static Future<CdpBrowserSession> attach(
     Uri httpBase, {
     String type = 'page',
+    CdpTargetSelector? selector,
     Duration timeout = const Duration(seconds: 10),
   }) async {
-    final version = await CdpDiscovery.requireAlive(httpBase, timeout: timeout);
-    final target = await CdpDiscovery.findTarget(
-      httpBase,
-      type: type,
+    final effective = selector ?? CdpTargetSelector.fromUri(httpBase);
+    // The fragment is a client-side annotation: the browser must never
+    // see it, so the probes use the address without it.
+    final probeBase = httpBase.replace(fragment: '');
+    final version = await CdpDiscovery.requireAlive(
+      probeBase,
       timeout: timeout,
     );
-    if (target == null || target.webSocketDebuggerUrl.isEmpty) {
+    if (effective == null) {
+      final target = await CdpDiscovery.findTarget(
+        probeBase,
+        type: type,
+        timeout: timeout,
+      );
+      if (target == null || target.webSocketDebuggerUrl.isEmpty) {
+        throw EndpointUnreachableException(
+          'no "$type" target with a debugger URL at $httpBase',
+          details: {'httpBase': httpBase.toString(), 'type': type},
+        );
+      }
+      return _attachTo(target, version, probeBase, timeout: timeout);
+    }
+
+    final matches = await CdpDiscovery.listTargets(
+      probeBase,
+      type: type,
+      selector: effective,
+      timeout: timeout,
+    );
+    if (matches.isEmpty) {
+      throw TargetSelectionException(
+        effective,
+        const [],
+        message: 'no $type target matches ${effective.describe()} at $httpBase',
+      );
+    }
+    if (matches.length > 1) {
+      throw TargetSelectionException(
+        effective,
+        matches,
+        message:
+            '${matches.length} $type targets match ${effective.describe()} at '
+            '$httpBase — narrow the selector (id, url, or title)',
+      );
+    }
+    final target = matches.single;
+    if (target.webSocketDebuggerUrl.isEmpty) {
       throw EndpointUnreachableException(
-        'no "$type" target with a debugger URL at $httpBase',
+        'the $type target matching ${effective.describe()} has no debugger URL',
         details: {'httpBase': httpBase.toString(), 'type': type},
       );
     }
+    return _attachTo(target, version, probeBase, timeout: timeout);
+  }
+
+  static Future<CdpBrowserSession> _attachTo(
+    CdpTargetInfo target,
+    CdpVersionInfo version,
+    Uri httpBase, {
+    Duration timeout = const Duration(seconds: 10),
+  }) async {
     final connection = await CdpConnection.connect(
       Uri.parse(target.webSocketDebuggerUrl),
       timeout: timeout,

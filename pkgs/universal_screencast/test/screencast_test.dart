@@ -354,6 +354,51 @@ void main() {
       expect(receipts[1]['offset'], jpegBytes(1).length);
       expect(receipts[1]['sequence'], 2);
     });
+
+    test('the artifact is named for the frames it holds', () async {
+      // A file named for an encoding it does not hold would misdescribe
+      // the evidence, so the extension follows the written frames.
+      final jpegSink = FileRecorderSink(directory: tempDir.path);
+      await jpegSink.push(frameAt(1));
+      await jpegSink.close();
+      expect(jpegSink.framesPath, endsWith('.mjpeg'));
+
+      final pngSink = FileRecorderSink(directory: tempDir.path);
+      await pngSink.push(
+        Frame(
+          sourceId: 'test',
+          sequence: 1,
+          revision: 0,
+          bytes: Uint8List.fromList([0x89, 0x50]),
+          contentType: 'image/png',
+          capturedAt: DateTime.now().toUtc(),
+        ),
+      );
+      await pngSink.close();
+      expect(pngSink.framesPath, endsWith('.png'));
+      expect(File(pngSink.framesPath).existsSync(), isTrue);
+    });
+
+    test(
+      'mixing encodings in one recording refuses rather than mislabels',
+      () async {
+        final sink = FileRecorderSink(directory: tempDir.path);
+        await sink.push(frameAt(1));
+        await expectLater(
+          sink.push(
+            Frame(
+              sourceId: 'test',
+              sequence: 2,
+              revision: 0,
+              bytes: Uint8List.fromList([0x89, 0x50]),
+              contentType: 'image/png',
+              capturedAt: DateTime.now().toUtc(),
+            ),
+          ),
+          throwsA(isA<ProtocolException>()),
+        );
+      },
+    );
   });
 
   group('CdpScreencastFrameSource', () {

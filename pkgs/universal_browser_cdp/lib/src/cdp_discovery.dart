@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import 'automation_exceptions_export.dart';
 
 const _utf8Decoder = Utf8Decoder(allowMalformed: true);
@@ -73,6 +75,115 @@ class CdpTargetInfo {
   String toString() => 'CdpTargetInfo($id, $type, $url)';
 }
 
+/// Picks one page target out of a browser's open tabs.
+///
+/// A browser session usually has several tabs open, and the CDP endpoint
+/// lists them all. Attaching to "the first page" is a guess: a real
+/// Chrome exposes every open tab as a `page` target, so the first one is
+/// an arbitrary tab rather than the one the user means. A selector makes
+/// the choice explicit and fails loudly when it cannot be resolved —
+/// never silently attaching to the wrong tab.
+@immutable
+class CdpTargetSelector {
+  /// Creates a selector. Every field is optional; when more than one is
+  /// set they must all match.
+  const CdpTargetSelector({this.id, this.urlContains, this.titleContains});
+
+  /// The exact CDP target id.
+  final String? id;
+
+  /// A substring the target's URL must contain.
+  final String? urlContains;
+
+  /// A substring the target's title must contain.
+  final String? titleContains;
+
+  /// The query-parameter names this selector is encoded as.
+  ///
+  /// The selector rides in the endpoint URI's *fragment*, the same place
+  /// the OS tier encodes its app anchor (`ax://pid/123`): the fragment is
+  /// never sent to the browser, so the debug endpoint's own HTTP probes
+  /// (`/json/version`, `/json/list`) stay untouched while the choice
+  /// travels with the address.
+  /// The query-parameter name the target id is encoded as.
+  static const String idParam = 'targetId';
+
+  /// The query-parameter name the URL criterion is encoded as.
+  static const String urlParam = 'targetUrl';
+
+  /// The query-parameter name the title criterion is encoded as.
+  static const String titleParam = 'targetTitle';
+
+  /// Reads a selector from [uri]'s fragment, or `null` when it carries
+  /// none.
+  ///
+  /// The fragment is parsed as query-style parameters, so a selector can
+  /// combine criteria: `#targetId=ABC&targetUrl=example.com`.
+  static CdpTargetSelector? fromUri(Uri uri) {
+    final fragment = uri.fragment;
+    if (fragment.isEmpty) {
+      return null;
+    }
+    final params = Uri.splitQueryString(fragment);
+    final id = params[idParam];
+    final url = params[urlParam];
+    final title = params[titleParam];
+    if (id == null && url == null && title == null) {
+      return null;
+    }
+    return CdpTargetSelector(id: id, urlContains: url, titleContains: title);
+  }
+
+  /// A copy of [base] carrying this selector in its fragment.
+  Uri applyTo(Uri base) {
+    final params = <String, String>{
+      idParam: ?id,
+      urlParam: ?urlContains,
+      titleParam: ?titleContains,
+    };
+    if (params.isEmpty) {
+      return base;
+    }
+    return base.replace(fragment: Uri(queryParameters: params).query);
+  }
+
+  /// Whether [target] satisfies this selector.
+  bool matches(CdpTargetInfo target) {
+    final wantedId = id;
+    if (wantedId != null && target.id != wantedId) {
+      return false;
+    }
+    final wantedUrl = urlContains;
+    if (wantedUrl != null && !target.url.contains(wantedUrl)) {
+      return false;
+    }
+    final wantedTitle = titleContains;
+    if (wantedTitle != null && !target.title.contains(wantedTitle)) {
+      return false;
+    }
+    return true;
+  }
+
+  /// The targets this selector accepts, in endpoint order.
+  List<CdpTargetInfo> selectFrom(List<CdpTargetInfo> targets) => [
+    for (final target in targets)
+      if (matches(target)) target,
+  ];
+
+  /// A human-readable description of what this selector asks for.
+  String describe() {
+    final parts = <String>[
+      if (id != null) 'id=$id',
+      if (urlContains != null) 'url~$urlContains',
+      if (titleContains != null) 'title~$titleContains',
+    ];
+    return parts.isEmpty ? 'any target' : parts.join(', ');
+  }
+
+  @override
+  String toString() => 'CdpTargetSelector(${describe()})';
+}
+
 /// HTTP-side discovery against a CDP endpoint's debug server.
 ///
 /// This is the same readiness contract oka uses for borrowed-lease identity
@@ -128,8 +239,12 @@ abstract final class CdpDiscovery {
   }
 
   /// Lists targets (`/json/list`); empty when unreachable.
+  ///
+  /// With a [selector], only the targets it accepts are returned.
   static Future<List<CdpTargetInfo>> listTargets(
     Uri httpBase, {
+    String type = 'page',
+    CdpTargetSelector? selector,
     Duration timeout = const Duration(seconds: 5),
     HttpClient? client,
   }) async {
@@ -147,10 +262,14 @@ abstract final class CdpDiscovery {
           .timeout(timeout);
       final decoded = jsonDecode(body);
       if (decoded is! List<Object?>) return const [];
-      return decoded
+      final targets = decoded
           .whereType<Map<String, Object?>>()
           .map(CdpTargetInfo.fromJson)
           .toList(growable: false);
+      if (selector == null) {
+        return targets;
+      }
+      return selector.selectFrom(targets);
     } on Object {
       return const [];
     } finally {
@@ -159,14 +278,21 @@ abstract final class CdpDiscovery {
   }
 
   /// First target of [type], or `null`.
+  ///
+  /// With a [selector], the first target *matching the selector* is
+  /// returned; a selector that matches nothing yields `null` so the
+  /// caller can refuse loudly.
   static Future<CdpTargetInfo?> findTarget(
     Uri httpBase, {
     String type = 'page',
+    CdpTargetSelector? selector,
     Duration timeout = const Duration(seconds: 5),
     HttpClient? client,
   }) async {
     final targets = await listTargets(
       httpBase,
+      type: type,
+      selector: selector,
       timeout: timeout,
       client: client,
     );

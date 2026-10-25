@@ -6,6 +6,13 @@
 /// build hooks; requires the Accessibility TCC grant for tree queries and
 /// Screen Recording for `screenshot`.
 ///
+/// The Screen Recording grant is requestable from the product:
+///
+/// ```dart
+/// final driver = MacosDriver();
+/// if (!driver.screenCaptureTrusted) driver.requestScreenCaptureConsent();
+/// ```
+///
 /// ```dart
 /// final driver = MacosDriver();
 /// if (!driver.axTrusted) driver.requestTrust();
@@ -22,7 +29,14 @@
 library;
 
 export 'package:universal_automation_interface/universal_automation_interface.dart'
-    show AutomationAction, AxNode, Snapshot;
+    show
+        AutomationAction,
+        AxNode,
+        CaptureFormat,
+        CaptureOptions,
+        ConfigurableCapture,
+        OsConsentRequester,
+        Snapshot;
 
 export 'src/accessibility_activation.dart';
 export 'src/driver_bridge.dart';

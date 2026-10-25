@@ -7,6 +7,7 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
 import 'package:universal_driver_macos/universal_driver_macos.dart';
 
+import '../capture/capture_request.dart';
 import '../composition/desktop_os_factory.dart';
 import '../mcp/mcp_server.dart' as mcp;
 import '../plan/checks.dart';
@@ -80,6 +81,40 @@ Uri? _parseEndpoint(String? value, String flag) {
   return uri;
 }
 
+/// The capture options a screenshot command asked for.
+///
+/// The same vocabulary the MCP tool takes, so both agent faces speak the
+/// same words about a capture.
+CaptureRequest _captureRequest(ArgResults command) {
+  final maxPx = int.tryParse(command['max-px'] as String? ?? '');
+  final quality = int.tryParse(command['quality'] as String? ?? '');
+  try {
+    return CaptureRequest.fromArguments({
+      'maxPx': maxPx == null ? null : maxPx,
+      'fullPage': command['full-page'] == true,
+      'format': command['format'] as String?,
+      'quality': quality == null ? null : quality,
+    });
+  } on FormatException catch (error) {
+    throw UsageException(error.message);
+  }
+}
+
+/// Captures with the requested options, translating a tier's refusal into
+/// a usage error that names the route out.
+Future<List<int>> _capture(
+  CaptureRequest request,
+  AutomationDriver driver,
+) async {
+  try {
+    return await request.capture(driver);
+  } on DriverUnsupportedException catch (error) {
+    throw UsageException(error.message);
+  } on SpecViolationException catch (error) {
+    throw UsageException(error.violations.join('; '));
+  }
+}
+
 /// The resolved serve face (ADR 0003): which transport ad-hoc calls
 /// attach to by default, and the per-transport endpoint registry.
 ///
@@ -112,8 +147,7 @@ ServeTierConfig _serveTierConfig(ArgResults options) {
   );
   final endpoints = <AutomationTransport, Uri>{
     if (envCdp != null) AutomationTransport.cdp: envCdp,
-    if (envWebdriver != null)
-      AutomationTransport.webdriver: envWebdriver,
+    if (envWebdriver != null) AutomationTransport.webdriver: envWebdriver,
     if (webdriver != null) AutomationTransport.webdriver: webdriver,
     if (cdp != null) AutomationTransport.cdp: cdp,
   };
@@ -127,9 +161,15 @@ ServeTierConfig _serveTierConfig(ArgResults options) {
   return (defaultTransport, endpoints);
 }
 
-Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
+Future<ResolvedSession> _attachAdHoc(
+  ArgResults options, {
+  ArgResults? command,
+}) async {
   final (transport, endpoints) = _serveTierConfig(options);
-  final registry = SessionRegistry(bindings: const {}, factories: _desktopFactories);
+  final registry = SessionRegistry(
+    bindings: const {},
+    factories: _desktopFactories,
+  );
   final appSpec = options['app'] as String?;
   if (appSpec != null) {
     if (transport != AutomationTransport.osAccessibility) {
@@ -167,8 +207,32 @@ Future<ResolvedSession> _attachAdHoc(ArgResults options) async {
       'UNIVERSAL_AUTOMATION_CDP also configures the browser tier',
     );
   }
+  // The target selector rides the endpoint URI, so the choice reaches the
+  // browser tier through every surface (CLI, MCP, plan) without a second
+  // channel. It applies to the CDP tier only.
+  final targetId = command?['target-id'] as String?;
+  final targetUrl = command?['target-url'] as String?;
+  final targetTitle = command?['target-title'] as String?;
+  var resolved = endpoint;
+  if (targetId != null || targetUrl != null || targetTitle != null) {
+    if (transport != AutomationTransport.cdp) {
+      throw const UsageException(
+        '--target-id/--target-url/--target-title select a browser tab and '
+        'need the CDP tier (--cdp)',
+      );
+    }
+    resolved = endpoint.replace(
+      fragment: Uri(
+        queryParameters: {
+          if (targetId != null) 'targetId': targetId,
+          if (targetUrl != null) 'targetUrl': targetUrl,
+          if (targetTitle != null) 'targetTitle': targetTitle,
+        },
+      ).query,
+    );
+  }
   return _DetachingSession(
-    await registry.attachUri(endpoint, transport),
+    await registry.attachUri(resolved, transport),
     registry,
   );
 }
@@ -215,8 +279,7 @@ Future<int> _dispatch(List<String> arguments) async {
     ..addFlag(
       'os',
       negatable: false,
-      help:
-          'Drive the desktop accessibility tier of this host (macOS AX focused app / Linux AT-SPI / Windows UIA); endpoint-free.',
+      help: 'Drive the desktop accessibility tier of this host (macOS AX focused app / Linux AT-SPI / Windows UIA); endpoint-free.',
     )
     ..addOption(
       'app',
@@ -325,7 +388,31 @@ Future<int> _dispatch(List<String> arguments) async {
     )
     ..addOption(
       'max-px',
-      help: 'Cap the long side in pixels (e.g. 1024; OS tier).',
+      help: 'Cap the long side in pixels (e.g. 1024; 0 = no cap).',
+    )
+    ..addFlag(
+      'full-page',
+      negatable: false,
+      help: 'Capture the whole scrollable surface (a scrolling tier only).',
+    )
+    ..addOption(
+      'format',
+      help: 'Encoding: png (lossless, default) or jpeg.',
+      allowed: ['png', 'jpeg'],
+    )
+    ..addOption('quality', help: 'JPEG quality 1..100 (jpeg only).')
+    ..addOption(
+      'target-id',
+      help:
+          'Attach to this CDP target id (a browser tab) instead of the first.',
+    )
+    ..addOption(
+      'target-url',
+      help: 'Attach to the CDP tab whose URL contains this.',
+    )
+    ..addOption(
+      'target-title',
+      help: 'Attach to the CDP tab whose title contains this.',
     );
   parser.addCommand('validate')
     ..addOption('plan', mandatory: true, help: 'Plan document path.');
@@ -545,8 +632,9 @@ Future<int> _dispatch(List<String> arguments) async {
         await session.detach();
       }
     case 'screenshot':
-      final session = await _attachAdHoc(options);
+      final session = await _attachAdHoc(options, command: command);
       try {
+        final request = _captureRequest(command);
         final driver = session.driver;
         // An is-check cannot promote through the ResolvedSession seam:
         // cast explicitly (the catalog gotcha).
@@ -554,9 +642,9 @@ Future<int> _dispatch(List<String> arguments) async {
         final listWindows = command['list-windows'] == true;
         final windowId = command['window-id'] as String?;
         final maxPx = int.tryParse(command['max-px'] as String? ?? '') ?? 0;
-        if (listWindows || windowId != null || maxPx > 0) {
-          // Window discovery, window capture, and resizing are the
-          // native tier's surface; plain display capture is not.
+        if (listWindows || windowId != null) {
+          // Window discovery and window capture are the native tier's
+          // surface; plain display capture is not.
           if (macos == null) {
             throw const UsageException(
               'window capture needs the OS tier (--os)',
@@ -577,9 +665,7 @@ Future<int> _dispatch(List<String> arguments) async {
         }
         final bytes = windowId != null
             ? await macos!.windowScreenshot(int.parse(windowId), maxPx: maxPx)
-            : maxPx > 0
-            ? await macos!.screenshot(maxPx: maxPx)
-            : await driver.screenshot();
+            : await _capture(request, driver);
         final file = File(command['out'] as String);
         await file.parent.create(recursive: true);
         await file.writeAsBytes(bytes, flush: true);

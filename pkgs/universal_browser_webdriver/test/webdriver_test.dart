@@ -79,7 +79,11 @@ void main() {
         throwsA(
           isA<ElementNotFoundException>()
               .having((error) => error.locator, 'locator', 'unspecified')
-              .having((error) => error.locatorValue, 'locatorValue', '#missing'),
+              .having(
+                (error) => error.locatorValue,
+                'locatorValue',
+                '#missing',
+              ),
         ),
       );
     });
@@ -104,6 +108,91 @@ void main() {
         throwsA(isA<DriverUnsupportedException>()),
       );
     });
+  });
+
+  group('WebDriverDriver capture', () {
+    late WebDriverDriver driver;
+
+    setUp(() async {
+      final sessionClient = WebDriverClient(client.serverUri);
+      await sessionClient.newSession();
+      driver = WebDriverDriver(sessionClient);
+      addTearDown(sessionClient.deleteSession);
+    });
+
+    test('the plain viewport PNG is served', () async {
+      final bytes = await driver.capture(const CaptureOptions());
+      expect(base64Encode(bytes), fakePngBase64);
+    });
+
+    test('a full-page capture refuses with the route out', () async {
+      await expectLater(
+        driver.capture(const CaptureOptions(fullPage: true)),
+        throwsA(
+          isA<DriverUnsupportedException>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('no full-page screenshot'),
+              )
+              .having(
+                (error) => error.details['remedy'],
+                'remedy',
+                contains('--cdp'),
+              ),
+        ),
+      );
+    });
+
+    test('a size cap refuses with the route out', () async {
+      await expectLater(
+        driver.capture(const CaptureOptions(maxPx: 800)),
+        throwsA(
+          isA<DriverUnsupportedException>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('cannot resize'),
+              )
+              .having(
+                (error) => error.details['remedy'],
+                'remedy',
+                contains('--cdp'),
+              ),
+        ),
+      );
+    });
+
+    test('a jpeg capture refuses with the route out', () async {
+      await expectLater(
+        driver.capture(
+          const CaptureOptions(format: CaptureFormat.jpeg, quality: 80),
+        ),
+        throwsA(
+          isA<DriverUnsupportedException>()
+              .having(
+                (error) => error.message,
+                'message',
+                contains('returns PNG only'),
+              )
+              .having(
+                (error) => error.details['remedy'],
+                'remedy',
+                contains('--cdp'),
+              ),
+        ),
+      );
+    });
+
+    test(
+      'an invalid option set is rejected before anything is captured',
+      () async {
+        await expectLater(
+          driver.capture(const CaptureOptions(quality: 80)),
+          throwsA(isA<SpecViolationException>()),
+        );
+      },
+    );
   });
 
   automationDriverConformanceTests(

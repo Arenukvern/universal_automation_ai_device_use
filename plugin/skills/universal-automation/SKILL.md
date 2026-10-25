@@ -24,33 +24,35 @@ commands, oka calls, arbitrary checks.
 
 ## Linked tiers
 
-| Tier | Transport | Notes |
-| --- | --- | --- |
-| Chromium / Flutter web AOT | `cdp` | snapshots, semantic clicks, profiles, `record` |
-| Safari / WebDriver ends | `webdriver` | actions + screenshots; no a11y tree |
-| macOS apps | `osAccessibility` | focused app; Accessibility (+Screen Recording) TCC; `navigate` opens the system browser (ADR 0003) |
-| Linux apps | `osAccessibility` | session D-Bus AT-SPI; `navigate` opens the system browser |
-| Windows apps | `osAccessibility` | UIA sidecar binary; `navigate` opens the system browser |
-| Flutter JIT (debug) | `vmService` | inject `DriverFactory` (composition root) |
+| Tier                       | Transport         | Notes                                                                                                                             |
+| -------------------------- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Chromium / Flutter web AOT | `cdp`             | snapshots, semantic clicks, profiles, `record`; full page, size cap, JPEG, tab selection                                          |
+| Safari / WebDriver ends    | `webdriver`       | actions + screenshots; no a11y tree; no full page, resize, or JPEG (W3C has none)                                                 |
+| macOS apps                 | `osAccessibility` | focused app; Accessibility (+Screen Recording) TCC; `navigate` opens the system browser (ADR 0003); size cap + JPEG, no full page |
+| Linux apps                 | `osAccessibility` | session D-Bus AT-SPI; `navigate` opens the system browser                                                                         |
+| Windows apps               | `osAccessibility` | UIA sidecar binary; `navigate` opens the system browser                                                                           |
+| Flutter JIT (debug)        | `vmService`       | inject `DriverFactory` (composition root)                                                                                         |
 
 ## MCP tools (plugin server mounted)
 
-| Tool | Purpose |
-| --- | --- |
-| `automation_capabilities` | What this server can reach — default transport, per-tier endpoints + reachability probe, verb matrix, routing + handle config. Call first when unsure which tier a verb will take. |
-| `automation_observe` | Semantic snapshot of a surface (read-only). Pass `view` (`{subtreeOf, identifierPrefix, fields, maxNodes, panes}`) for a rendered, ref-stable observation instead of the raw tree; `diff: true` adds +/-/~ rows against the previous viewed observation (ADR 0052). |
-| `automation_act` | navigate/click/type/key/scroll/evaluate/invoke; optional `profile` (ADR-0044 humanized delivery) + `seed`; `returnState: true` attaches the post-action state render — act + observe in one call. |
-| `automation_verify` | Checks: `{exists: {role?, name?}}`, `{absent: …}`, `{value: {locator, equals/contains}}`, `{urlContains: s}`. |
-| `automation_screenshot` | PNG to a local path (opt-in pixels; the semantic channel is primary). |
-| `automation_list_apps` | macOS tier: running, anchorable apps — feed a row into any OS call's `app` argument (background observe/act, ADR 0064). |
-| `automation_validate_plan` | Fail-closed snapshot validation. |
-| `automation_run_plan` | Run a scenario; structured JSON report + receipts. |
+| Tool                         | Purpose                                                                                                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `automation_capabilities`    | What this server can reach — default transport, per-tier endpoints + reachability probe, verb matrix, routing + handle config. Call first when unsure which tier a verb will take.                                                                                  |
+| `automation_observe`         | Semantic snapshot of a surface (read-only). Pass `view` (`{subtreeOf, identifierPrefix, fields, maxNodes, panes}`) for a rendered, ref-stable observation instead of the raw tree; `diff: true` adds +/-/~ rows against the previous viewed observation (ADR 0052). |
+| `automation_act`             | navigate/click/type/key/scroll/evaluate/invoke; optional `profile` (ADR-0044 humanized delivery) + `seed`; `returnState: true` attaches the post-action state render — act + observe in one call.                                                                   |
+| `automation_verify`          | Checks: `{exists: {role?, name?}}`, `{absent: …}`, `{value: {locator, equals/contains}}`, `{urlContains: s}`.                                                                                                                                                       |
+| `automation_screenshot`      | PNG to a local path (opt-in pixels; the semantic channel is primary). `fullPage`, `maxPx`, `format`/`quality` choose how much and how large; `targetId`/`targetUrl`/`targetTitle` pick the browser tab.                                                             |
+| `automation_list_apps`       | macOS tier: running, anchorable apps — feed a row into any OS call's `app` argument (background observe/act, ADR 0064).                                                                                                                                             |
+| `automation_request_consent` | Ask the OS for a grant the tier needs (`accessibility` for the app tree, `screenRecording` for pixels). The OS shows its own prompt; a capture never raises it by itself.                                                                                           |
+| `automation_validate_plan`   | Fail-closed snapshot validation.                                                                                                                                                                                                                                    |
+| `automation_run_plan`        | Run a scenario; structured JSON report + receipts.                                                                                                                                                                                                                  |
 
 Ad-hoc tools take a `transport` (`cdp | webdriver | osAccessibility`)
 plus an `endpoint` (HTTP base); `osAccessibility` is the desktop tier —
 it binds the **focused application** and needs no endpoint. Without
 arguments the server uses its `serve` default (`--cdp <base>`, or
-`--os` for the desktop tier).
+`--os` for the desktop tier). A browser with several tabs open takes
+`targetId` / `targetUrl` / `targetTitle` to name the one you mean.
 
 ## Cold start (first call)
 
@@ -79,6 +81,51 @@ The handle artifact is the oka/moli route: something else starts the
 browser (e.g. `moli serve` or `chromium --remote-debugging-port=9222`)
 and publishes `<handles-dir>/<name>` containing the absolute URI; the
 toolkit attaches and never owns the process.
+
+### Which tab? (browser with several open)
+
+A browser session lists **every** open tab, so attaching to "the first page"
+is a guess. Name the tab you mean, and the attach refuses rather than
+guessing when the choice is ambiguous:
+
+```bash
+universal-automation screenshot --cdp http://127.0.0.1:9222 \
+  --target-url /checkout --out /tmp/checkout.png
+```
+
+`--target-id`, `--target-url`, `--target-title` (CLI) and `targetId` /
+`targetUrl` / `targetTitle` (MCP) pick the tab. In a plan, the same choice
+rides the session URI: `http://127.0.0.1:9222#targetUrl=/checkout`.
+
+## Captures that a model can actually use
+
+`automation_screenshot` (and the `screenshot` plan step) take options that
+decide _how much_ and _how large_:
+
+| Option                           | Effect                                              | Who honors it |
+| -------------------------------- | --------------------------------------------------- | ------------- |
+| `fullPage: true`                 | the whole scrollable surface, not just the viewport | CDP           |
+| `maxPx: 1024`                    | cap the long side in pixels                         | CDP, macOS    |
+| `format: "jpeg"` + `quality: 80` | much smaller for UI content                         | CDP, macOS    |
+
+A tier that cannot honor an option **refuses and names the route out** — it
+never quietly returns something else.
+
+`maxPx` is a _budget_, not a fidelity loss: the image is scaled by the
+browser **at capture time**, and a vision model downsamples large images to
+its own input budget anyway, so capping there keeps every pixel the model
+would have seen. A cap smaller than that resolution does discard detail, so
+the cap is your explicit choice.
+
+macOS pixels additionally need the **Screen Recording** grant. When it is
+missing, ask for it — the OS shows its own prompt:
+
+```
+automation_request_consent {kind: "screenRecording"}
+```
+
+Accessibility (`kind: "accessibility"`) is the grant for reading and driving
+the app tree. A capture never raises either prompt by itself.
 
 ## The loop (semantic-first)
 
@@ -109,6 +156,7 @@ final plan = AutomationPlan(
       verifyThat([absent(name: 'Error')]),
       record(const Duration(seconds: 2), '/tmp/out'),      // screencast
       shot('/tmp/cart.png'),
+      shot('/tmp/full.png', fullPage: true, maxPx: 1024),
     ]),
   ],
 );
@@ -126,6 +174,9 @@ universal-automation act      --cdp http://127.0.0.1:9222 --click-name Submit
 universal-automation verify   --cdp http://127.0.0.1:9222 --exists role=button,name=Go
 universal-automation actions  --cdp http://127.0.0.1:9222
 universal-automation screenshot --cdp http://127.0.0.1:9222 --out /tmp/s.png
+universal-automation screenshot --cdp http://127.0.0.1:9222 --out /tmp/full.png --full-page
+universal-automation screenshot --cdp http://127.0.0.1:9222 --out /tmp/s.jpg --format jpeg --quality 80
+universal-automation screenshot --cdp http://127.0.0.1:9222 --out /tmp/tab.png --target-url /checkout
 universal-automation run      --plan plan.yaml --scenario checkout --out /tmp/out
 universal-automation run      --plan plan.yaml --handles-dir ~/.oka/handles
 universal-automation serve    --cdp http://127.0.0.1:9222   # MCP stdio
@@ -171,8 +222,12 @@ the toolkit or its native driver.
 - Locators are semantic (`role`/accessible `name`) first; CSS is the
   fallback tier. `wait` instead of sleeps — deep links may resolve on
   the previous page's load event.
-- macOS tier needs the Accessibility TCC grant for the *host process*
-  (the MCP client or terminal that spawned the binary).
+- macOS tier needs the Accessibility TCC grant for the _host process_
+  (the MCP client or terminal that spawned the binary), and the Screen
+  Recording grant for pixels. `automation_request_consent` asks for either;
+  the OS shows its own prompt.
+- A tier that cannot honor a capture option refuses and names the route
+  out — it never returns a cheaper capture than the one asked for.
 - Multi-session scenarios: `onSession('name', steps)` or per-step
   `session:`; handle bindings resolve via `--set name=uri` or handle
   artifacts under `--handles-dir`.

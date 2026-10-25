@@ -35,6 +35,20 @@ external bool axdrvAxTrusted();
 /// Prompts with the system Accessibility consent dialog.
 external bool axdrvRequestTrust();
 
+@Native<Bool Function()>(
+  symbol: 'xs_axdrv_screen_capture_trusted',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Whether the Screen Recording TCC grant is present (never prompts).
+external bool axdrvScreenCaptureTrusted();
+
+@Native<Bool Function()>(
+  symbol: 'xs_axdrv_request_screen_capture',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Prompts with the system Screen Recording consent dialog.
+external bool axdrvRequestScreenCapture();
+
 /// Fills [outJson] with a malloc'd JSON string (free via [axdrvFree]).
 @Native<Int32 Function(Int32, Int32, Pointer<Pointer<Utf8>>)>(
   symbol: 'xs_axdrv_snapshot_json',
@@ -209,6 +223,39 @@ external int axdrvScreenshotPng(
 external int axdrvScreenshotWindowPng(
   int windowId,
   int maxPx,
+  Pointer<Pointer<Uint8>> outData,
+  Pointer<IntPtr> outLen,
+);
+
+@Native<
+  Int32 Function(Uint32, Int32, Int32, Pointer<Pointer<Uint8>>, Pointer<IntPtr>)
+>(
+  symbol: 'xs_axdrv_screenshot_jpeg',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Captures one JPEG frame; 10 = Screen Recording consent missing,
+/// `maxPx` caps the long side (0 = raw), `quality` is 1..100 (0 = the
+/// tier default).
+external int axdrvScreenshotJpeg(
+  int displayId,
+  int maxPx,
+  int quality,
+  Pointer<Pointer<Uint8>> outData,
+  Pointer<IntPtr> outLen,
+);
+
+@Native<
+  Int32 Function(Uint32, Int32, Int32, Pointer<Pointer<Uint8>>, Pointer<IntPtr>)
+>(
+  symbol: 'xs_axdrv_screenshot_window_jpeg',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Captures one window's JPEG; 10 = Screen Recording consent missing,
+/// 2 = unknown window.
+external int axdrvScreenshotWindowJpeg(
+  int windowId,
+  int maxPx,
+  int quality,
   Pointer<Pointer<Uint8>> outData,
   Pointer<IntPtr> outLen,
 );

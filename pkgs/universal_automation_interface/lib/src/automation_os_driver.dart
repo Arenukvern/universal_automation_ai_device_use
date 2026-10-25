@@ -78,5 +78,37 @@ abstract interface class OsWindowCapture {
 // ignore: one_member_abstracts
 abstract interface class OsDisplayCapture {
   /// Captures the display; [maxPx] caps the long side.
-  Future<Uint8List> screenshot({int maxPx});
+  Future<Uint8List> screenshot({int? maxPx});
+}
+
+/// Requests the operating system's consent prompts for a tier's
+/// capabilities.
+///
+/// The OS owns these grants (macOS: Accessibility and Screen Recording in
+/// System Settings → Privacy & Security). A driver that needs a grant
+/// detects its absence and refuses; this facade is how the *ask* is
+/// expressed, so the request stays an explicit, user-initiated action
+/// rather than something a capture silently triggers.
+///
+/// Implementations must not prompt on their own: the caller asks.
+abstract interface class OsConsentRequester {
+  /// Whether the Accessibility grant is currently held (never prompts).
+  bool get accessibilityTrusted;
+
+  /// Whether the Screen Recording grant is currently held (never prompts).
+  bool get screenCaptureTrusted;
+
+  /// Raises the system Accessibility prompt; returns the resulting status.
+  ///
+  /// A `true` result means the grant is now held. A `false` result means
+  /// the prompt was shown and the user has not granted it yet (the user
+  /// may still grant it in System Settings).
+  bool requestAccessibilityConsent();
+
+  /// Raises the system Screen Recording prompt; returns the resulting
+  /// status.
+  ///
+  /// A `true` result means the grant is now held. A `false` result means
+  /// the prompt was shown and the user has not granted it yet.
+  bool requestScreenCaptureConsent();
 }

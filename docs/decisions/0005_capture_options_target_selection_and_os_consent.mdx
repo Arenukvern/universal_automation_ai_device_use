@@ -1,0 +1,129 @@
+# ADR 0005 — Capture options, browser-tab selection, and OS consent requests
+
+**Status:** Accepted (2026-10-21)
+**Amends:** nothing; extends the driver contract in
+[ADR 0004](0004_harness_layer_and_packaging_boundaries.mdx) with optional
+capability facades, and builds on
+[ADR 0003](0003_seamless_tier_routing_and_system_browser_open.mdx).
+**North-star impact:** `applies` — the family already promised observe/act/verify
+over a real surface; this makes *seeing* that surface completely, at a size a
+model can use, and names the tab it means.
+
+## Context
+
+Three gaps made the capture surface weaker than the rest of the family.
+
+**1. Full-page capture existed only at package level.** `CdpPage.screenshot`
+took a `beyondViewport` flag, but `CdpDriver.screenshot()` — the method every
+agent surface actually calls — never passed it. The CLI, the MCP tool, and the
+plan step could therefore only ever capture the visible viewport, while the
+capability sat one layer below, unreachable without writing library code.
+
+**2. Attaching to a browser picked an arbitrary tab.** `CdpDiscovery.findTarget`
+returned the *first* target of type `page`. Measured against real Chrome 155, a
+one-tab browser reported **two** page targets. "The first page" is a guess, not a
+choice: with several tabs open the agent drives and captures whichever the
+endpoint happened to list first, and there is no way to ask for another.
+
+**3. A missing Screen Recording grant was a dead end.** The macOS driver had
+`requestTrust()` for the *Accessibility* grant but no equivalent for *Screen
+Recording*, which pixels require. A capture without the grant threw
+`ScreenRecordingPermissionRequiredException`, and the remedy was a prose
+instruction to open System Settings by hand. `universal_capture_macos` had the
+missing request call, but the toolkit's OS tier does not use that package.
+
+Separately, the toolkit's `record` step was CDP-only, and the `maxPx` size cap
+worked only on the OS tier — while the browser tier, the one agents use most,
+had no size budget at all. For a vision model that is the difference between a
+usable screenshot and an unusable one: a model downsamples a large image to its
+own input budget anyway, so sending the full-resolution frame pays bytes for
+pixels no model will ever see.
+
+## Decision
+
+### 1. Capture options are a request, and a tier refuses what it cannot honor
+
+`universal_automation_interface` gains `CaptureOptions` (`fullPage`, `maxPx`,
+`format`, `quality`) and the `ConfigurableCapture` facade. The base
+`AutomationDriver.screenshot()` contract is unchanged — a driver that cannot
+honor options still serves the plain frame.
+
+The rule the family holds everywhere else applies here: **a tier that cannot
+honor an option refuses loudly and names the route out.** It never substitutes a
+cheaper capture, and it never upscales to reach a requested size.
+
+| Tier | `fullPage` | `maxPx` | `format: jpeg` |
+| --- | --- | --- | --- |
+| CDP | yes (native) | yes (native, exact) | yes (native) |
+| macOS | refused — a native window has no scroll extent | yes (native) | yes (native) |
+| WebDriver | refused — W3C has no full-page screenshot | refused — W3C has no scale parameter | refused — W3C returns PNG only |
+
+### 2. The size cap is applied at capture time, not afterwards
+
+A cap is a *budget*, and a vision model's own downscale is the budget. Capping
+at capture time keeps every pixel the model would have seen and discards the
+ones it would have thrown away.
+
+Measured against Chrome 155: `clip.scale` scales a CSS-pixel region by the
+device pixel ratio, so the produced image is `region × dpr × scale` device
+pixels. The CDP tier therefore resolves the scale against the *device* size of
+the region, which makes the cap exact rather than approximate. Capturing at full
+size and resizing the PNG afterwards would resample twice and blur text — the
+browser scales in one step instead.
+
+Two measured facts shape the implementation: a `clip` is in **page**
+coordinates, so a scrolled page must offset the clip by the scroll position or
+it captures the document top instead of what is visible; and
+`captureBeyondViewport` combined with a clip does render off-screen content,
+which is what the full-page path needs.
+
+### 3. The browser-tab selector rides the endpoint URI
+
+`CdpTargetSelector` matches a page target by id, URL substring, or title
+substring. It is encoded in the endpoint URI's **fragment** — the same place the
+OS tier encodes its app anchor (`ax://pid/123`). The fragment is never sent to
+the browser, so the debug endpoint's own HTTP probes stay untouched while the
+choice travels with the address, reaching every surface (CLI, MCP, plan)
+without a second channel.
+
+A selector that matches nothing, or more than one target, refuses with
+`TargetSelectionException` and lists the candidates. It never guesses.
+
+### 4. OS consent is requested explicitly, never as a side effect
+
+`universal_automation_interface` gains the `OsConsentRequester` facade:
+`accessibilityTrusted` / `screenCaptureTrusted` (preflights that never prompt)
+and `requestAccessibilityConsent()` / `requestScreenCaptureConsent()` (the
+explicit ask). The macOS driver implements it through the native bridge's
+`CGRequestScreenCaptureAccess()`, the mirror of the Accessibility prompt it
+already had.
+
+A capture never raises the prompt. The toolkit exposes the ask as its own verb
+(`automation_request_consent`, `--request-consent`), so the OS prompt is always
+a deliberate, user-initiated action — the same contract
+`universal_capture_macos` already documented for its own call.
+
+### 5. `record` works on any tier that can produce frames
+
+The CDP tier keeps its damage-driven screencast: the browser pushes a frame
+only when the page repaints, so an idle page is an idle stream. Other tiers poll
+their capture path through `universal_screencast`'s existing
+`PollingFrameSource`. A tier that can produce no frames refuses.
+
+## Consequences
+
+- The CLI, the MCP tool, and the plan step speak one capture vocabulary:
+  `fullPage`, `maxPx`, `format`, `quality`, and the tab selector.
+- A plan's `screenshot` step carries its options in the document, so a recorded
+  plan states the capture it intends.
+- The macOS tier gained a native JPEG path and a Screen Recording consent
+  request; its PNG path is unchanged.
+- **Non-claims.** The native macOS JPEG encode and the TCC prompt are proven
+  only at the ABI and Dart-contract level: they need a real macOS host with the
+  grant, so the runtime behavior is unverified here. The CDP capture behavior
+  *is* verified against real Chrome (fake-server tests plus an opt-in
+  live-Chrome suite). The WebDriver refusals are tier-level and never reach the
+  wire, so the fake server is the complete oracle for them.
+- The size cap is a *budget*, not a fidelity promise: a cap smaller than the
+  model's own input resolution does discard detail, which is why the cap is
+  the caller's explicit choice and the default stays uncapped.

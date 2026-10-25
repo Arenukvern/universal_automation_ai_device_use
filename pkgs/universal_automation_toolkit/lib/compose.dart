@@ -10,6 +10,7 @@ import 'src/plan/steps.dart';
 
 export 'package:universal_automation_interface/universal_automation_interface.dart';
 export 'package:universal_automation_semantics/universal_automation_semantics.dart';
+
 export 'src/plan/checks.dart';
 export 'src/plan/intents.dart';
 export 'src/plan/plan.dart';
@@ -76,20 +77,19 @@ ActStep clickAt(
   String? profile,
   int? seed,
   bool returnState = false,
-}) =>
-    ActStep(
-      action: ClickAtAction(
-        x,
-        y,
-        button: button,
-        clickCount: clickCount,
-        modifiers: modifiers,
-      ),
-      session: session,
-      profile: profile,
-      seed: seed,
-      returnState: returnState,
-    );
+}) => ActStep(
+  action: ClickAtAction(
+    x,
+    y,
+    button: button,
+    clickCount: clickCount,
+    modifiers: modifiers,
+  ),
+  session: session,
+  profile: profile,
+  seed: seed,
+  returnState: returnState,
+);
 
 /// Act: move the pointer to ([x], [y]) without pressing — hover
 /// affordances and drag pre-positioning (ADR 0053).
@@ -99,13 +99,12 @@ ActStep moveTo(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: MoveAction(x, y),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: MoveAction(x, y),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act: press at (fromX, fromY), move to (toX, toY), release — drag and
 /// drop, sliders, canvas gestures (ADR 0053). Under a behavior profile
@@ -120,20 +119,19 @@ ActStep dragTo(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: DragAction(
-        fromX,
-        fromY,
-        toX,
-        toY,
-        button: button,
-        modifiers: modifiers,
-      ),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: DragAction(
+    fromX,
+    fromY,
+    toX,
+    toY,
+    button: button,
+    modifiers: modifiers,
+  ),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act: click an element by [css], [role], or accessible [name].
 /// [returnState] attaches the post-action state render to the result
@@ -146,14 +144,13 @@ ActStep click({
   String? profile,
   int? seed,
   bool returnState = false,
-}) =>
-    ActStep(
-      action: ClickAction(css: css, role: role, name: name),
-      session: session,
-      profile: profile,
-      seed: seed,
-      returnState: returnState,
-    );
+}) => ActStep(
+  action: ClickAction(css: css, role: role, name: name),
+  session: session,
+  profile: profile,
+  seed: seed,
+  returnState: returnState,
+);
 
 /// Act: focus [css] (or the current caret) and type [text].
 ActStep typeText(
@@ -163,13 +160,12 @@ ActStep typeText(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: TypeAction(text, css: css, submit: submit),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: TypeAction(text, css: css, submit: submit),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act: press a named key, optionally under a modifier [modifiers]
 /// chord (e.g. `['control']` + `Tab`).
@@ -179,13 +175,12 @@ ActStep keyPress(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: KeyPressAction(key, modifiers: modifiers),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: KeyPressAction(key, modifiers: modifiers),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act: scroll by logical pixels.
 ActStep scrollBy({
@@ -194,13 +189,12 @@ ActStep scrollBy({
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: ScrollAction(direction: direction, distance: distance),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: ScrollAction(direction: direction, distance: distance),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act: evaluate a read-only expression in the live surface.
 ActStep evaluateExpr(
@@ -208,8 +202,11 @@ ActStep evaluateExpr(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(action: EvaluateAction(expression), session: session, profile: profile);
+}) => ActStep(
+  action: EvaluateAction(expression),
+  session: session,
+  profile: profile,
+);
 
 /// Act: invoke a named surface action from the driver's action catalog.
 ActStep invokeAction(
@@ -218,13 +215,12 @@ ActStep invokeAction(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    ActStep(
-      action: InvokeAction(name, args: args),
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => ActStep(
+  action: InvokeAction(name, args: args),
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Act through an app intent (ADR 0038): the plan's intent registry
 /// resolves the hint; runtime [args] carry the operands.
@@ -235,23 +231,21 @@ IntentStep intent(
   String? session,
   String? profile,
   int? seed,
-}) =>
-    IntentStep(
-      app: app,
-      name: name,
-      args: args,
-      session: session,
-      profile: profile,
-      seed: seed,
-    );
+}) => IntentStep(
+  app: app,
+  name: name,
+  args: args,
+  session: session,
+  profile: profile,
+  seed: seed,
+);
 
 /// Verify: assert post-conditions against one fresh snapshot.
 VerifyStep verifyThat(
   List<VerifyCheck> checks, {
   String? session,
   bool soft = false,
-}) =>
-    VerifyStep(checks: checks, session: session, continueOnFailure: soft);
+}) => VerifyStep(checks: checks, session: session, continueOnFailure: soft);
 
 /// Wait: poll the checks until they hold or [timeout] elapses — the
 /// auto-wait form of [verifyThat].
@@ -261,18 +255,37 @@ WaitStep waitFor(
   Duration poll = const Duration(milliseconds: 250),
   String? session,
   bool soft = false,
-}) =>
-    WaitStep(
-      checks: checks,
-      timeout: timeout,
-      pollInterval: poll,
-      session: session,
-      continueOnFailure: soft,
-    );
+}) => WaitStep(
+  checks: checks,
+  timeout: timeout,
+  pollInterval: poll,
+  session: session,
+  continueOnFailure: soft,
+);
 
 /// Screenshot: capture one PNG frame to [out].
-ScreenshotStep shot(String out, {String? session}) =>
-    ScreenshotStep(out: out, session: session);
+///
+/// The options name how much of the surface to capture and how large:
+/// [fullPage] reaches beyond the viewport, [maxPx] caps the long side,
+/// and [format]/[quality] choose the encoding. A tier that cannot
+/// honor one refuses the step rather than capturing something else.
+ScreenshotStep shot(
+  String out, {
+  String? session,
+  bool fullPage = false,
+  int? maxPx,
+  CaptureFormat format = CaptureFormat.png,
+  int? quality,
+}) => ScreenshotStep(
+  out: out,
+  options: CaptureOptions(
+    fullPage: fullPage,
+    maxPx: maxPx,
+    format: format,
+    quality: quality,
+  ),
+  session: session,
+);
 
 /// Returns [step] marked continue-on-failure: a failure is recorded and
 /// the scenario proceeds.
@@ -282,7 +295,10 @@ PlanStep soft(PlanStep step) =>
 /// Rebinds every step in [steps] to [session] (multi-session scenarios).
 List<PlanStep> onSession(String session, Iterable<PlanStep> steps) => [
   for (final step in steps)
-    step.withCommon(session: session, continueOnFailure: step.continueOnFailure),
+    step.withCommon(
+      session: session,
+      continueOnFailure: step.continueOnFailure,
+    ),
 ];
 
 /// Scope a step tree through [view] (ADR 0052): the scope opens with an
@@ -322,12 +338,11 @@ ValueCheck value(
   String? nameContains,
   String? equals,
   String? contains,
-}) =>
-    ValueCheck(
-      locator: CheckLocator(role: role, name: name, nameContains: nameContains),
-      equals: equals,
-      contains: contains,
-    );
+}) => ValueCheck(
+  locator: CheckLocator(role: role, name: name, nameContains: nameContains),
+  equals: equals,
+  contains: contains,
+);
 
 /// The surface URL contains [fragment] (transports that expose a URL).
 UrlContainsCheck urlContains(String fragment) => UrlContainsCheck(fragment);
@@ -339,18 +354,15 @@ Scenario scenario(
   String name, {
   List<PlanStep> steps = const [],
   String? extend,
-}) =>
-    Scenario(name: name, parent: extend, steps: List.of(steps));
+}) => Scenario(name: name, parent: extend, steps: List.of(steps));
 
 /// Declares an attach-only CDP session binding.
-SessionBinding cdp(String name, {Uri? uri, String? handle}) =>
-    SessionBinding(
-      name: name,
-      transport: AutomationTransport.cdp,
-      uri: uri,
-      handle: handle,
-    );
-
+SessionBinding cdp(String name, {Uri? uri, String? handle}) => SessionBinding(
+  name: name,
+  transport: AutomationTransport.cdp,
+  uri: uri,
+  handle: handle,
+);
 
 // — First-class code (the oka posture) ———————————————————————————————————
 
@@ -376,43 +388,44 @@ CodeStep exec(
   bool runInShell = false,
   String? session,
   bool soft = false,
-}) =>
-    code(
-      (context) async {
-        final result = await Process.run(
-          executable,
-          args,
-          workingDirectory: workingDirectory,
-          environment: environment,
-          runInShell: runInShell,
-          stdoutEncoding: utf8,
-          stderrEncoding: utf8,
-        );
-        final ok = result.exitCode == 0 || allowNonZeroExit;
-        final detail = {
-          'command': '$executable ${args.join(' ')}'.trim(),
-          'exitCode': result.exitCode,
-          'stdoutTail': _tail(result.stdout as String),
-          'stderrTail': _tail(result.stderr as String),
-        };
-        if (!ok) {
-          throw CodeStepException(
-            '$executable',
-            'command "$executable ${args.join(' ')}" exited '
-                '${result.exitCode}',
-            details: detail,
-          );
-        }
-        return detail;
-      },
-      label: '$executable ${args.join(' ')}'.trim(),
-      session: session,
-      soft: soft,
+}) => code(
+  (context) async {
+    final result = await Process.run(
+      executable,
+      args,
+      workingDirectory: workingDirectory,
+      environment: environment,
+      runInShell: runInShell,
+      stdoutEncoding: utf8,
+      stderrEncoding: utf8,
     );
+    final ok = result.exitCode == 0 || allowNonZeroExit;
+    final detail = {
+      'command': '$executable ${args.join(' ')}'.trim(),
+      'exitCode': result.exitCode,
+      'stdoutTail': _tail(result.stdout as String),
+      'stderrTail': _tail(result.stderr as String),
+    };
+    if (!ok) {
+      throw CodeStepException(
+        '$executable',
+        'command "$executable ${args.join(' ')}" exited '
+            '${result.exitCode}',
+        details: detail,
+      );
+    }
+    return detail;
+  },
+  label: '$executable ${args.join(' ')}'.trim(),
+  session: session,
+  soft: soft,
+);
 
 String _tail(String text, [int limit = 800]) {
   final trimmed = text.trim();
-  return trimmed.length <= limit ? trimmed : '…${trimmed.substring(trimmed.length - limit)}';
+  return trimmed.length <= limit
+      ? trimmed
+      : '…${trimmed.substring(trimmed.length - limit)}';
 }
 
 /// Record the frame stream for [duration] into [out] (the screencast
@@ -423,14 +436,13 @@ RecordStep record(
   String base = 'frames',
   String? session,
   bool soft = false,
-}) =>
-    RecordStep(
-      duration: duration,
-      out: out,
-      base: base,
-      session: session,
-      continueOnFailure: soft,
-    );
+}) => RecordStep(
+  duration: duration,
+  out: out,
+  base: base,
+  session: session,
+  continueOnFailure: soft,
+);
 
 // — Snapshot export ———————————————————————————————————————————————————————
 
@@ -448,7 +460,7 @@ Map<String, Object?> planDocument(AutomationPlan plan) {
   if (codeSteps.isNotEmpty) {
     throw SpecViolationException([
       'plan contains Dart-only code steps and cannot be exported to a '
-      'snapshot: ${codeSteps.join(', ')}',
+          'snapshot: ${codeSteps.join(', ')}',
     ]);
   }
   return plan.toJson();

@@ -4,13 +4,13 @@ Concise **how** answers for contributors and integrators. Charter and ethics liv
 
 ## Router
 
-| Need | Go to |
-| --- | --- |
-| Charter, consent, proof habits | [North Star](/NORTH_STAR) · [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md) |
-| Agent map & validation gate | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) · `steward.yaml` |
-| Toolkit CLI / MCP / plans | [toolkit README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/README.md) |
-| Usage questions (not bugs) | [GitHub Discussions](https://github.com/Arenukvern/universal_automation_ai_device_use/discussions) |
-| Sibling storage product | [universal_storage](https://github.com/Arenukvern/universal_storage) |
+| Need                           | Go to                                                                                                                                    |
+| ------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Charter, consent, proof habits | [North Star](/NORTH_STAR) · [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)        |
+| Agent map & validation gate    | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) · `steward.yaml`                       |
+| Toolkit CLI / MCP / plans      | [toolkit README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/README.md) |
+| Usage questions (not bugs)     | [GitHub Discussions](https://github.com/Arenukvern/universal_automation_ai_device_use/discussions)                                       |
+| Sibling storage product        | [universal_storage](https://github.com/Arenukvern/universal_storage)                                                                     |
 
 ## Packages & pub.dev
 
@@ -38,6 +38,23 @@ A: [GitHub Discussions](https://github.com/Arenukvern/universal_automation_ai_de
 
 **Q: Where do I report security problems?**  
 A: Follow [SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md) — no public issue.
+
+## Captures
+
+**Q: How do I capture the whole page, not just the viewport?**  
+A: `automation_screenshot {fullPage: true}` (CDP tier), `screenshot --full-page`, or `shot('/tmp/x.png', fullPage: true)` in a plan. The macOS tier refuses it — a native window has no scroll extent — and the refusal names the route out.
+
+**Q: How do I keep a screenshot small enough for a vision model?**  
+A: `maxPx` caps the long side (`automation_screenshot {maxPx: 1024}`). The image is scaled **at capture time** by the browser, so this is a budget rather than a fidelity loss: a model downsamples a large image to its own input ceiling anyway, so capping there keeps every pixel the model would have seen. A cap _below_ that ceiling does discard detail — the cap is your explicit choice.
+
+**Q: Which tab does it capture when the browser has several open?**  
+A: Name it: `targetId` / `targetUrl` / `targetTitle` (MCP), `--target-id` / `--target-url` / `--target-title` (CLI), or in a plan the session URI carries it (`http://127.0.0.1:9222#targetUrl=/checkout`). Attaching to "the first page" is a guess, so an ambiguous or empty match refuses with the candidate list instead.
+
+**Q: Can I get JPEG instead of PNG?**  
+A: `format: "jpeg"` with `quality` (1..100) — CDP and macOS tiers, natively. The W3C WebDriver standard returns PNG only, so that tier refuses and names the route out.
+
+**Q: The macOS capture says Screen Recording is required. Now what?**  
+A: `automation_request_consent {kind: "screenRecording"}` asks the OS (the system prompt appears) and reports whether the grant is now held. A capture never raises the prompt by itself. See [ADR 0005](/decisions/0005_capture_options_target_selection_and_os_consent).
 
 ## North Star impact (structural changes)
 

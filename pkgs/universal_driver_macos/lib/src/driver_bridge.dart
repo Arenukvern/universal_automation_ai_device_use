@@ -166,9 +166,53 @@ abstract interface class AllWindowListingBridge {
   BridgeJsonResult allWindowsJson({int pid = 0});
 }
 
-/// Native implementation of the driver and optional all-window discovery.
+/// Optional extension so custom bridges retain the original capture ABI.
+///
+/// The JPEG path is a NEW native verb, not a re-encoding of the PNG
+/// bytes: a bridge that predates it simply does not implement this
+/// capability, and the driver refuses the lossy request loudly instead
+/// of shipping PNG bytes under a JPEG contract.
+abstract interface class EncodedCaptureBridge {
+  /// One JPEG frame of [displayId] (0 = main display); [maxPx] caps the
+  /// long side (0 = raw), [quality] is the 1..100 scale (0 = the tier
+  /// default). Code 10 = Screen Recording consent.
+  BridgeBytesResult screenshotJpeg({
+    int displayId = 0,
+    int maxPx = 0,
+    int quality = 0,
+  });
+
+  /// One JPEG frame of a single window. Code 10 = Screen Recording
+  /// consent, 2 = unknown window.
+  BridgeBytesResult screenshotWindowJpeg({
+    required int windowId,
+    int maxPx = 0,
+    int quality = 0,
+  });
+}
+
+/// Optional extension so custom bridges retain the original consent ABI.
+///
+/// The Screen Recording grant is a SECOND TCC dialog, separate from
+/// Accessibility: a bridge that cannot ask for it says so rather than
+/// pretending the grant is absent.
+abstract interface class ScreenCaptureConsentBridge {
+  /// Whether the Screen Recording grant is currently held (never
+  /// prompts).
+  bool screenCaptureTrusted();
+
+  /// Raises the system Screen Recording consent prompt; returns the
+  /// resulting status.
+  bool requestScreenCapture();
+}
+
+/// Native implementation of the driver and its optional capabilities.
 final class NativeAxDriverBridge
-    implements AxDriverBridge, AllWindowListingBridge {
+    implements
+        AxDriverBridge,
+        AllWindowListingBridge,
+        EncodedCaptureBridge,
+        ScreenCaptureConsentBridge {
   @override
   String version() {
     final pointer = axdrvVersion();
@@ -180,6 +224,12 @@ final class NativeAxDriverBridge
 
   @override
   bool requestTrust() => axdrvRequestTrust();
+
+  @override
+  bool screenCaptureTrusted() => axdrvScreenCaptureTrusted();
+
+  @override
+  bool requestScreenCapture() => axdrvRequestScreenCapture();
 
   @override
   BridgeJsonResult snapshotJson({
@@ -424,6 +474,26 @@ final class NativeAxDriverBridge
   }) => _captureBytes(
     (outData, outLen) =>
         axdrvScreenshotWindowPng(windowId, maxPx, outData, outLen),
+  );
+
+  @override
+  BridgeBytesResult screenshotJpeg({
+    int displayId = 0,
+    int maxPx = 0,
+    int quality = 0,
+  }) => _captureBytes(
+    (outData, outLen) =>
+        axdrvScreenshotJpeg(displayId, maxPx, quality, outData, outLen),
+  );
+
+  @override
+  BridgeBytesResult screenshotWindowJpeg({
+    required int windowId,
+    int maxPx = 0,
+    int quality = 0,
+  }) => _captureBytes(
+    (outData, outLen) =>
+        axdrvScreenshotWindowJpeg(windowId, maxPx, quality, outData, outLen),
   );
 
   @override

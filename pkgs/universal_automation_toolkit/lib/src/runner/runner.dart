@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
@@ -179,7 +180,7 @@ final class PlanRunner {
     if (name == null || !plan.scenarios.containsKey(name)) {
       throw SpecViolationException([
         'scenario ${scenarioName == null ? 'not given and the plan declares '
-            'several' : '"$scenarioName"'} does not exist',
+                  'several' : '"$scenarioName"'} does not exist',
       ]);
     }
     final steps = plan.effectiveSteps(name);
@@ -260,7 +261,8 @@ final class PlanRunner {
     final watch = Stopwatch()..start();
     String? sessionName;
     try {
-      final sessionBindingName = step.session ??
+      final sessionBindingName =
+          step.session ??
           sessionFallback ??
           (plan.sessions.length == 1 ? plan.sessions.keys.single : null);
       final session = await registry.attach(sessionBindingName!);
@@ -281,7 +283,14 @@ final class PlanRunner {
       final detail = await switch (step) {
         ObserveStep() => _observe(session, step),
         ActStep() => _act(plan, session, step, index, outDir, receipts),
-        IntentStep() => _actIntent(plan, session, step, index, outDir, receipts),
+        IntentStep() => _actIntent(
+          plan,
+          session,
+          step,
+          index,
+          outDir,
+          receipts,
+        ),
         VerifyStep() => _verify(session, step.checks),
         WaitStep() => _wait(session, step),
         ScreenshotStep() => _screenshot(session, step, outDir),
@@ -517,7 +526,11 @@ final class PlanRunner {
       );
     }
     final effectiveSeed = seed ?? DateTime.now().microsecondsSinceEpoch;
-    final outcome = await behavioral.performWith(action, profile, seed: effectiveSeed);
+    final outcome = await behavioral.performWith(
+      action,
+      profile,
+      seed: effectiveSeed,
+    );
     final directory = outDir ?? Directory.current.path;
     final writer = CdpBehaviorReceiptWriter(
       directory: directory,
@@ -604,21 +617,49 @@ final class PlanRunner {
     ScreenshotStep step,
     String? outDir,
   ) async {
-    if (!session.driver.capabilities.screenshot) {
-      throw DriverUnsupportedException(
-        'transport "${session.binding.transport.name}" cannot capture '
-        'screenshots',
-      );
-    }
     final requested = File(step.out);
     final path = requested.isAbsolute || outDir == null
         ? step.out
         : '$outDir/${step.out}';
     final file = File(path);
     await file.parent.create(recursive: true);
-    final bytes = await session.driver.screenshot();
+    // The step's options are the plan's explicit request; a tier that
+    // cannot honor one refuses rather than returning a cheaper frame.
+    final bytes = await _capture(session.driver, step.options);
     await file.writeAsBytes(bytes, flush: true);
     return {'path': file.path, 'bytes': bytes.length};
+  }
+
+  /// Captures with the requested options.
+  ///
+  /// A driver that implements [ConfigurableCapture] receives the options
+  /// as given, so it can honor them natively or refuse them. One that does
+  /// not can only serve the plain frame, so anything beyond it is refused
+  /// here — never silently downgraded.
+  Future<Uint8List> _capture(
+    AutomationDriver driver,
+    CaptureOptions options,
+  ) async {
+    final plain =
+        !options.fullPage &&
+        options.maxPx == null &&
+        options.format == CaptureFormat.png;
+    if (plain) {
+      if (!driver.capabilities.screenshot) {
+        throw DriverUnsupportedException(
+          'transport cannot capture screenshots',
+        );
+      }
+      return driver.screenshot();
+    }
+    if (driver is! ConfigurableCapture) {
+      throw DriverUnsupportedException(
+        'this transport cannot honor the requested capture options '
+        '(full page, a size cap, or a chosen encoding)',
+      );
+    }
+    // The check above is the capability test; the cast is the promotion.
+    return (driver as ConfigurableCapture).capture(options);
   }
 
   Future<Map<String, Object?>> _record(
@@ -626,21 +667,29 @@ final class PlanRunner {
     RecordStep step,
     String? outDir,
   ) async {
-    final cdpDriver = session.driver;
-    if (cdpDriver is! CdpDriver) {
-      throw DriverUnsupportedException(
-        'record is linked for the CDP tier only (transport '
-        '"${session.binding.transport.name}"); screencast sources for '
-        'other tiers are future work',
-      );
-    }
+    final driver = session.driver;
     final directory = outDir == null || step.out.startsWith('/')
         ? step.out
         : '$outDir/${step.out}';
-    final source = CdpScreencastFrameSource(
-      cdpDriver.page.connection,
-      revisionProbe: () => cdpDriver.page.revision,
-    );
+    // The CDP tier has a damage-driven screencast: the browser pushes a
+    // frame only when the page repaints, so an idle page is an idle
+    // stream. Other tiers are polled from their capture path, which
+    // produces a frame on demand.
+    final source = switch (driver) {
+      final CdpDriver cdp => CdpScreencastFrameSource(
+        cdp.page.connection,
+        revisionProbe: () => cdp.page.revision,
+      ),
+      _ when driver.capabilities.screenshot => PollingFrameSource(
+        driver.screenshot,
+        contentType: 'image/png',
+      ),
+      _ => throw DriverUnsupportedException(
+        'record needs a tier that can produce frames (transport '
+        '"${session.binding.transport.name}"); the CDP tier screencasts, '
+        'other tiers poll their capture path',
+      ),
+    };
     final sink = FileRecorderSink(directory: directory, base: step.base);
     final frames = source.start();
     var written = 0;

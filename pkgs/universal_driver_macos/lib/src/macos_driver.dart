@@ -31,7 +31,8 @@ final class ScreenRecordingPermissionRequiredException
   /// Creates the exception.
   const ScreenRecordingPermissionRequiredException()
     : super(
-        'Screen Recording permission required for capture; grant it in '
+        'Screen Recording permission required for capture; request it '
+        'in process (call requestScreenCaptureConsent once) or grant it in '
         'System Settings → Privacy & Security → Screen & System Audio',
       );
 
@@ -76,7 +77,9 @@ class MacosDriver
         OsAppCatalog,
         OsActivator,
         OsWindowCapture,
-        OsDisplayCapture {
+        OsDisplayCapture,
+        ConfigurableCapture,
+        OsConsentRequester {
   /// Creates a driver. [snapshotDepth] and [snapshotMaxNodes] bound the
   /// tree walk (AX trees of real apps can be enormous; hover needs only
   /// the visible surface). [targetPid] anchors every observation to that
@@ -181,11 +184,53 @@ class MacosDriver
     return bridge.axTrusted();
   }
 
+  /// Whether the Accessibility grant is held right now (never prompts) —
+  /// the [OsConsentRequester] spelling of [axTrusted].
+  @override
+  bool get accessibilityTrusted => axTrusted;
+
+  /// Whether the Screen Recording grant is held right now (never
+  /// prompts).
+  ///
+  /// Screen Recording is a second TCC grant, separate from
+  /// Accessibility: a capture needs it, a tree read does not.
+  @override
+  bool get screenCaptureTrusted {
+    _ensureOpen();
+    if (bridge case final ScreenCaptureConsentBridge consent) {
+      return consent.screenCaptureTrusted();
+    }
+    throw const DriverUnsupportedException(
+      'This bridge does not expose the Screen Recording consent state',
+    );
+  }
+
   /// Raises the system consent prompt when untrusted; returns the
   /// resulting status (a manual System Settings step may still be needed).
   bool requestTrust() {
     _ensureOpen();
     return bridge.requestTrust();
+  }
+
+  /// Raises the system Accessibility prompt; returns the resulting
+  /// status.
+  @override
+  bool requestAccessibilityConsent() => requestTrust();
+
+  /// Raises the system Screen Recording prompt; returns the resulting
+  /// status.
+  ///
+  /// Explicit user action only: a capture never triggers the prompt, it
+  /// refuses with the typed permission exception instead.
+  @override
+  bool requestScreenCaptureConsent() {
+    _ensureOpen();
+    if (bridge case final ScreenCaptureConsentBridge consent) {
+      return consent.requestScreenCapture();
+    }
+    throw const DriverUnsupportedException(
+      'This bridge does not expose the Screen Recording consent request',
+    );
   }
 
   // -- APP MANAGEMENT (the macOS rung: manage APPLICATIONS, not only
@@ -289,6 +334,9 @@ class MacosDriver
   /// Captures one window's PNG (occlusion included, exact window
   /// bounds); [maxPx] caps the long side when set. Needs Screen
   /// Recording consent, not Accessibility.
+  ///
+  /// The base OS facade carries only the PNG cap; [windowCapture] is
+  /// the options-aware sibling (encoding included).
   @override
   Future<Uint8List> windowScreenshot(int windowId, {int? maxPx}) async {
     _ensureOpen();
@@ -296,17 +344,17 @@ class MacosDriver
       windowId: windowId,
       maxPx: maxPx ?? 0,
     );
-    if (result.code == 10) {
-      throw const ScreenRecordingPermissionRequiredException();
-    }
     if (result.code == 2) {
       throw ElementNotFoundException('window', 'screenshot #$windowId');
     }
-    if (result.code != 0) {
-      throw ProtocolException('window screenshot failed', code: result.code);
-    }
-    return result.bytes;
+    return _capturedBytes(result, 'window screenshot');
   }
+
+  /// Captures one window's frame honoring [options] — the options-aware
+  /// sibling of [windowScreenshot] (the base OS facade carries only the
+  /// PNG cap).
+  Future<Uint8List> windowCapture(int windowId, CaptureOptions options) =>
+      _captureWith(options, windowId: windowId);
 
   /// The accessibility element at top-left-origin screen coordinates
   /// (the same system CGEvent mouse coordinates use). This is the hover
@@ -457,7 +505,8 @@ class MacosDriver
           'AX cannot evaluate expressions (${expression.length} chars); '
           'evaluation is an instrumented-tier capability',
           details: const {
-            'remedy': 'configure a browser tier (serve --cdp, env '
+            'remedy':
+                'configure a browser tier (serve --cdp, env '
                 'UNIVERSAL_AUTOMATION_CDP, or --browser-handle) and '
                 're-send with transport "cdp"',
           },
@@ -467,7 +516,8 @@ class MacosDriver
           'the AX tier has no surface action registry; '
           'InvokeAction("$name") needs the instrumented or CDP tier',
           details: const {
-            'remedy': 'use elementAction for AX-advertised actions, or '
+            'remedy':
+                'use elementAction for AX-advertised actions, or '
                 'configure a browser tier (serve --cdp, env '
                 'UNIVERSAL_AUTOMATION_CDP, or --browser-handle)',
           },
@@ -627,11 +677,82 @@ class MacosDriver
   Future<Uint8List> screenshot({int? maxPx}) async {
     _ensureOpen();
     final result = bridge.screenshotPng(maxPx: maxPx ?? 0);
+    return _capturedBytes(result, 'screenshot');
+  }
+
+  /// Captures one frame of the main display honoring [options] — the
+  /// macOS lowering of [ConfigurableCapture].
+  ///
+  /// The macOS tier captures a NATIVE surface: the main display, or one
+  /// window through [windowCapture]. Such a surface has no scroll
+  /// extent, so `fullPage` has nothing to reach and is refused loudly
+  /// rather than silently reduced to the visible frame. The size cap
+  /// and the encoding are honored natively.
+  @override
+  Future<Uint8List> capture(CaptureOptions options) => _captureWith(options);
+
+  /// The one capture path behind [capture] and [windowCapture].
+  Future<Uint8List> _captureWith(
+    CaptureOptions options, {
+    int? windowId,
+  }) async {
+    _ensureOpen();
+    // An invalid option set is the caller's mistake, not a tier gap:
+    // the family refuses it before any bridge call.
+    options.ensureValid();
+    if (options.fullPage) {
+      throw const DriverUnsupportedException(
+        'macOS captures a native display or window frame, which has no '
+        'scroll extent: there is no beyond-the-viewport surface to '
+        'capture (a scrolling tier serves full-page captures)',
+      );
+    }
+    final maxPx = options.maxPx ?? 0;
+    final quality = options.quality ?? 0;
+    if (options.format == CaptureFormat.jpeg) {
+      // The lossy path is a separate native verb, not a re-encode of
+      // PNG bytes: a bridge without it refuses instead of shipping the
+      // wrong encoding.
+      if (bridge case final EncodedCaptureBridge encoded) {
+        final result = windowId == null
+            ? encoded.screenshotJpeg(maxPx: maxPx, quality: quality)
+            : encoded.screenshotWindowJpeg(
+                windowId: windowId,
+                maxPx: maxPx,
+                quality: quality,
+              );
+        if (windowId != null && result.code == 2) {
+          throw ElementNotFoundException('window', 'screenshot #$windowId');
+        }
+        return _capturedBytes(
+          result,
+          windowId == null ? 'screenshot' : 'window screenshot',
+        );
+      }
+      throw const DriverUnsupportedException(
+        'This bridge cannot encode JPEG captures',
+      );
+    }
+    final result = windowId == null
+        ? bridge.screenshotPng(maxPx: maxPx)
+        : bridge.screenshotWindowPng(windowId: windowId, maxPx: maxPx);
+    if (windowId != null && result.code == 2) {
+      throw ElementNotFoundException('window', 'screenshot #$windowId');
+    }
+    return _capturedBytes(
+      result,
+      windowId == null ? 'screenshot' : 'window screenshot',
+    );
+  }
+
+  /// Maps the capture bridge's error codes onto the family's typed
+  /// exceptions (10 = the Screen Recording grant is missing).
+  Uint8List _capturedBytes(BridgeBytesResult result, String operation) {
     if (result.code == 10) {
       throw const ScreenRecordingPermissionRequiredException();
     }
     if (result.code != 0) {
-      throw ProtocolException('screenshot failed', code: result.code);
+      throw ProtocolException('$operation failed', code: result.code);
     }
     return result.bytes;
   }

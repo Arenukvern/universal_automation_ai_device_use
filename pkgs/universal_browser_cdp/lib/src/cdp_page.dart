@@ -34,6 +34,132 @@ enum NameMatch {
   contains,
 }
 
+/// The page region a capture covers, in CSS pixels, plus the device
+/// pixel ratio that turns it into device pixels.
+///
+/// The geometry is read from `Page.getLayoutMetrics` and reflects what
+/// Chrome was measured to do:
+///
+/// - The **viewport** region is the visual viewport, offset by the
+///   current scroll position. A `clip` is in page coordinates, so a
+///   scrolled page must offset the clip or it captures the document top
+///   instead of what the user sees.
+/// - The **full-page** region is the whole content box, starting at the
+///   document origin; `captureBeyondViewport` makes Chrome render the
+///   off-screen part.
+/// - The device pixel ratio is `contentSize / cssContentSize` — the same
+///   box measured in device pixels over CSS pixels.
+final class _CaptureRegion {
+  _CaptureRegion({
+    required this.x,
+    required this.y,
+    required this.width,
+    required this.height,
+    required this.devicePixelRatio,
+  });
+
+  /// Builds the region for this capture from the page's layout metrics.
+  factory _CaptureRegion.fromMetrics(
+    Map<Object?, Object?> metrics, {
+    required bool fullPage,
+  }) {
+    if (fullPage) {
+      final css = _size(metrics['cssContentSize']);
+      if (css == null) {
+        throw const ProtocolException(
+          'Page.getLayoutMetrics reported no cssContentSize',
+        );
+      }
+      return _CaptureRegion(
+        x: 0,
+        y: 0,
+        width: css.width,
+        height: css.height,
+        devicePixelRatio: _devicePixelRatio(metrics),
+      );
+    }
+
+    final viewport = metrics['cssVisualViewport'];
+    if (viewport is! Map<Object?, Object?>) {
+      throw const ProtocolException(
+        'Page.getLayoutMetrics reported no cssVisualViewport',
+      );
+    }
+    final width = (viewport['clientWidth'] as num?)?.round() ?? 0;
+    final height = (viewport['clientHeight'] as num?)?.round() ?? 0;
+    if (width <= 0 || height <= 0) {
+      throw const ProtocolException(
+        'Page.getLayoutMetrics reported an empty visual viewport',
+      );
+    }
+    return _CaptureRegion(
+      // Page coordinates: the clip must follow the scroll position.
+      x: (viewport['pageX'] as num?)?.round() ?? 0,
+      y: (viewport['pageY'] as num?)?.round() ?? 0,
+      width: width,
+      height: height,
+      devicePixelRatio: _devicePixelRatio(metrics),
+    );
+  }
+
+  /// The region origin in page CSS pixels.
+  final int x;
+
+  /// The region origin in page CSS pixels.
+  final int y;
+
+  /// The region width in CSS pixels.
+  final int width;
+
+  /// The region height in CSS pixels.
+  final int height;
+
+  /// The device pixel ratio of this page.
+  final double devicePixelRatio;
+
+  /// The scale factor that lands the capture exactly on [maxPx] device
+  /// pixels on its long side.
+  ///
+  /// Chrome's `clip.scale` multiplies the region's *device* size, so the
+  /// factor is `maxPx / deviceLongSide`. A region already within budget
+  /// keeps a scale of 1: the capture is never enlarged to reach the cap.
+  double scaleForMaxPx(int maxPx, Map<Object?, Object?> metrics) {
+    final deviceLongSide = width >= height
+        ? width * devicePixelRatio
+        : height * devicePixelRatio;
+    if (deviceLongSide <= maxPx) {
+      return 1;
+    }
+    return maxPx / deviceLongSide;
+  }
+
+  static ({int width, int height})? _size(Object? value) {
+    if (value is! Map<Object?, Object?>) return null;
+    final width = (value['width'] as num?)?.round() ?? 0;
+    final height = (value['height'] as num?)?.round() ?? 0;
+    if (width <= 0 || height <= 0) return null;
+    return (width: width, height: height);
+  }
+
+  /// The device pixel ratio: the content box in device pixels over the
+  /// same box in CSS pixels.
+  static double _devicePixelRatio(Map<Object?, Object?> metrics) {
+    final device = _size(metrics['contentSize']);
+    final css = _size(metrics['cssContentSize']);
+    if (device == null || css == null) {
+      return 1;
+    }
+    final dpr = device.width / css.width;
+    // A ratio outside the plausible range means the two metrics describe
+    // different boxes (a zoomed page, a mobile emulation): fall back to 1
+    // rather than scaling the image by a wrong factor.
+    if (dpr < 0.1 || dpr > 10) {
+      return 1;
+    }
+    return dpr;
+  }
+}
+
 /// A page-level CDP facade: navigation, evaluation, accessibility
 /// snapshots, screenshots, and trusted-input synthesis.
 ///
@@ -148,7 +274,8 @@ class CdpPage {
         final frame = event.params['frame'] as Map<String, Object?>?;
         if (frame == null || frame.containsKey('parentId')) return;
         final frameLoader = frame['loaderId'];
-        final matches = loaderId.isEmpty ||
+        final matches =
+            loaderId.isEmpty ||
             frameLoader is! String ||
             frameLoader.isEmpty ||
             frameLoader == loaderId;
@@ -166,11 +293,9 @@ class CdpPage {
     ];
     final watch = Stopwatch()..start();
     try {
-      final result = await connection.send(
-        'Page.navigate',
-        {'url': url.toString()},
-        timeout,
-      );
+      final result = await connection.send('Page.navigate', {
+        'url': url.toString(),
+      }, timeout);
       final errorText = result['errorText'];
       if (errorText is String && errorText.isNotEmpty) {
         throw ProtocolException(
@@ -256,7 +381,8 @@ class CdpPage {
     _ensureOpen();
     final result = await connection.send('Page.captureScreenshot', {
       'format': 'png',
-      'captureBeyondViewport': beyondViewport,
+      // Only sent when it changes the outcome: false is CDP's default.
+      if (beyondViewport) 'captureBeyondViewport': true,
     });
     final data = result['data'];
     if (data is! String) {
@@ -264,6 +390,80 @@ class CdpPage {
     }
     return base64Decode(data);
   }
+
+  /// Captures one frame honoring [options].
+  ///
+  /// The size cap is applied *at capture time* through CDP's own
+  /// `clip.scale`, so the browser renders and scales in one step. The
+  /// alternative — capturing at full size and resizing the PNG afterwards
+  /// — would resample twice and blur text.
+  ///
+  /// Measured against Chrome: `clip.scale` scales the CSS-pixel region by
+  /// the device pixel ratio, so the produced image is
+  /// `region * dpr * scale` device pixels. [CaptureOptions.maxPx] resolves
+  /// the scale against the *device* size of the region, which makes the cap
+  /// exact rather than approximate.
+  ///
+  /// Two further measured facts shape this method:
+  ///
+  /// - A `clip` is in **page coordinates**, not viewport coordinates. On a
+  ///   scrolled page, clipping at the origin captures the document top, not
+  ///   what is visible. The viewport path therefore offsets the clip by the
+  ///   scroll position.
+  /// - `captureBeyondViewport` combined with a clip *does* render
+  ///   off-screen content, which is what the full-page path needs.
+  ///
+  /// The full-page case ([CaptureOptions.fullPage]) uses
+  /// `captureBeyondViewport`, which Chrome expands to the whole scrollable
+  /// content height.
+  Future<Uint8List> capture(CaptureOptions options) async {
+    _ensureOpen();
+    options.ensureValid();
+    if (options.maxPx == null &&
+        !options.fullPage &&
+        options.format == CaptureFormat.png) {
+      // Nothing to scale, nothing to extend, nothing to re-encode: the
+      // plain capture is already the requested frame.
+      return screenshot();
+    }
+
+    final metrics = await _layoutMetrics();
+    final region = _CaptureRegion.fromMetrics(
+      metrics,
+      fullPage: options.fullPage,
+    );
+    final scale = options.maxPx == null
+        ? 1.0
+        : region.scaleForMaxPx(options.maxPx!, metrics);
+
+    final params = <String, Object?>{
+      'format': options.format == CaptureFormat.jpeg ? 'jpeg' : 'png',
+      if (options.quality != null) 'quality': options.quality,
+    };
+    if (scale != 1.0) {
+      params['clip'] = {
+        'x': region.x,
+        'y': region.y,
+        'width': region.width,
+        'height': region.height,
+        'scale': scale,
+      };
+    }
+    if (options.fullPage) {
+      params['captureBeyondViewport'] = true;
+    }
+
+    final result = await connection.send('Page.captureScreenshot', params);
+    final data = result['data'];
+    if (data is! String) {
+      throw const ProtocolException('Page.captureScreenshot returned no data');
+    }
+    return base64Decode(data);
+  }
+
+  /// The page's layout metrics.
+  Future<Map<String, Object?>> _layoutMetrics() =>
+      connection.send('Page.getLayoutMetrics');
 
   /// Clicks the element at [css] by dispatching mouse events at its
   /// center, after it becomes actionable (attached → visible → stable →
@@ -379,17 +579,13 @@ class CdpPage {
     int? width;
     int? height;
     try {
-      final decoded =
-          jsonDecode(viewport as String) as Map<String, Object?>;
+      final decoded = jsonDecode(viewport as String) as Map<String, Object?>;
       width = (decoded['w'] as num?)?.toInt();
       height = (decoded['h'] as num?)?.toInt();
     } on FormatException {
       // Keep the fallback center below.
     }
-    final (x, y) = (
-      (width ?? 800) / 2,
-      (height ?? 600) / 2,
-    );
+    final (x, y) = ((width ?? 800) / 2, (height ?? 600) / 2);
     final (deltaX, deltaY) = switch (direction.toLowerCase()) {
       'up' => (0.0, -distance),
       'down' => (0.0, distance),
@@ -491,8 +687,7 @@ class CdpPage {
     }
 
     final held = <(String, int)>[
-      for (final modifier in modifiers)
-        await hold(modifierKeyName(modifier)),
+      for (final modifier in modifiers) await hold(modifierKeyName(modifier)),
     ];
     for (final (name, modCode) in held) {
       await _dispatchKey(name, modCode, 'keyDown');
@@ -596,7 +791,6 @@ class CdpPage {
     return raw == true;
   }
 
-
   /// Resolves an element by accessible NAME — the live-DOM locator that
   /// keeps working when Chromium's AX-cache `backendDOMNodeId`s have
   /// gone stale (Flutter web replaces semantics DOM nodes as the tree
@@ -669,13 +863,12 @@ class CdpPage {
     String css, {
     Duration timeout = const Duration(seconds: 10),
     bool force = false,
-  }) =>
-      _waitForActionableRect(
-        probe: () => evaluate(_elementProbe(_cssProbeBody(css))),
-        label: css,
-        timeout: timeout,
-        force: force,
-      );
+  }) => _waitForActionableRect(
+    probe: () => evaluate(_elementProbe(_cssProbeBody(css))),
+    label: css,
+    timeout: timeout,
+    force: force,
+  );
 
   /// Resolves a semantic-snapshot node (by CDP `backendDOMNodeId`, the
   /// handle `accessibilitySnapshot` records) to actionable viewport
@@ -687,10 +880,9 @@ class CdpPage {
   }) {
     Future<Object?> probe() async {
       try {
-        final resolved = await connection.send(
-          'DOM.resolveNode',
-          {'backendNodeId': backendNodeId},
-        );
+        final resolved = await connection.send('DOM.resolveNode', {
+          'backendNodeId': backendNodeId,
+        });
         final objectId =
             (resolved['object'] as Map<String, Object?>?)?['objectId'];
         if (objectId is! String) return null;
@@ -860,6 +1052,7 @@ List<AxNode> _buildTree(List<Map<String, Object?>> raw) {
       if (childId is String) hasParent.add(childId);
     }
   }
+
   /// Builds (and splices) the subtree under [id].
   ///
   /// Ignored wrapper nodes (role `none`, `ignored: true` — layout
@@ -880,12 +1073,10 @@ List<AxNode> _buildTree(List<Map<String, Object?>> raw) {
     final name = (node['name'] as Map<String, Object?>?)?['value'] as String?;
     // Chromium reports slider values as numbers, not only strings. The
     // shared semantic model stores display values as text across transports.
-    final value =
-        (node['value'] as Map<String, Object?>?)?['value']?.toString();
+    final value = (node['value'] as Map<String, Object?>?)?['value']
+        ?.toString();
     final boundsJson = node['bounds'] as Map<String, Object?>?;
-    final children = [
-      for (final childId in childIds) ...build(childId),
-    ];
+    final children = [for (final childId in childIds) ...build(childId)];
     final backendNodeId = node['backendDOMNodeId'];
     return [
       AxNode(
@@ -901,8 +1092,8 @@ List<AxNode> _buildTree(List<Map<String, Object?>> raw) {
                 height: (boundsJson['height']! as num).toDouble(),
               ),
         attributes: {
-          for (final property in
-              (node['properties'] as List<Object?>? ?? const [])
+          for (final property
+              in (node['properties'] as List<Object?>? ?? const [])
                   .whereType<Map<String, Object?>>())
             if (property['name'] is String && property['value'] is Map)
               property['name']! as String:

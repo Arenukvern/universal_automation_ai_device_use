@@ -6,6 +6,7 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
 import 'package:xsoulspace_permission_core/xsoulspace_permission_core.dart';
 
+import '../capture/capture_request.dart';
 import '../consent/consent_gated_driver.dart';
 import '../plan/checks.dart';
 import '../plan/plan.dart';
@@ -68,8 +69,7 @@ final class ToolkitMcpServer {
     this.consentOrigin = 'universal-automation-mcp',
   }) : _defaultTransport = defaultTransport,
        _endpoints = {
-         if (defaultEndpoint != null)
-           AutomationTransport.cdp: defaultEndpoint,
+         if (defaultEndpoint != null) AutomationTransport.cdp: defaultEndpoint,
          ...endpoints,
        },
        _overrides = overrides,
@@ -247,6 +247,7 @@ final class ToolkitMcpServer {
         'automation_verify' => _verify(arguments),
         'automation_screenshot' => _screenshot(arguments),
         'automation_list_apps' => _listApps(arguments),
+        'automation_request_consent' => _requestConsent(arguments),
         'automation_validate_plan' => _validatePlan(arguments),
         'automation_run_plan' => _runPlan(arguments),
         'automation_run_background' => _runBackground(arguments),
@@ -416,7 +417,33 @@ final class ToolkitMcpServer {
         },
       );
     }
-    return _sessions.attachUri(uri, resolvedTransport);
+    return _sessions.attachUri(
+      _withTargetSelector(uri, arguments),
+      resolvedTransport,
+    );
+  }
+
+  /// The endpoint with the browser-tab selector folded in.
+  ///
+  /// The selector rides the endpoint URI (the same place the OS tier
+  /// encodes its app anchor), so the choice reaches the browser tier
+  /// without a second channel. It applies to the CDP tier only.
+  Uri _withTargetSelector(Uri uri, Map<String, Object?> arguments) {
+    final id = arguments['targetId'];
+    final url = arguments['targetUrl'];
+    final title = arguments['targetTitle'];
+    if (id == null && url == null && title == null) {
+      return uri;
+    }
+    return uri.replace(
+      fragment: Uri(
+        queryParameters: {
+          if (id is String) 'targetId': id,
+          if (url is String) 'targetUrl': url,
+          if (title is String) 'targetTitle': title,
+        },
+      ).query,
+    );
   }
 
   Future<Map<String, Object?>> _observe(Map<String, Object?> arguments) async {
@@ -691,6 +718,48 @@ final class ToolkitMcpServer {
     };
   }
 
+  /// Asks the operating system for a consent grant the OS tier needs.
+  ///
+  /// A missing grant is otherwise a dead end: the tier refuses and the
+  /// agent can only tell the user to open System Settings. This is the
+  /// explicit ask — the OS shows its own prompt, and the result says
+  /// whether the grant is now held.
+  Future<Map<String, Object?>> _requestConsent(
+    Map<String, Object?> arguments,
+  ) async {
+    final kind = arguments['kind'];
+    if (kind != 'accessibility' && kind != 'screenRecording') {
+      throw const McpToolError(
+        'automation_request_consent needs kind '
+        '"accessibility" or "screenRecording"',
+      );
+    }
+    final session = await _session({
+      ...arguments,
+      'transport': 'osAccessibility',
+    });
+    final driver = session.driver;
+    if (driver is! OsConsentRequester) {
+      throw const McpToolError(
+        'automation_request_consent needs the OS tier (transport '
+        '"osAccessibility"); other tiers hold no OS consent',
+      );
+    }
+    final requester = driver as OsConsentRequester;
+    final granted = switch (kind) {
+      'accessibility' => requester.requestAccessibilityConsent(),
+      _ => requester.requestScreenCaptureConsent(),
+    };
+    return {
+      'kind': kind,
+      'granted': granted,
+      if (!granted)
+        'remedy':
+            'the grant was not given; enable it in System Settings -> '
+            'Privacy & Security',
+    };
+  }
+
   Future<Map<String, Object?>> _verify(Map<String, Object?> arguments) async {
     final rawChecks = arguments['checks'];
     if (rawChecks is! List<Object?> || rawChecks.isEmpty) {
@@ -726,9 +795,7 @@ final class ToolkitMcpServer {
         );
       }
       final pid = arguments['pid'] is int ? arguments['pid']! as int : 0;
-      final windows = await (driver as OsWindowCapture).windows(
-        pid: pid,
-      );
+      final windows = await (driver as OsWindowCapture).windows(pid: pid);
       return {
         'windows': [
           for (final window in windows)
@@ -770,20 +837,21 @@ final class ToolkitMcpServer {
       if (path is! String || path.isEmpty) {
         throw const McpToolError('automation_screenshot needs a path');
       }
-      if (!driver.capabilities.screenshot) {
-        throw const McpToolError('this transport cannot capture screenshots');
-      }
-      if (maxPx > 0) {
-        if (driver is! OsDisplayCapture) {
-          throw const McpToolError(
-            'maxPx needs the OS tier; this transport cannot resize capture',
-          );
-        }
-        bytes = await (driver as OsDisplayCapture).screenshot(
-          maxPx: maxPx,
+      // The options are the agent's explicit request: a tier that cannot
+      // honor one refuses (and names the route out) rather than quietly
+      // returning a cheaper frame.
+      final request = CaptureRequest.fromArguments(arguments);
+      try {
+        bytes = await request.capture(driver);
+      } on DriverUnsupportedException catch (error) {
+        throw McpToolError(
+          'automation_screenshot: ${error.message}',
+          details: error.details,
         );
-      } else {
-        bytes = await driver.screenshot();
+      } on SpecViolationException catch (error) {
+        throw McpToolError(
+          'automation_screenshot: ${error.violations.join("; ")}',
+        );
       }
     }
 
@@ -979,9 +1047,8 @@ final class ToolkitMcpServer {
     if (endpoint == null) return {'configured': false};
     Map<String, Object?> probe;
     try {
-      final client = HttpClient()..connectionTimeout = const Duration(
-        seconds: 2,
-      );
+      final client = HttpClient()
+        ..connectionTimeout = const Duration(seconds: 2);
       try {
         final request = await client
             .getUrl(endpoint.replace(path: probePath))
@@ -1047,6 +1114,25 @@ final class ToolkitMcpServer {
         'description':
             'CDP/WebDriver HTTP base (e.g. http://127.0.0.1:9222); '
             'defaults to the serve --cdp endpoint',
+      },
+      // The browser-tab selector: which page target the CDP tier attaches
+      // to. A browser with several tabs open lists them all, so "the
+      // first one" is a guess — the selector makes the choice explicit
+      // and refuses when it cannot be resolved.
+      'targetId': {
+        'type': 'string',
+        'description':
+            'CDP tier: attach to this page target id (a browser tab).',
+      },
+      'targetUrl': {
+        'type': 'string',
+        'description':
+            'CDP tier: attach to the page target whose URL contains this.',
+      },
+      'targetTitle': {
+        'type': 'string',
+        'description':
+            'CDP tier: attach to the page target whose title contains this.',
       },
     };
     Map<String, Object?> tool(
@@ -1240,7 +1326,11 @@ final class ToolkitMcpServer {
         'automation_screenshot',
         'Capture one PNG frame to a local file path. `windowId` scopes '
             'the capture to one window (OS tier); `image` attaches the PNG '
-            'as an opt-in image content block; `maxPx` caps the long side.',
+            'as an opt-in image content block; `maxPx` caps the long side '
+            'in pixels. `fullPage` captures beyond the viewport (a '
+            'scrolling tier only); `format`/`quality` choose the encoding '
+            '(png is lossless, jpeg is smaller). A tier that cannot honor '
+            'an option refuses and names the route out.',
         {
           'type': 'object',
           'required': ['path'],
@@ -1266,7 +1356,29 @@ final class ToolkitMcpServer {
             },
             'maxPx': {
               'type': 'integer',
-              'description': 'Cap the long side in pixels (e.g. 1024)',
+              'description':
+                  'Cap the long side in pixels (e.g. 1024). The image is '
+                  'scaled at capture time, so this is quality-preserving: '
+                  'a vision model resizes large images down anyway.',
+            },
+            'fullPage': {
+              'type': 'boolean',
+              'description':
+                  'Capture the whole scrollable surface, not just the '
+                  'visible viewport (a scrolling tier only).',
+            },
+            'format': {
+              'type': 'string',
+              'enum': ['png', 'jpeg'],
+              'description':
+                  'Encoding of the capture. png is lossless (default); '
+                  'jpeg is much smaller for UI content.',
+            },
+            'quality': {
+              'type': 'integer',
+              'description':
+                  'JPEG quality 1..100 (jpeg only). Higher keeps more '
+                  'detail at the cost of size.',
             },
             ...transportOverride,
           },
@@ -1282,6 +1394,27 @@ final class ToolkitMcpServer {
         {
           'type': 'object',
           'properties': {...transportOverride},
+        },
+      ),
+      tool(
+        'automation_request_consent',
+        'Ask the operating system for a consent grant the OS tier needs '
+            '(macOS: "accessibility" for reading and driving the app tree, '
+            '"screenRecording" for capturing pixels). The OS shows its own '
+            'prompt; the result reports whether the grant is now held. '
+            'Explicit by design — a capture never triggers the prompt '
+            'itself.',
+        {
+          'type': 'object',
+          'required': ['kind'],
+          'properties': {
+            'kind': {
+              'type': 'string',
+              'enum': ['accessibility', 'screenRecording'],
+              'description': 'Which OS grant to ask for.',
+            },
+            ...transportOverride,
+          },
         },
       ),
       tool(

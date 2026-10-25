@@ -10,7 +10,14 @@ import 'webdriver_client.dart';
 /// `capabilities.a11yTree` is declared `false` and [snapshot] refuses
 /// loudly — semantic snapshots for Safari arrive through the OS-native
 /// tier, not through WebDriver.
-class WebDriverDriver implements AutomationDriver {
+///
+/// The tier is also a [ConfigurableCapture], but the standard offers
+/// exactly one capture verb: `GET /session/{id}/screenshot` returns a PNG
+/// of the current viewport. There is no full-page scope, no size
+/// parameter, and no encoding choice, so every capture option beyond the
+/// plain viewport PNG refuses loudly rather than silently handing back a
+/// cheaper frame.
+class WebDriverDriver implements AutomationDriver, ConfigurableCapture {
   /// Creates a driver over a started session.
   WebDriverDriver(this._client);
 
@@ -158,6 +165,53 @@ class WebDriverDriver implements AutomationDriver {
 
   @override
   Future<Uint8List> screenshot() => _client.screenshot();
+
+  /// Captures one frame honoring [options].
+  ///
+  /// Only the plain viewport PNG is servable: the standard's screenshot
+  /// verb takes no parameters, so the tier cannot extend the frame, cap
+  /// its size, or re-encode it. Each of those refuses with
+  /// [DriverUnsupportedException] and names the CDP tier as the route
+  /// out; an invalid option set is rejected by [CaptureOptions.ensureValid]
+  /// before anything is requested.
+  @override
+  Future<Uint8List> capture(CaptureOptions options) async {
+    options.ensureValid();
+    if (options.fullPage) {
+      throw const DriverUnsupportedException(
+        'the W3C standard has no full-page screenshot: '
+        'GET /session/{id}/screenshot captures the viewport only; '
+        'use a CDP endpoint (--cdp) for full-page capture',
+        details: {
+          'remedy': 'use the CDP tier (serve --cdp) for full-page capture',
+        },
+      );
+    }
+    if (options.maxPx != null) {
+      throw const DriverUnsupportedException(
+        'the W3C standard cannot resize a screenshot: '
+        'GET /session/{id}/screenshot has no scale parameter; '
+        'use a CDP endpoint (--cdp) for a size-capped capture',
+        details: {
+          'remedy': 'use the CDP tier (serve --cdp) for a size-capped capture',
+        },
+      );
+    }
+    if (options.format != CaptureFormat.png) {
+      throw const DriverUnsupportedException(
+        'the W3C standard returns PNG only: '
+        'GET /session/{id}/screenshot has no encoding parameter; '
+        'use a CDP endpoint (--cdp) for a JPEG capture',
+        details: {
+          'remedy': 'use the CDP tier (serve --cdp) for a JPEG capture',
+        },
+      );
+    }
+    // The plain viewport PNG is what the standard serves; the driver's
+    // own screenshot() is that frame.
+    final bytes = await screenshot();
+    return bytes;
+  }
 
   @override
   Future<void> close() async {

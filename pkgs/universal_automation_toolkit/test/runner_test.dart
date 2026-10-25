@@ -47,84 +47,133 @@ void main() {
   });
   tearDown(() => fake.stop());
 
-  test('runs a scenario end-to-end over CDP and reports structured steps',
-      () async {
+  test(
+    'runs a scenario end-to-end over CDP and reports structured steps',
+    () async {
+      final plan = AutomationPlan(
+        sessions: [cdp('browser', uri: endpoint)],
+        scenarios: [
+          scenario(
+            'full',
+            steps: [
+              navigate(Uri.parse('$endpoint/#form')),
+              waitFor([exists(role: 'button', name: 'Submit')]),
+              typeText('antonio@example.com', css: '#email'),
+              observe(save: 'form'),
+              click(name: 'Submit'),
+              verifyThat([
+                exists(role: 'textbox', name: 'Email'),
+                absent(name: 'Error'),
+                urlContains('#form'),
+              ]),
+            ],
+          ),
+        ],
+      );
+
+      final outDir = Directory.systemTemp.createTempSync('uat-runner');
+      addTearDown(() => outDir.deleteSync(recursive: true));
+
+      final report = await PlanRunner().run(
+        plan,
+        scenarioName: 'full',
+        outDir: outDir.path,
+      );
+
+      expect(report.ok, isTrue);
+      expect(report.scenario, 'full');
+      expect(report.steps.map((step) => step.kind).toList(), [
+        'act',
+        'wait',
+        'act',
+        'observe',
+        'act',
+        'verify',
+      ]);
+      expect(report.steps.every((step) => step.ok), isTrue);
+      // The css-locator type dispatches per-key events, the semantic click
+      // lands at the element center: real input reached the fake.
+      expect(
+        fake.inputEvents.map((event) => event['method']),
+        containsAll(['Input.dispatchKeyEvent', 'Input.dispatchMouseEvent']),
+      );
+      expect(fake.currentUrl, contains('#form'));
+      // The observe step embedded the full snapshot under its save name.
+      expect(report.steps[3].detail.containsKey('form'), isTrue);
+    },
+  );
+
+  test(
+    'a failed verify aborts remaining steps and marks the run failed',
+    () async {
+      final plan = AutomationPlan(
+        sessions: [cdp('browser', uri: endpoint)],
+        scenarios: [
+          scenario(
+            's',
+            steps: [
+              verifyThat([exists(name: 'NoSuchThing')]),
+              navigate(Uri.parse('$endpoint/x')),
+            ],
+          ),
+        ],
+      );
+
+      final report = await PlanRunner().run(plan);
+      expect(report.ok, isFalse);
+      expect(report.steps[0].ok, isFalse);
+      expect(report.steps[0].errorKind, 'verificationFailed');
+      expect(report.steps[1].skipped, isTrue);
+      expect(fake.methods, isNot(contains('Page.navigate')));
+    },
+  );
+
+  test('record produces frames on a tier that can produce them', () async {
+    // The record step is not CDP-only: any tier that can produce frames
+    // is polled from its capture path, and the artifact is named for the
+    // frames it actually holds.
+    final out = Directory.systemTemp.createTempSync('uat-record-');
+    addTearDown(() => out.deleteSync(recursive: true));
+
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario('full', steps: [
-          navigate(Uri.parse('$endpoint/#form')),
-          waitFor([exists(role: 'button', name: 'Submit')]),
-          typeText('antonio@example.com', css: '#email'),
-          observe(save: 'form'),
-          click(name: 'Submit'),
-          verifyThat([
-            exists(role: 'textbox', name: 'Email'),
-            absent(name: 'Error'),
-            urlContains('#form'),
-          ]),
-        ]),
-      ],
-    );
-
-    final outDir = Directory.systemTemp.createTempSync('uat-runner');
-    addTearDown(() => outDir.deleteSync(recursive: true));
-
-    final report = await PlanRunner().run(
-      plan,
-      scenarioName: 'full',
-      outDir: outDir.path,
-    );
-
-    expect(report.ok, isTrue);
-    expect(report.scenario, 'full');
-    expect(
-      report.steps.map((step) => step.kind).toList(),
-      ['act', 'wait', 'act', 'observe', 'act', 'verify'],
-    );
-    expect(report.steps.every((step) => step.ok), isTrue);
-    // The css-locator type dispatches per-key events, the semantic click
-    // lands at the element center: real input reached the fake.
-    expect(
-      fake.inputEvents.map((event) => event['method']),
-      containsAll(['Input.dispatchKeyEvent', 'Input.dispatchMouseEvent']),
-    );
-    expect(fake.currentUrl, contains('#form'));
-    // The observe step embedded the full snapshot under its save name.
-    expect(report.steps[3].detail.containsKey('form'), isTrue);
-  });
-
-  test('a failed verify aborts remaining steps and marks the run failed',
-      () async {
-    final plan = AutomationPlan(
-      sessions: [cdp('browser', uri: endpoint)],
-      scenarios: [
-        scenario('s', steps: [
-          verifyThat([exists(name: 'NoSuchThing')]),
-          navigate(Uri.parse('$endpoint/x')),
-        ]),
+        scenario(
+          's',
+          steps: [record(const Duration(milliseconds: 300), out.path)],
+        ),
       ],
     );
 
     final report = await PlanRunner().run(plan);
-    expect(report.ok, isFalse);
-    expect(report.steps[0].ok, isFalse);
-    expect(report.steps[0].errorKind, 'verificationFailed');
-    expect(report.steps[1].skipped, isTrue);
-    expect(fake.methods, isNot(contains('Page.navigate')));
+    expect(report.ok, isTrue);
+    final frames = Directory(out.path)
+        .listSync()
+        .where((entry) => entry.path.endsWith('.mjpeg'))
+        .toList();
+    expect(frames, isNotEmpty);
+    expect(
+      Directory(out.path)
+          .listSync()
+          .where((entry) => entry.path.endsWith('.meta.jsonl')),
+      isNotEmpty,
+    );
   });
 
   test('wait reports waitTimeout with the last reasons', () async {
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario('s', steps: [
-          waitFor(
-            [exists(name: 'Never')],
-            timeout: const Duration(milliseconds: 400),
-            poll: const Duration(milliseconds: 80),
-          ),
-        ]),
+        scenario(
+          's',
+          steps: [
+            waitFor(
+              [exists(name: 'Never')],
+              timeout: const Duration(milliseconds: 400),
+              poll: const Duration(milliseconds: 80),
+            ),
+          ],
+        ),
       ],
     );
 
@@ -137,10 +186,13 @@ void main() {
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario('s', steps: [
-          soft(verifyThat([exists(name: 'NoSuchThing')])),
-          navigate(Uri.parse('$endpoint/x')),
-        ]),
+        scenario(
+          's',
+          steps: [
+            soft(verifyThat([exists(name: 'NoSuchThing')])),
+            navigate(Uri.parse('$endpoint/x')),
+          ],
+        ),
       ],
     );
 
@@ -159,9 +211,10 @@ void main() {
       sessions: [cdp('browser', uri: endpoint)],
       profiles: {'humanish': BehaviorProfile.humanPrior(42)},
       scenarios: [
-        scenario('s', steps: [
-          click(name: 'Submit', profile: 'humanish', seed: 7),
-        ]),
+        scenario(
+          's',
+          steps: [click(name: 'Submit', profile: 'humanish', seed: 7)],
+        ),
       ],
     );
 
@@ -177,70 +230,84 @@ void main() {
     expect(envelope['profileHash'], isNotEmpty);
   });
 
-  test('intent steps resolve through the registry and lower to actions',
-      () async {
-    final plan = AutomationPlan(
-      sessions: [cdp('browser', uri: endpoint)],
-      intents: IntentRegistry([
-        IntentManifest(
-          app: 'webshop',
-          intents: [
-            AppIntent(
-              name: 'checkout',
-              hint: IntentHint(
-                driver: 'cdp',
-                verb: IntentVerb.type,
-                locator: {'css': '#email'},
+  test(
+    'intent steps resolve through the registry and lower to actions',
+    () async {
+      final plan = AutomationPlan(
+        sessions: [cdp('browser', uri: endpoint)],
+        intents: IntentRegistry([
+          IntentManifest(
+            app: 'webshop',
+            intents: [
+              AppIntent(
+                name: 'checkout',
+                hint: IntentHint(
+                  driver: 'cdp',
+                  verb: IntentVerb.type,
+                  locator: {'css': '#email'},
+                ),
               ),
-            ),
-          ],
-        ),
-      ]),
-      scenarios: [
-        scenario('s', steps: [
-          intent('webshop', 'checkout', args: {'text': 'antonio@example.com'}),
+            ],
+          ),
         ]),
-      ],
-    );
-
-    final report = await PlanRunner().run(plan);
-    expect(report.ok, isTrue);
-    expect(
-      fake.inputEvents.map((event) => event['method']),
-      contains('Input.dispatchKeyEvent'),
-    );
-  });
-
-  test('a view hint closes the intent loop through the declared view',
-      () async {
-    final plan = AutomationPlan(
-      sessions: [cdp('browser', uri: endpoint)],
-      intents: IntentRegistry([
-        IntentManifest(
-          app: 'webshop',
-          intents: [
-            AppIntent(
-              name: 'checkout',
-              hint: IntentHint(
-                driver: 'cdp',
-                verb: IntentVerb.click,
-                locator: {'name': 'Submit'},
-                viewHint: const SemanticView(maxNodes: 3),
+        scenarios: [
+          scenario(
+            's',
+            steps: [
+              intent(
+                'webshop',
+                'checkout',
+                args: {'text': 'antonio@example.com'},
               ),
-            ),
-          ],
-        ),
-      ]),
-      scenarios: [
-        scenario('s', steps: [intent('webshop', 'checkout')]),
-      ],
-    );
+            ],
+          ),
+        ],
+      );
 
-    final report = await PlanRunner().run(plan);
-    expect(report.ok, isTrue);
-    // The step result carries the post-action state render.
-    expect((report.steps.single.detail['state'] as String), contains('Submit'));
-  });
+      final report = await PlanRunner().run(plan);
+      expect(report.ok, isTrue);
+      expect(
+        fake.inputEvents.map((event) => event['method']),
+        contains('Input.dispatchKeyEvent'),
+      );
+    },
+  );
+
+  test(
+    'a view hint closes the intent loop through the declared view',
+    () async {
+      final plan = AutomationPlan(
+        sessions: [cdp('browser', uri: endpoint)],
+        intents: IntentRegistry([
+          IntentManifest(
+            app: 'webshop',
+            intents: [
+              AppIntent(
+                name: 'checkout',
+                hint: IntentHint(
+                  driver: 'cdp',
+                  verb: IntentVerb.click,
+                  locator: {'name': 'Submit'},
+                  viewHint: const SemanticView(maxNodes: 3),
+                ),
+              ),
+            ],
+          ),
+        ]),
+        scenarios: [
+          scenario('s', steps: [intent('webshop', 'checkout')]),
+        ],
+      );
+
+      final report = await PlanRunner().run(plan);
+      expect(report.ok, isTrue);
+      // The step result carries the post-action state render.
+      expect(
+        (report.steps.single.detail['state'] as String),
+        contains('Submit'),
+      );
+    },
+  );
 
   test('screenshot writes the PNG artifact under outDir', () async {
     final outDir = Directory.systemTemp.createTempSync('uat-shot');
@@ -260,20 +327,22 @@ void main() {
     expect(file.lengthSync(), greaterThan(0));
   });
 
-  test('an unresolvable handle binding fails loudly with the override hint',
-      () async {
-    final plan = AutomationPlan(
-      sessions: [cdp('browser', handle: 'session-browser-handle')],
-      scenarios: [
-        scenario('s', steps: [observe()]),
-      ],
-    );
+  test(
+    'an unresolvable handle binding fails loudly with the override hint',
+    () async {
+      final plan = AutomationPlan(
+        sessions: [cdp('browser', handle: 'session-browser-handle')],
+        scenarios: [
+          scenario('s', steps: [observe()]),
+        ],
+      );
 
-    final report = await PlanRunner().run(plan);
-    expect(report.ok, isFalse);
-    expect(report.steps.single.errorKind, 'endpointUnreachable');
-    expect(report.steps.single.errorMessage, contains('--set'));
-  });
+      final report = await PlanRunner().run(plan);
+      expect(report.ok, isFalse);
+      expect(report.steps.single.errorKind, 'endpointUnreachable');
+      expect(report.steps.single.errorMessage, contains('--set'));
+    },
+  );
 
   test('a handle binding resolves through session overrides', () async {
     final plan = AutomationPlan(
@@ -296,10 +365,13 @@ void main() {
     final plan = AutomationPlan(
       sessions: [cdp('browser', handle: 'session-browser-handle')],
       scenarios: [
-        scenario('s', steps: [
-          observe(),
-          waitFor([exists(role: 'button', name: 'Submit')]),
-        ]),
+        scenario(
+          's',
+          steps: [
+            observe(),
+            waitFor([exists(role: 'button', name: 'Submit')]),
+          ],
+        ),
       ],
     );
 

@@ -32,6 +32,7 @@ export 'src/behavior/behavior_synthesizer.dart';
 export 'src/behavior/behavioral_driver.dart';
 export 'src/behavior/canonical.dart';
 export 'src/behavior/timing.dart';
+export 'src/capture_options.dart';
 export 'src/driver.dart';
 export 'src/driver_capabilities.dart';
 export 'src/keyboard_modifiers.dart';

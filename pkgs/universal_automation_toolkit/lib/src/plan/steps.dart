@@ -22,15 +22,19 @@ sealed class PlanStep {
     }
     // Common keys may ride inside the step body (`- act: {click: {...},
     // session: b}`) — promote them to the step level before reading.
-    final kindKeysProbe = json.keys.where((key) => const {
-      'observe',
-      'act',
-      'verify',
-      'wait',
-      'screenshot',
-      'intent',
-      'scope',
-    }.contains(key)).toList();
+    final kindKeysProbe = json.keys
+        .where(
+          (key) => const {
+            'observe',
+            'act',
+            'verify',
+            'wait',
+            'screenshot',
+            'intent',
+            'scope',
+          }.contains(key),
+        )
+        .toList();
     if (kindKeysProbe.length == 1) {
       final probed = json[kindKeysProbe.single];
       if (probed is Map<Object?, Object?>) {
@@ -56,16 +60,18 @@ sealed class PlanStep {
       );
     }
     final kindKeys = json.keys
-        .where((key) => const {
-          'observe',
-          'act',
-          'verify',
-          'wait',
-          'screenshot',
-          'intent',
-          'record',
-          'scope',
-        }.contains(key))
+        .where(
+          (key) => const {
+            'observe',
+            'act',
+            'verify',
+            'wait',
+            'screenshot',
+            'intent',
+            'record',
+            'scope',
+          }.contains(key),
+        )
         .toList();
     if (kindKeys.length > 1) {
       throw FormatException(
@@ -78,18 +84,20 @@ sealed class PlanStep {
       // Ergonomic shorthand: a lone action verb is an act step
       // (`- navigate: {url: ...}` ≡ `- act: {navigate: {url: ...}}`).
       final actionKey = json.keys
-          .where((key) => const {
-            'navigate',
-            'click',
-            'clickAt',
-            'moveTo',
-            'drag',
-            'type',
-            'key',
-            'scroll',
-            'evaluate',
-            'invoke',
-          }.contains(key))
+          .where(
+            (key) => const {
+              'navigate',
+              'click',
+              'clickAt',
+              'moveTo',
+              'drag',
+              'type',
+              'key',
+              'scroll',
+              'evaluate',
+              'invoke',
+            }.contains(key),
+          )
           .toList();
       if (actionKey.length == 1) {
         return ActStep._(
@@ -145,6 +153,39 @@ String? _optionalString(Object? value, String field) {
   return value;
 }
 
+/// The capture options a step body asks for.
+///
+/// The vocabulary matches the CLI and the MCP tool, so a plan, a command
+/// line, and a tool call name the same capture the same way.
+CaptureOptions _captureOptions(Map<Object?, Object?> body, String field) {
+  final maxPx = body['maxPx'];
+  if (maxPx != null && (maxPx is! int || maxPx <= 0)) {
+    throw FormatException('$field.maxPx must be a positive integer');
+  }
+  final format = switch (body['format']) {
+    null => CaptureFormat.png,
+    'png' => CaptureFormat.png,
+    'jpeg' || 'jpg' => CaptureFormat.jpeg,
+    final Object value => throw FormatException(
+      '$field.format must be "png" or "jpeg" (got $value)',
+    ),
+  };
+  final quality = body['quality'];
+  if (quality != null && quality is! int) {
+    throw FormatException('$field.quality must be an integer');
+  }
+  final options = CaptureOptions(
+    fullPage: body['fullPage'] == true,
+    maxPx: maxPx as int?,
+    format: format,
+    quality: quality as int?,
+  );
+  // An invalid combination (a quality on a lossless format) is the
+  // plan's mistake, and it is reported before the run starts.
+  options.ensureValid();
+  return options;
+}
+
 /// Capture one semantic snapshot — optionally through a
 /// [SemanticView] (ADR 0052): the report then carries the view's
 /// rendered text + ref index, while `save` keeps the raw snapshot.
@@ -163,8 +204,7 @@ final class ObserveStep extends PlanStep {
       throw const FormatException('observe must be a map when present');
     }
     final map = (body as Map<Object?, Object?>?) ?? const {};
-    if (map.keys
-        .any((key) => key != 'save' && key != 'view' && key != 'at')) {
+    if (map.keys.any((key) => key != 'save' && key != 'view' && key != 'at')) {
       throw FormatException(
         'observe supports only `save`, `view`, and `at` '
         '(got ${map.keys.join(', ')})',
@@ -172,9 +212,7 @@ final class ObserveStep extends PlanStep {
     }
     return ObserveStep(
       save: _optionalString(map['save'], 'save'),
-      view: map.containsKey('view')
-          ? SemanticView.fromJson(map['view'])
-          : null,
+      view: map.containsKey('view') ? SemanticView.fromJson(map['view']) : null,
       at: _atPoint(map['at']),
     );
   }
@@ -241,7 +279,10 @@ final class ActStep extends PlanStep {
     this.returnState = false,
   });
 
-  factory ActStep._({required Object? body, required Map<Object?, Object?> json}) {
+  factory ActStep._({
+    required Object? body,
+    required Map<Object?, Object?> json,
+  }) {
     if (body is! Map<Object?, Object?> || body.isEmpty) {
       throw const FormatException('act must be a non-empty action map');
     }
@@ -262,13 +303,16 @@ final class ActStep extends PlanStep {
       throw const FormatException('act must be a non-empty action map');
     }
     final action = ActStep.actionFromJson(actionBody);
-    final profile =
-        _optionalString(json['profile'] ?? body['profile'], 'profile');
+    final profile = _optionalString(
+      json['profile'] ?? body['profile'],
+      'profile',
+    );
     final seedValue = json['seed'] ?? body['seed'];
     if (seedValue != null && seedValue is! int) {
       throw const FormatException('seed must be an integer');
     }
-    final returnState = json['returnState'] ??
+    final returnState =
+        json['returnState'] ??
         body['returnState'] ??
         // The verb shorthand keeps extra keys inside the action map
         // (`- click: {name: Go, returnState: true}`) — lift them here.
@@ -509,8 +553,10 @@ final class ActStep extends PlanStep {
       case 'evaluate':
         final expression = value is String
             ? value
-            : _optionalString(_asMap(value, 'evaluate')['expression'],
-                'evaluate.expression');
+            : _optionalString(
+                _asMap(value, 'evaluate')['expression'],
+                'evaluate.expression',
+              );
         if (expression == null || expression.isEmpty) {
           throw const FormatException('evaluate needs an expression');
         }
@@ -543,7 +589,10 @@ final class ActStep extends PlanStep {
         return SetValueAction(setValue, css: css, role: role, name: name);
       case 'elementAction':
         final params = _asMap(value, 'elementAction');
-        final action = _optionalString(params['action'], 'elementAction.action');
+        final action = _optionalString(
+          params['action'],
+          'elementAction.action',
+        );
         if (action == null || action.isEmpty) {
           throw const FormatException('elementAction needs an action name');
         }
@@ -551,9 +600,7 @@ final class ActStep extends PlanStep {
         final role = _optionalString(params['role'], 'elementAction.role');
         final name = _optionalString(params['name'], 'elementAction.name');
         if (css == null && role == null && name == null) {
-          throw const FormatException(
-            'elementAction needs css, role, or name',
-          );
+          throw const FormatException('elementAction needs css, role, or name');
         }
         return ElementAction(action, css: css, role: role, name: name);
       default:
@@ -622,7 +669,11 @@ Map<Object?, Object?> _asMapOrString(Object? value, String what) {
 /// fails the step.
 final class VerifyStep extends PlanStep {
   /// Creates a verify step.
-  const VerifyStep({required this.checks, super.session, super.continueOnFailure});
+  const VerifyStep({
+    required this.checks,
+    super.session,
+    super.continueOnFailure,
+  });
 
   factory VerifyStep._({required Object? body}) {
     final list = body is List<Object?> ? body : null;
@@ -630,9 +681,7 @@ final class VerifyStep extends PlanStep {
       throw const FormatException('verify needs a non-empty list of checks');
     }
     return VerifyStep(
-      checks: [
-        for (final check in list) VerifyCheck.fromJson(check),
-      ],
+      checks: [for (final check in list) VerifyCheck.fromJson(check)],
     );
   }
 
@@ -694,15 +743,11 @@ final class WaitStep extends PlanStep {
         'wait needs checks or a urlContains shorthand',
       );
     }
-    final timeout = _seconds(params['timeout'], 'timeout') ??
-        const Duration(seconds: 10);
-    final poll = _seconds(params['poll'], 'poll') ??
-        const Duration(milliseconds: 250);
-    return WaitStep(
-      checks: checks,
-      timeout: timeout,
-      pollInterval: poll,
-    );
+    final timeout =
+        _seconds(params['timeout'], 'timeout') ?? const Duration(seconds: 10);
+    final poll =
+        _seconds(params['poll'], 'poll') ?? const Duration(milliseconds: 250);
+    return WaitStep(checks: checks, timeout: timeout, pollInterval: poll);
   }
 
   static Duration? _seconds(Object? value, String field) {
@@ -759,27 +804,37 @@ final class ScreenshotStep extends PlanStep {
   /// Creates a screenshot step.
   const ScreenshotStep({
     required this.out,
+    this.options = const CaptureOptions(),
     super.session,
     super.continueOnFailure,
   });
 
   factory ScreenshotStep._({required Object? body}) {
     final String out;
+    var options = const CaptureOptions();
     if (body is String && body.isNotEmpty) {
       out = body;
     } else if (body is Map<Object?, Object?>) {
       out = _optionalString(body['out'], 'screenshot.out') ?? '';
+      options = _captureOptions(body, 'screenshot');
     } else {
       out = '';
     }
     if (out.isEmpty) {
       throw const FormatException('screenshot needs an out path');
     }
-    return ScreenshotStep(out: out);
+    return ScreenshotStep(out: out, options: options);
   }
 
   /// Destination path (directories are created).
   final String out;
+
+  /// The capture options: how much of the surface, how large, which
+  /// encoding.
+  ///
+  /// A tier that cannot honor one refuses the step (the runner reports
+  /// the refusal); it never silently captures something else.
+  final CaptureOptions options;
 
   @override
   String get kind => 'screenshot';
@@ -788,13 +843,14 @@ final class ScreenshotStep extends PlanStep {
   PlanStep withCommon({String? session, required bool continueOnFailure}) =>
       ScreenshotStep(
         out: out,
+        options: options,
         session: session,
         continueOnFailure: continueOnFailure,
       );
 
   @override
   Map<String, Object?> toJson() => {
-    'screenshot': out,
+    'screenshot': {'out': out, ...options.toJson()},
     if (session != null) 'session': session,
     if (continueOnFailure) 'continueOnFailure': true,
   };
@@ -894,18 +950,13 @@ final class IntentStep extends PlanStep {
 
   @override
   Map<String, Object?> toJson() => {
-    'intent': {
-      'app': app,
-      'name': name,
-      if (args.isNotEmpty) 'args': args,
-    },
+    'intent': {'app': app, 'name': name, if (args.isNotEmpty) 'args': args},
     if (profile != null) 'profile': profile,
     if (seed != null) 'seed': seed,
     if (session != null) 'session': session,
     if (continueOnFailure) 'continueOnFailure': true,
   };
 }
-
 
 /// Run a view-scoped step tree (ADR 0052) — the calling dimension of
 /// composition: the view opens with an observation, the child steps run
@@ -1047,8 +1098,11 @@ final class CodeStep extends PlanStep {
 /// A [CodeStep] body reported failure.
 class CodeStepException extends AutomationException {
   /// Creates the failure.
-  const CodeStepException(this.stepLabel, String message, {this.details = const {}})
-    : super(message);
+  const CodeStepException(
+    this.stepLabel,
+    String message, {
+    this.details = const {},
+  }) : super(message);
 
   @override
   String get kind => 'codeStepFailed';

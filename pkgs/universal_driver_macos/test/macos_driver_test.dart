@@ -7,7 +7,11 @@ import 'package:universal_driver_macos/universal_driver_macos.dart';
 
 /// Records every bridge call and replays scripted observations — the
 /// FakeBus pattern from `universal_driver_linux`.
-final class FakeBridge implements AxDriverBridge {
+final class FakeBridge
+    implements
+        AxDriverBridge,
+        EncodedCaptureBridge,
+        ScreenCaptureConsentBridge {
   FakeBridge({this.trusted = true});
 
   bool trusted;
@@ -32,6 +36,23 @@ final class FakeBridge implements AxDriverBridge {
   BridgeJsonResult windowsResult = (code: 0, json: _windowsJson);
   int? lastWindowId;
   int? lastWindowMaxPx;
+
+  // -- capture options (encoding, cap, quality) --
+
+  /// The Screen Recording grant the fake reports (never prompts).
+  bool screenCaptureGranted = false;
+
+  /// What the fake's consent request returns.
+  bool screenCaptureRequestResult = false;
+
+  /// The encoding the last capture asked for (`png` / `jpeg`).
+  String? lastCaptureFormat;
+
+  /// The long-side cap the last capture asked for.
+  int? lastCaptureMaxPx;
+
+  /// The JPEG quality the last capture asked for (0 = tier default).
+  int? lastCaptureQuality;
 
   double? lastScrollDx;
   double? lastScrollDy;
@@ -70,6 +91,18 @@ final class FakeBridge implements AxDriverBridge {
   bool requestTrust() {
     calls.add('requestTrust');
     return trusted;
+  }
+
+  @override
+  bool screenCaptureTrusted() {
+    calls.add('screenCaptureTrusted');
+    return screenCaptureGranted;
+  }
+
+  @override
+  bool requestScreenCapture() {
+    calls.add('requestScreenCapture');
+    return screenCaptureRequestResult;
   }
 
   @override
@@ -222,7 +255,36 @@ final class FakeBridge implements AxDriverBridge {
   @override
   BridgeBytesResult screenshotPng({int displayId = 0, int maxPx = 0}) {
     calls.add('screenshot($displayId)');
+    lastCaptureFormat = 'png';
+    lastCaptureMaxPx = maxPx;
     return screenshotResult;
+  }
+
+  @override
+  BridgeBytesResult screenshotJpeg({
+    int displayId = 0,
+    int maxPx = 0,
+    int quality = 0,
+  }) {
+    calls.add('screenshotJpeg($displayId)');
+    lastCaptureFormat = 'jpeg';
+    lastCaptureMaxPx = maxPx;
+    lastCaptureQuality = quality;
+    return screenshotResult;
+  }
+
+  @override
+  BridgeBytesResult screenshotWindowJpeg({
+    required int windowId,
+    int maxPx = 0,
+    int quality = 0,
+  }) {
+    calls.add('windowScreenshotJpeg($windowId)');
+    lastCaptureFormat = 'jpeg';
+    lastCaptureMaxPx = maxPx;
+    lastCaptureQuality = quality;
+    lastWindowId = windowId;
+    return windowScreenshotResult;
   }
 
   @override
@@ -339,6 +401,16 @@ const _appJsonWithPid =
     '{"role":"button","name":"Save","attributes":{"axid":"2"}},'
     '{"role":"textbox","name":"Search","value":"","attributes":{"axid":"3"}}'
     ']}';
+
+/// A bridge that predates the encoded-capture and consent capabilities:
+/// every member it lacks fails loudly, so the driver must refuse BEFORE
+/// reaching for it.
+final class LegacyBridge implements AxDriverBridge {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw UnimplementedError(
+    '${invocation.memberName} is not on this legacy bridge',
+  );
+}
 
 final class AllWindowsFakeBridge extends FakeBridge
     implements AllWindowListingBridge {
@@ -852,28 +924,157 @@ void main() {
     );
   });
 
+  test('capture honors the long-side cap on the png path', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    final bytes = await driver.capture(const CaptureOptions(maxPx: 1024));
+
+    expect(bytes, [1, 2, 3]);
+    expect(bridge.lastCaptureFormat, 'png');
+    expect(bridge.lastCaptureMaxPx, 1024);
+  });
+
+  test(
+    'capture refuses fullPage: a native frame has no scroll extent',
+    () async {
+      final bridge = FakeBridge();
+      final driver = driverWith(bridge);
+
+      await expectLater(
+        driver.capture(const CaptureOptions(fullPage: true)),
+        throwsA(
+          isA<DriverUnsupportedException>().having(
+            (error) => error.message,
+            'message',
+            contains('scroll extent'),
+          ),
+        ),
+      );
+      expect(bridge.calls, isEmpty, reason: 'the refusal precedes the capture');
+    },
+  );
+
+  test('capture refuses a quality on a lossless png request', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    await expectLater(
+      driver.capture(const CaptureOptions(quality: 80)),
+      throwsA(isA<SpecViolationException>()),
+    );
+    expect(bridge.calls, isEmpty, reason: 'the invalid option set is caught');
+  });
+
+  test('capture honors the jpeg encoding and its quality', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    final bytes = await driver.capture(
+      const CaptureOptions(format: CaptureFormat.jpeg, quality: 60, maxPx: 800),
+    );
+
+    expect(bytes, [1, 2, 3]);
+    expect(bridge.lastCaptureFormat, 'jpeg');
+    expect(bridge.lastCaptureQuality, 60);
+    expect(bridge.lastCaptureMaxPx, 800);
+  });
+
+  test('a bridge without the jpeg verb refuses the lossy request', () async {
+    final driver = MacosDriver(bridge: LegacyBridge());
+
+    await expectLater(
+      driver.capture(const CaptureOptions(format: CaptureFormat.jpeg)),
+      throwsA(isA<DriverUnsupportedException>()),
+    );
+  });
+
+  test('capture surfaces the missing screen recording consent', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+    bridge.screenshotResult = (code: 10, bytes: Uint8List(0));
+
+    await expectLater(
+      driver.capture(const CaptureOptions()),
+      throwsA(isA<ScreenRecordingPermissionRequiredException>()),
+    );
+  });
+
+  test('window capture honors the options too', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    final bytes = await driver.windowCapture(
+      77,
+      const CaptureOptions(format: CaptureFormat.jpeg, quality: 40),
+    );
+
+    expect(bytes, [4, 5]);
+    expect(bridge.lastWindowId, 77);
+    expect(bridge.lastCaptureFormat, 'jpeg');
+    expect(bridge.lastCaptureQuality, 40);
+
+    await expectLater(
+      driver.windowCapture(77, const CaptureOptions(fullPage: true)),
+      throwsA(isA<DriverUnsupportedException>()),
+    );
+  });
+
+  test('screen recording consent: the preflight reads, the request asks', () {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    expect(driver.screenCaptureTrusted, isFalse);
+    bridge.screenCaptureGranted = true;
+    expect(driver.screenCaptureTrusted, isTrue);
+    expect(driver.accessibilityTrusted, isTrue);
+
+    bridge.screenCaptureRequestResult = true;
+    expect(driver.requestScreenCaptureConsent(), isTrue);
+    expect(bridge.calls, contains('requestScreenCapture'));
+  });
+
+  test('a capture never raises the consent prompt', () async {
+    final bridge = FakeBridge();
+    final driver = driverWith(bridge);
+
+    await driver.capture(const CaptureOptions());
+
+    expect(bridge.calls, isNot(contains('requestScreenCapture')));
+    expect(bridge.calls, isNot(contains('requestTrust')));
+  });
+
+  test('a legacy bridge refuses the screen recording consent state', () {
+    final driver = MacosDriver(bridge: LegacyBridge());
+
+    expect(
+      () => driver.screenCaptureTrusted,
+      throwsA(isA<DriverUnsupportedException>()),
+    );
+  });
+
   test(
     'offscreen listing preserves visibility states',
     () async {
-      final bridge = AllWindowsFakeBridge()
-        ..windowsResult = (
-          code: 0,
-          json:
-              '[{"windowId":77,"pid":42,"name":"host","onScreen":true},'
-              '{"windowId":78,"pid":42,"name":"helper","onScreen":false},'
-              '{"windowId":79,"pid":42,"name":"unknown"}]',
-        );
-      final driver = driverWith(bridge);
-      final windows = await driver.windows(pid: 42, onScreenOnly: false);
-      expect(bridge.calls, ['allWindows(pid=42)']);
-      expect(windows.map((window) => window.onScreen), [true, false, null]);
-      expect(windows.last.toJson().containsKey('onScreen'), isFalse);
-      expect(windows[1].toJson()['onScreen'], isFalse);
-      bridge.windowsResult = (code: 3, json: '');
-      await expectLater(
-        driver.windows(onScreenOnly: false),
-        throwsA(isA<ProtocolException>()),
+    final bridge = AllWindowsFakeBridge()
+      ..windowsResult = (
+        code: 0,
+        json:
+            '[{"windowId":77,"pid":42,"name":"host","onScreen":true},'
+            '{"windowId":78,"pid":42,"name":"helper","onScreen":false},'
+            '{"windowId":79,"pid":42,"name":"unknown"}]',
       );
+    final driver = driverWith(bridge);
+    final windows = await driver.windows(pid: 42, onScreenOnly: false);
+    expect(bridge.calls, ['allWindows(pid=42)']);
+    expect(windows.map((window) => window.onScreen), [true, false, null]);
+    expect(windows.last.toJson().containsKey('onScreen'), isFalse);
+    expect(windows[1].toJson()['onScreen'], isFalse);
+    bridge.windowsResult = (code: 3, json: '');
+    await expectLater(
+      driver.windows(onScreenOnly: false),
+      throwsA(isA<ProtocolException>()),
+    );
     },
   );
 

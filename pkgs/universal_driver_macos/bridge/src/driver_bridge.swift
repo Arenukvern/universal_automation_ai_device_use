@@ -712,13 +712,16 @@ public func xs_axdrv_release_all() {
     scrollRemainderY = 0
 }
 
-/// One PNG encode with an optional long-side downscale (`maxPx` > 0
+/// One image encode with an optional long-side downscale (`maxPx` > 0
 /// caps the image budget agents receive; mcp_flutter's ~1024px
-/// convention). 3 = destination failed, 4 = encode failed,
+/// convention). `jpegQuality` is the family's 1..100 scale mapped onto
+/// ImageIO's 0.0..1.0 lossy compression; `nil` keeps the lossless PNG
+/// default. 3 = destination failed, 4 = encode failed,
 /// 5 = allocation failed.
-private func encodePng(
+private func encodeImage(
     _ image: CGImage,
     _ maxPx: Int32,
+    jpegQuality: Int32? = nil,
     _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
     _ outLen: UnsafeMutablePointer<Int>?
 ) -> Int32 {
@@ -727,10 +730,19 @@ private func encodePng(
         finalImage = downscaled(image, maxPx) ?? image
     }
     let data = NSMutableData()
+    let lossy = jpegQuality != nil
+    let type = lossy ? "public.jpeg" as CFString : "public.png" as CFString
     guard let destination = CGImageDestinationCreateWithData(
-        data, "public.png" as CFString, 1, nil
+        data, type, 1, nil
     ) else { return 3 }
-    CGImageDestinationAddImage(destination, finalImage, nil)
+    if let jpegQuality {
+        let clamped = min(max(jpegQuality, 1), 100)
+        CGImageDestinationAddImage(destination, finalImage, [
+            kCGImageDestinationLossyCompressionQuality: Double(clamped) / 100.0
+        ] as CFDictionary)
+    } else {
+        CGImageDestinationAddImage(destination, finalImage, nil)
+    }
     guard CGImageDestinationFinalize(destination) else { return 4 }
     let length = data.length
     guard let buffer = malloc(length) else { return 5 }
@@ -779,7 +791,7 @@ public func xs_axdrv_screenshot_png(
     guard CGPreflightScreenCaptureAccess() else { return 10 }
     let target = displayId == 0 ? CGMainDisplayID() : CGDirectDisplayID(displayId)
     guard let image = CGDisplayCreateImage(target) else { return 2 }
-    return encodePng(image, maxPx, outData, outLen)
+    return encodeImage(image, maxPx, outData, outLen)
 }
 
 /// Captures one PNG frame of a single [windowId] — the window-scoped
@@ -801,7 +813,69 @@ public func xs_axdrv_screenshot_window_png(
         CGWindowID(windowId),
         [.bestResolution]
     ) else { return 2 }
-    return encodePng(image, maxPx, outData, outLen)
+    return encodeImage(image, maxPx, outData, outLen)
+}
+
+/// Whether the Screen Recording TCC grant is held right now (never
+/// prompts) — the non-prompting preflight the consent facade reads.
+@_cdecl("xs_axdrv_screen_capture_trusted")
+public func xs_axdrv_screen_capture_trusted() -> Bool {
+    CGPreflightScreenCaptureAccess()
+}
+
+/// Prompts with the system Screen Recording consent dialog when the
+/// grant is absent. Explicit user action only: no capture calls this.
+@_cdecl("xs_axdrv_request_screen_capture")
+public func xs_axdrv_request_screen_capture() -> Bool {
+    CGRequestScreenCaptureAccess()
+}
+
+/// Captures one JPEG frame of [displayId] (0 = main display) into a
+/// malloc'd buffer the caller frees with `xs_axdrv_free`. [quality] is
+/// the 1..100 scale the family speaks (0 = the tier default, 80).
+/// Requires screen recording permission: 10 = permission missing,
+/// 2 = image failed, then the encode table.
+@_cdecl("xs_axdrv_screenshot_jpeg")
+public func xs_axdrv_screenshot_jpeg(
+    _ displayId: UInt32,
+    _ maxPx: Int32,
+    _ quality: Int32,
+    _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+    _ outLen: UnsafeMutablePointer<Int>?
+) -> Int32 {
+    guard let outData, let outLen else { return 1 }
+    guard CGPreflightScreenCaptureAccess() else { return 10 }
+    let target = displayId == 0 ? CGMainDisplayID() : CGDirectDisplayID(displayId)
+    guard let image = CGDisplayCreateImage(target) else { return 2 }
+    return encodeImage(
+        image, maxPx, jpegQuality: quality > 0 ? quality : 80, outData, outLen
+    )
+}
+
+/// Captures one JPEG frame of a single [windowId] — the lossy sibling
+/// of `xs_axdrv_screenshot_window_png`. [quality] is the 1..100 scale
+/// the family speaks (0 = the tier default, 80). Requires screen
+/// recording permission: 10 = permission missing, 2 = image failed
+/// (unknown window), then the encode table.
+@_cdecl("xs_axdrv_screenshot_window_jpeg")
+public func xs_axdrv_screenshot_window_jpeg(
+    _ windowId: UInt32,
+    _ maxPx: Int32,
+    _ quality: Int32,
+    _ outData: UnsafeMutablePointer<UnsafeMutablePointer<UInt8>?>?,
+    _ outLen: UnsafeMutablePointer<Int>?
+) -> Int32 {
+    guard let outData, let outLen else { return 1 }
+    guard CGPreflightScreenCaptureAccess() else { return 10 }
+    guard let image = CGWindowListCreateImage(
+        .null,
+        .optionIncludingWindow,
+        CGWindowID(windowId),
+        [.bestResolution]
+    ) else { return 2 }
+    return encodeImage(
+        image, maxPx, jpegQuality: quality > 0 ? quality : 80, outData, outLen
+    )
 }
 
 /// Serializes the on-screen, normal-layer windows owned by [pid]
