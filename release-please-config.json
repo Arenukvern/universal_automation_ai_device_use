@@ -112,6 +112,13 @@
       "package-name": "universal_webrtc_raw",
       "include-component-in-tag": true,
       "bump-minor-pre-major": true
+    },
+    "pkgs/xsoulspace_tooling_runtime": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "xsoulspace_tooling_runtime",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
     }
   }
 }

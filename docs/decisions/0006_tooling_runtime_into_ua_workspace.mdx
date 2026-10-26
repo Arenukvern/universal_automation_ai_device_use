@@ -1,0 +1,69 @@
+# ADR 0006 — `xsoulspace_tooling_runtime` into the UA workspace
+
+**Status:** Accepted (2026-10-26)  
+**North-star impact:** `applies` — adds an independent package without pulling
+device drivers into harness/Last Answer consumers.  
+**Supersedes (for consumers):** dart_flutter_packages (DFP) as the home of
+`xsoulspace_tooling_runtime`; DFP should retain a thin re-export shim after
+publish (out of scope for this repo).
+
+## Context
+
+Host coding harnesses and Last Answer need the same bounded runner:
+
+- deadlines that **own** the process tree (no orphan vector from
+  `Process.run(...).timeout(...)`),
+- exact stdio capture and named settlement failures,
+- workspace path policy and cooperative file locks,
+- macOS no-fork candidate verification for untrusted command lanes.
+
+That logic lived in DFP at `pkgs/xsoulspace_tooling_runtime`, coupled to a large
+monorepo. Arenukvern/ecsai_harness and xsoulspace/last_answer already depend on
+the package name `xsoulspace_tooling_runtime`; they need a **hosted** copy that
+does not drag DFP or UA device drivers.
+
+[oka](https://github.com/Arenukvern/oka) owns long-lived process composition;
+the upcoming **`oka_process`** package will hold shared POSIX/Windows process
+primitives. **`xsoulspace_tooling_runtime`** stays a thin **admission + policy**
+layer: who may run what, where, under which locks — not driver or browser code.
+
+DFP PR
+[#5](https://github.com/xsoulspace/dart_flutter_packages/pull/5) (open, base
+`ag-c`) lands the Perl owned-session anchor, owned-group teardown fixes, and
+ps-fallback regression tests. The package is **not on dfp `main` yet**; this
+move imports that branch state and will reconcile when PR #5 merges.
+
+## Decision
+
+1. **Add** `pkgs/xsoulspace_tooling_runtime` to this workspace with
+   `resolution: workspace`, unchanged package name, version **0.2.0** (minor bump
+   for the relocation).
+2. **Dependencies:** only `meta` until `oka_process` is published on pub.dev.
+   No path/git dependency on oka in this round. Inline POSIX helpers remain
+   temporarily; switch to `oka_process` in a follow-up CHANGELOG entry.
+3. **Boundaries:** the package must not depend on any UA driver, browser,
+   capture, WebRTC, or lexicon package in this repo.
+4. **Platform scope for this move:** **macOS and Linux** — Perl session leader,
+   `ps` tree observation, and macOS no-fork verification. DFP PR #5
+   ps-fallback conformance tests (`SIGSTOP` + owned-session timing) stay on the
+   **macOS gate** in this repo until `oka_process` and merged DFP PR #5 land;
+   other Linux VM tests run in CI. **Windows is deferred:** Job Objects, tree
+   kill, and the Windows UI Automation sidecar process model are **not**
+   requirements of this ADR; document root-only limitations in package README
+   until a shared `oka_process` Windows backend exists.
+5. **Publishing:** owner (Anton) publishes to pub.dev; this ADR does not
+   authorize tags or release cuts from automation agents.
+
+## Consequences
+
+- ecsai_harness and last_answer can pin `^0.2.0` from pub.dev after publish.
+- DFP reverse dependency today: `xsoulspace_inference_mlx_native` (path + tools/
+  tests). A DFP shim should re-export or path-pin to pub.dev and drop the in-tree
+  copy once consumers migrate.
+- Follow-ups: merge DFP PR #5 and diff any post-merge fixes; adopt `oka_process`
+  when tagged; Windows Job Objects via oka, not ad hoc in this package.
+
+## References
+
+- DFP ADR 0066 (tooling process runtime) — historical rationale in DFP.
+- Package evidence: `pkgs/xsoulspace_tooling_runtime/doc/evidence/2026-10-13/`.

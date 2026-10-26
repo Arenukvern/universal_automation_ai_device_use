@@ -1,0 +1,33 @@
+name: xsoulspace_tooling_runtime
+description: >-
+  Host-admitted bounded process runs with deadlines and exact stdio, plus
+  workspace path policy, cooperative file locks, and macOS no-fork candidate
+  verification. POSIX session ownership via a trusted system helper; no ECS,
+  drivers, or device packages.
+version: 0.2.0
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/xsoulspace_tooling_runtime
+
+environment:
+  sdk: ^3.13.0
+
+resolution: workspace
+
+dependencies:
+  meta: ^1.19.0
+  # TODO(oka_process): replace inline POSIX session/process helpers with
+  # `oka_process` once Arenukvern/oka tags and publishes it on pub.dev.
+  # Do not add a git or path dependency here until then.
+
+dev_dependencies:
+  lints: ^6.1.0
+  test: ^1.31.2
+  xsoulspace_lints: ^0.1.2
+
+topics:
+  - automation
+  - process
+  - agents
+  - tooling

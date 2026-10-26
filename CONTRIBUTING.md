@@ -37,7 +37,7 @@ Run the workspace validation command from `steward.yaml`:
 ```sh
 dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics \
   pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast \
-  pkgs/universal_lexicon pkgs/universal_webrtc_raw
+  pkgs/universal_lexicon pkgs/universal_webrtc_raw pkgs/xsoulspace_tooling_runtime
 ```
 
 Per-package tests (when you touch a package):

@@ -14,5 +14,6 @@
   "pkgs/universal_lexicon": "0.1.0-dev.3",
   "pkgs/universal_screencast": "0.2.0",
   "pkgs/universal_webrtc": "0.2.0",
-  "pkgs/universal_webrtc_raw": "0.1.0"
+  "pkgs/universal_webrtc_raw": "0.1.0",
+  "pkgs/xsoulspace_tooling_runtime": "0.2.0"
 }
