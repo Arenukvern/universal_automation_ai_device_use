@@ -29,9 +29,16 @@ layer: who may run what, where, under which locks — not driver or browser code
 
 DFP PR
 [#5](https://github.com/xsoulspace/dart_flutter_packages/pull/5) (open, base
-`ag-c`) lands the Perl owned-session anchor, owned-group teardown fixes, and
-ps-fallback regression tests. The package is **not on dfp `main` yet**; this
-move imports that branch state and will reconcile when PR #5 merges.
+`ag-c`) lands the P0 Perl owned-session leader (`tool/owned_session_p1_leader.pl`),
+`doc/owned_session_p1.md`, and the p1 conformance suite. This import is pinned
+to commit **`2f9ce9b1`** (`fix(tooling_runtime): owned settle without pipe EOF
+or SIGCHLD socket races`); the SHA may change during review. The package is
+**not on dfp `main` yet** — reconcile when PR #5 merges.
+
+Stdin settlement and settlement-priority naming fixes that are not yet on that
+SHA are carried in-tree and exported for upstream as
+`dfp-stdin-settlement.patch` (format-patch against `2f9ce9b1`, no UA-specific
+content).
 
 ## Decision
 

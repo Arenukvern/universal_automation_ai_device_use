@@ -20,6 +20,10 @@ One implementation of `runBounded`, `stopProcessTree`, and
 `awaitProcessSettlement`, used through harness compatibility exports by host
 coding execution/checkers and Last Answer runtime preparation.
 
+POSIX owned sessions use the P0 Perl session leader (`tool/owned_session_p1_leader.pl`)
+and the [owned session p1 contract](doc/owned_session_p1.md); conformance lives in
+`test/owned_session_p1_conformance_test.dart`.
+
 The host supplies admission, executable, arguments, CWD and limits. On POSIX a
 trusted system helper establishes an acknowledged session before target exec;
 deadline ownership continues through target/root exit, output drain and live

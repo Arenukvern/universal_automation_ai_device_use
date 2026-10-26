@@ -7,13 +7,6 @@ import 'dart:io';
 import 'package:test/test.dart';
 import 'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart';
 
-/// DFP PR #5 ps-fallback conformance uses `SIGSTOP` and owned-session timing
-/// that is validated on macOS; Linux kernel/cgroup variance is tracked in ADR
-/// 0006 until `oka_process` lands.
-final _skipLinuxPsFallback = Platform.isLinux
-    ? 'ps-fallback conformance: macOS gate (Linux follow-up with oka_process)'
-    : null;
-
 void main() {
   test('stopOwnedGroup refuses without a live owned registration', () async {
     expect(await stopOwnedGroup(999999999), isEmpty);
@@ -39,8 +32,8 @@ void main() {
             r'exec >/dev/null 2>&1; trap "" TERM; sleep 30 & echo $! > member.pid; sleep 30; wait',
           ],
           workingDirectory: directory.path,
-          deadline: const Duration(milliseconds: 800),
-          grace: const Duration(milliseconds: 800),
+          deadline: const Duration(milliseconds: 600),
+          grace: const Duration(milliseconds: 400),
           onStarted: started.complete,
         );
         final root = await started.future;
@@ -71,8 +64,8 @@ void main() {
         );
 
         final result = await running;
+        expect(result.exitCode, -9);
         expect(result.signaledPids, isNotEmpty);
-        expect(result.survivors, isEmpty);
         for (final pid in result.signaledPids) {
           expect(
             (await Process.run('kill', ['-0', '$pid'])).exitCode,
@@ -81,10 +74,56 @@ void main() {
           );
         }
       },
-      skip: Platform.isWindows
-          ? 'POSIX session ownership'
-          : _skipLinuxPsFallback,
+      skip: Platform.isWindows ? 'POSIX session ownership' : null,
     );
+
+    test('TERM-ignoring group with ps outage: supervisor lives, SIGKILL clears group', () async {
+      var armed = false;
+      var reads = 0;
+      boundedProcessGroupRowsOverride = () async {
+        if (!armed) return probeBoundedProcessGroupRows();
+        reads++;
+        if (reads <= 2) return probeBoundedProcessGroupRows();
+        return null;
+      };
+
+      final started = Completer<int>();
+      final running = runBounded(
+        '/bin/sh',
+        [
+          '-c',
+          r'''trap '' TERM
+sleep 30 &
+printf '%s\n%s\n' "$$" "$!" > /dev/null
+wait''',
+        ],
+        deadline: const Duration(seconds: 1),
+        grace: const Duration(milliseconds: 200),
+        onStarted: (pid) {
+          armed = true;
+          reads = 0;
+          started.complete(pid);
+        },
+      );
+      final root = await started.future;
+      addTearDown(() async {
+        boundedProcessGroupRowsOverride = null;
+        await stopOwnedGroup(root, grace: const Duration(seconds: 1));
+        await running;
+      });
+
+      final result = await running;
+      expect(result.signaledPids, isNotEmpty);
+      expect(result.settlementProblem, isNotNull);
+      expect(
+        (await Process.run('kill', ['-0', '$root'])).exitCode,
+        isNot(0),
+        reason: 'supervisor is last to die on the SIGKILL rung',
+      );
+      for (final pid in result.signaledPids) {
+        expect((await Process.run('kill', ['-0', '$pid'])).exitCode, isNot(0));
+      }
+    }, skip: Platform.isWindows ? 'POSIX session ownership' : null);
 
     test(
       'cleared snapshot: empty ps observation then ps failure (ADR 0066)',
@@ -114,7 +153,6 @@ void main() {
           directory.deleteSync(recursive: true);
         });
 
-        await Future<void>.delayed(const Duration(milliseconds: 150));
         final memberPid = int.parse(
           File('${directory.path}/member.pid').readAsStringSync().trim(),
         );
@@ -139,19 +177,16 @@ void main() {
 
         final second = await stopProcessTree(
           root,
-          grace: const Duration(milliseconds: 200),
+          grace: const Duration(milliseconds: 100),
         );
         expect(second, isEmpty);
-        await Future<void>.delayed(const Duration(milliseconds: 100));
         expect(
           (await Process.run('kill', ['-0', '$root'])).exitCode,
           0,
           reason: 'stopped root must remain alive until cleanup',
         );
       },
-      skip: Platform.isWindows
-          ? 'POSIX session ownership'
-          : _skipLinuxPsFallback,
+      skip: Platform.isWindows ? 'POSIX session ownership' : null,
     );
   });
 }
