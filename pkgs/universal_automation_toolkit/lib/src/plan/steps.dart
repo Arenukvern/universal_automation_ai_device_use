@@ -386,6 +386,7 @@ final class ActStep extends PlanStep {
         ClickAtAction(
           :final x,
           :final y,
+          :final windowId,
           :final button,
           :final clickCount,
           :final modifiers,
@@ -394,6 +395,7 @@ final class ActStep extends PlanStep {
             'clickAt': {
               'x': x,
               'y': y,
+              if (windowId != null) 'windowId': windowId,
               if (button != 'left') 'button': button,
               if (clickCount != 1) 'clickCount': clickCount,
               if (modifiers.isNotEmpty) 'modifiers': modifiers,
@@ -498,6 +500,7 @@ final class ActStep extends PlanStep {
         return ClickAtAction(
           x,
           y,
+          windowId: params['windowId'] is int ? params['windowId'] as int : null,
           button: _button(params),
           clickCount: _clickCount(params),
           modifiers: _modifiers(params),

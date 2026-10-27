@@ -310,7 +310,7 @@ external int axdrvLaunchApp(Pointer<Utf8> bundleId);
 /// Asks the application with [pid] to quit.
 external int axdrvTerminateApp(int pid);
 
-@Native<Int32 Function(Int32, Int32, Int32, Pointer<Pointer<Utf8>>)>(
+@Native<Int32 Function(Int32, Int32, Int32, Int32, Pointer<Pointer<Utf8>>)>(
   symbol: 'xs_axdrv_snapshot_app_json',
   assetId: 'package:universal_driver_macos/xs_ax_driver',
 )
@@ -319,6 +319,7 @@ external int axdrvSnapshotAppJson(
   int maxDepth,
   int maxNodes,
   int pid,
+  int preferWebContent,
   Pointer<Pointer<Utf8>> outJson,
 );
 

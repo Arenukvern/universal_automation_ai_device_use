@@ -6,6 +6,7 @@ import 'package:test/test.dart';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_automation_toolkit/universal_automation_toolkit.dart';
 import 'package:universal_browser_cdp/universal_browser_cdp_testing.dart';
+import 'package:universal_driver_macos/universal_driver_macos.dart';
 
 Future<Map<String, Object?>?> call(
   ToolkitMcpServer server,
@@ -110,6 +111,7 @@ void main() {
         'automation_act',
         'automation_verify',
         'automation_screenshot',
+        'automation_preview',
         'automation_validate_plan',
         'automation_run_plan',
       ]),
@@ -435,11 +437,11 @@ Future<void> main() async {
         isNot(contains('_imageContent')),
       );
 
-      // windowId on a non-OS-tier driver refuses loudly.
-      final windowed = await call(server, 33, 'tools/call', {
+      // windowId on a browser-tier driver refuses loudly.
+      final cdpServer = ToolkitMcpServer(defaultEndpoint: endpoint);
+      final windowed = await call(cdpServer, 33, 'tools/call', {
         'name': 'automation_screenshot',
         'arguments': {
-          'transport': 'osAccessibility',
           'path': path,
           'windowId': 7,
         },
@@ -453,8 +455,42 @@ Future<void> main() async {
           contains('windowId needs the OS tier'),
         ),
       );
+
+      final osWindowed = await call(server, 34, 'tools/call', {
+        'name': 'automation_screenshot',
+        'arguments': {
+          'transport': 'osAccessibility',
+          'path': path,
+          'windowId': 99,
+        },
+      });
+      expect(payloadOf(osWindowed)['bytes'], 2);
     },
   );
+
+  test('automation_preview frame returns window bytes on OS tier', () async {
+    final server = ToolkitMcpServer(
+      defaultTransport: AutomationTransport.osAccessibility,
+      factories: {
+        AutomationTransport.osAccessibility:
+            (binding, endpoint, timeout) async =>
+                _FakeOsResolvedSession(binding),
+      },
+    );
+    final response = await call(server, 40, 'tools/call', {
+      'name': 'automation_preview',
+      'arguments': {
+        'transport': 'osAccessibility',
+        'op': 'frame',
+        'windowId': 99,
+        'maxPx': 320,
+      },
+    });
+    final payload = payloadOf(response);
+    expect(payload['ok'], isTrue);
+    expect(payload['bytes'], 2);
+    expect(payload['windowId'], 99);
+  });
 }
 
 final class _FakeOsResolvedSession implements ResolvedSession {
@@ -476,7 +512,7 @@ final class _FakeOsResolvedSession implements ResolvedSession {
   Future<void> detach() async {}
 }
 
-final class _FakeOsDriver implements AutomationDriver {
+final class _FakeOsDriver implements AutomationDriver, OsWindowCapture {
   @override
   DriverCapabilities get capabilities => const DriverCapabilities(
     screenshot: true,
@@ -496,6 +532,15 @@ final class _FakeOsDriver implements AutomationDriver {
 
   @override
   Future<Uint8List> screenshot() async => Uint8List.fromList([1, 2, 3]);
+
+  @override
+  Future<List<OsWindowRecord>> windows({int pid = 0}) async => [
+    MacosWindow(windowId: 99, pid: pid, name: 'Fake'),
+  ];
+
+  @override
+  Future<Uint8List> windowScreenshot(int windowId, {int? maxPx}) async =>
+      Uint8List.fromList([windowId, maxPx ?? 0]);
 
   @override
   Future<void> close() async {}

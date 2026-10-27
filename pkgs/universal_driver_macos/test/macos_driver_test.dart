@@ -334,8 +334,9 @@ final class FakeBridge
     required int maxDepth,
     required int maxNodes,
     required int pid,
+    int preferWebContent = 1,
   }) {
-    calls.add('snapshotApp(pid=$pid)');
+    calls.add('snapshotApp(pid=$pid,web=$preferWebContent)');
     lastSnapshotPid = pid;
     return snapshotAppResult;
   }
@@ -454,6 +455,52 @@ void main() {
         .where((event) => event['kind'] == 'down')
         .toList();
     expect(presses.map((event) => event['clickCount']).toList(), [1, 2]);
+  });
+
+  test('window-local clickAt uses semantic press without pointer events', () async {
+    final bridge = FakeBridge();
+    bridge.elementResult = (
+      code: 0,
+      json: '{"role":"checkbox","attributes":{"axid":"9","pid":"42"}}',
+    );
+    final driver = MacosDriver(bridge: bridge, targetPid: 42);
+    await driver.perform(const ClickAtAction(100, 100, windowId: 77));
+    expect(bridge.calls, contains('elementAt(110.0,120.0)'));
+    expect(bridge.calls, contains('press(9)'));
+    expect(bridge.pointerEvents, isEmpty);
+  });
+
+  test('requiresForeground is false for window-local clickAt', () {
+    expect(
+      MacosDriver.requiresForeground(const ClickAtAction(1, 2, windowId: 77)),
+      isFalse,
+    );
+  });
+
+  test('lastWalkMeta surfaces web-first walk attributes from the bridge', () async {
+    const webMetaJson =
+        '{"role":"application","name":"Chrome","attributes":{"axid":"0",'
+        '"uaPreferWebContent":"true","uaWebRootFound":"true",'
+        '"uaWebTrimmed":"false","uaWebRootRole":"AXWebArea",'
+        '"uaWebRootName":"pub.dev"},'
+        '"children":[{"role":"webarea","name":"pub.dev","attributes":{"axid":"1"},'
+        '"children":[{"role":"textbox","name":"Repository","attributes":{"axid":"2"}}]}]}';
+    final bridge = FakeBridge();
+    bridge.snapshotAppResult = (code: 0, json: webMetaJson);
+    final driver = MacosDriver(bridge: bridge, targetPid: 99);
+    driver.preferWebContent = true;
+    await driver.snapshot();
+    expect(bridge.calls, contains('snapshotApp(pid=99,web=1)'));
+    expect(
+      driver.lastWalkMeta,
+      {
+        'preferWebContent': true,
+        'webRootFound': true,
+        'webTrimmed': false,
+        'webRootRole': 'AXWebArea',
+        'webRootName': 'pub.dev',
+      },
+    );
   });
 
   test('clickAt preserves the button axis', () async {

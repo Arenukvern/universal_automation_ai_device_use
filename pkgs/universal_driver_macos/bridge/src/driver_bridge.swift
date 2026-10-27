@@ -81,10 +81,109 @@ private func semanticRole(_ axRole: String?) -> String {
     case "AXCell": return "cell"
     case "AXList": return "list"
     case "AXScrollArea": return "scrollarea"
+    case "AXWebArea": return "webarea"
     case "AXToolbar": return "toolbar"
     case "AXApplication": return "application"
     default: return "generic"
     }
+}
+
+private let browserBundleIds: Set<String> = [
+    "com.google.Chrome",
+    "com.apple.Safari",
+    "org.mozilla.firefox",
+    "company.thebrowser.Browser",
+    "com.microsoft.edgemac",
+    "com.brave.Browser",
+    "com.operasoftware.Opera",
+]
+
+private func isBrowserPid(_ pid: pid_t) -> Bool {
+    guard let app = NSRunningApplication(processIdentifier: pid),
+          let id = app.bundleIdentifier
+    else { return false }
+    return browserBundleIds.contains(id)
+}
+
+/// Shallow scan for the page content root (ADR 0065 web-first walk).
+private func findPreferredWebRoot(
+    _ element: AXUIElement,
+    depth: Int,
+    maxDepth: Int,
+    budget: inout Int
+) -> AXUIElement? {
+    if budget <= 0 { return nil }
+    budget -= 1
+    let role = optionalStringAttribute(element, kAXRoleAttribute as String)
+    if role == "AXWebArea" { return element }
+    if depth >= maxDepth { return nil }
+    var childrenRaw: CFTypeRef?
+    guard AXUIElementCopyAttributeValue(
+        element, kAXChildrenAttribute as CFString, &childrenRaw
+    ) == .success, let children = childrenRaw as? [AXUIElement]
+    else { return nil }
+    var scrollFallback: AXUIElement?
+    for child in children where budget > 0 {
+        if let web = findPreferredWebRoot(child, depth: depth + 1, maxDepth: maxDepth, budget: &budget) {
+            let childRole = optionalStringAttribute(child, kAXRoleAttribute as String)
+            if childRole == "AXWebArea" { return web }
+            if scrollFallback == nil { scrollFallback = web }
+        }
+    }
+    return scrollFallback
+}
+
+private func attachWalkMeta(
+    _ tree: inout [String: Any],
+    preferWebContent: Bool,
+    webRootFound: Bool,
+    webTrimmed: Bool,
+    webRootRole: String?,
+    webRootName: String?
+) {
+    guard var attrs = tree["attributes"] as? [String: Any] else { return }
+    attrs["uaPreferWebContent"] = preferWebContent ? "true" : "false"
+    attrs["uaWebRootFound"] = webRootFound ? "true" : "false"
+    attrs["uaWebTrimmed"] = webTrimmed ? "true" : "false"
+    if let webRootRole { attrs["uaWebRootRole"] = webRootRole }
+    if let webRootName { attrs["uaWebRootName"] = webRootName }
+    tree["attributes"] = attrs
+}
+
+private func snapshotTree(
+    _ app: AXUIElement,
+    maxDepth: Int,
+    maxNodes: Int,
+    preferWebContent: Bool
+) -> [String: Any] {
+    var budget = maxNodes - 1
+    var webRootFound = false
+    var webRootRole: String?
+    var webRootName: String?
+    var tree: [String: Any]
+    if preferWebContent {
+        var scanBudget = 120
+        if let web = findPreferredWebRoot(app, depth: 0, maxDepth: 8, budget: &scanBudget) {
+            webRootFound = true
+            webRootRole = optionalStringAttribute(web, kAXRoleAttribute as String)
+            webRootName = accessibleName(web)
+            budget = maxNodes - 1
+            tree = walkTree(web, depth: 0, maxDepth: maxDepth, budget: &budget)
+        } else {
+            tree = walkTree(app, depth: 0, maxDepth: maxDepth, budget: &budget)
+        }
+    } else {
+        tree = walkTree(app, depth: 0, maxDepth: maxDepth, budget: &budget)
+    }
+    attachWalkMeta(
+        &tree,
+        preferWebContent: preferWebContent,
+        webRootFound: webRootFound,
+        webTrimmed: budget <= 0,
+        webRootRole: webRootRole,
+        webRootName: webRootName
+    )
+    return tree
 }
 
 /// Accessible name: AXDescription first (buttons/fields carry user-visible
@@ -156,6 +255,10 @@ private func nodeDict(_ element: AXUIElement) -> [String: Any] {
     if let value = accessibleValue(element) { node["value"] = value }
     if let bounds = accessibleBounds(element) { node["bounds"] = bounds }
     var attributes: [String: Any] = ["axid": String(registry.add(element))]
+    var elementPid: pid_t = 0
+    if AXUIElementGetPid(element, &elementPid) == .success {
+        attributes["pid"] = String(elementPid)
+    }
     let actions = advertisedActions(element)
     if !actions.isEmpty { attributes["axActions"] = actions.joined(separator: ",") }
     node["attributes"] = attributes
@@ -250,13 +353,13 @@ public func xs_axdrv_snapshot_json(
         // Raw negative AXError code; 2 reserved for "nothing focused".
         return code == .cannotComplete ? 3 : (code == .noValue ? 2 : Int32(code.rawValue))
     }
-    var budget = Int(maxNodes) - 1
-    var tree = walkTree(app, depth: 0, maxDepth: Int(maxDepth), budget: &budget)
+    var appPid: pid_t = 0
+    AXUIElementGetPid(app, &appPid)
+    let preferWeb = isBrowserPid(appPid)
+    var tree = snapshotTree(app, maxDepth: Int(maxDepth), maxNodes: Int(maxNodes), preferWebContent: preferWeb)
     // The observed pid rides on the root (string attribute): the Dart
     // focus contract compares it against the frontmost app before any
     // global-event dispatch (ADR 0064).
-    var appPid: pid_t = 0
-    AXUIElementGetPid(app, &appPid)
     if var attrs = tree["attributes"] as? [String: Any] {
         attrs["pid"] = String(appPid)
         tree["attributes"] = attrs
@@ -1079,6 +1182,7 @@ public func xs_axdrv_snapshot_app_json(
     _ maxDepth: Int32,
     _ maxNodes: Int32,
     _ pid: Int32,
+    _ preferWebContent: Int32,
     _ outJson: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>?
 ) -> Int32 {
     guard let outJson, maxDepth > 0, maxNodes > 0, pid > 0 else { return 1 }
@@ -1094,8 +1198,8 @@ public func xs_axdrv_snapshot_app_json(
     if roleCode == .attributeUnsupported || roleCode == .noValue {
         return 7
     }
-    var budget = Int(maxNodes) - 1
-    var tree = walkTree(app, depth: 0, maxDepth: Int(maxDepth), budget: &budget)
+    let preferWeb = preferWebContent != 0 || isBrowserPid(pid_t(pid))
+    var tree = snapshotTree(app, maxDepth: Int(maxDepth), maxNodes: Int(maxNodes), preferWebContent: preferWeb)
     if var attrs = tree["attributes"] as? [String: Any] {
         attrs["pid"] = String(pid)
         tree["attributes"] = attrs

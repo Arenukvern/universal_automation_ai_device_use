@@ -60,3 +60,9 @@ A: `automation_request_consent {kind: "screenRecording"}` asks the OS (the syste
 
 **Q: When do I stop and write an ADR?**  
 A: When `north_star_impact` is `amends` or `conflicts` with the charter — see [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md). For `clarifies`, update this FAQ, docs map, or a skill instead of expanding scope silently.
+
+
+## Background browsers (no CDP)
+
+**Q: How do I drive a browser form while another app stays focused?**  
+A: On macOS, anchor with `app: {bundleId|pid|name}`, use `automation_observe` (web-first walk), `automation_preview` for frames, and semantic `setValue`/`click` or window-local `clickAt` with `windowId`. See ADR 0007 / family ADR 0065.

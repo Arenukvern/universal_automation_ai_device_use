@@ -140,6 +140,7 @@ final class ClickAtAction extends AutomationAction {
   const ClickAtAction(
     this.x,
     this.y, {
+    this.windowId,
     this.button = 'left',
     this.clickCount = 1,
     this.modifiers = const [],
@@ -150,6 +151,10 @@ final class ClickAtAction extends AutomationAction {
 
   /// Y in surface coordinates.
   final double y;
+
+  /// When set, coordinates are window-local and actuation uses semantic
+  /// hit-test (ADR 0065) — background-safe, no global pointer stream.
+  final int? windowId;
 
   /// Pointer button: `left` (default), `right`, or `middle`.
   final String button;

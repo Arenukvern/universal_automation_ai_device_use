@@ -68,6 +68,7 @@ final class FakeAxDriverBridge implements AxDriverBridge {
     required int maxDepth,
     required int maxNodes,
     required int pid,
+    int preferWebContent = 1,
   }) {
     calls.add('snapshotApp(pid=$pid)');
     lastSnapshotPid = pid;

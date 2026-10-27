@@ -1,0 +1,15 @@
+# ADR 0007 — OS-AX web fidelity, window-local pointer, preview stream
+
+**Status:** Accepted (2026-10-26)
+**Amends:** [ADR 0003](0003_seamless_tier_routing_and_system_browser_open.mdx)
+(browser OS tier is a first-class drive path without CDP for forms)
+**Family record:** `0065_os_ax_web_fidelity_and_window_local_actuation.md`
+in `storage_problem/dart_flutter_packages/docs/decisions/`
+
+## Summary
+
+macOS `osAccessibility` sessions can observe browser page content via
+web-first AX walks, act on background forms with window-local semantic
+`clickAt`, and poll window PNG previews — without attaching a CDP endpoint.
+
+See the family ADR for the full decision, non-claims, and evidence paths.

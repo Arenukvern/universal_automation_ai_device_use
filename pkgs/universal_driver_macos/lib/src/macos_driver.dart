@@ -90,6 +90,7 @@ class MacosDriver
     this.targetPid,
     this.snapshotDepth = 12,
     this.snapshotMaxNodes = 600,
+    this.preferWebContent = true,
     Future<void> Function(Uri url)? openUrl,
   }) : bridge = bridge ?? NativeAxDriverBridge(),
        // An anchored session observes its target by construction — the
@@ -114,6 +115,24 @@ class MacosDriver
   /// Maximum node count per snapshot.
   final int snapshotMaxNodes;
 
+  /// Web-first AX walk for browser hosts (ADR 0065).
+  bool preferWebContent;
+
+  /// Walk metadata from the latest snapshot root (ADR 0065).
+  Map<String, Object?>? get lastWalkMeta {
+    final roots = _lastSnapshot?.roots;
+    if (roots == null || roots.isEmpty) return null;
+    final attrs = roots.first.attributes;
+    if (attrs == null || attrs['uaWebRootFound'] == null) return null;
+    return {
+      'preferWebContent': attrs['uaPreferWebContent'] == 'true',
+      'webRootFound': attrs['uaWebRootFound'] == 'true',
+      'webTrimmed': attrs['uaWebTrimmed'] == 'true',
+      if (attrs['uaWebRootRole'] != null) 'webRootRole': attrs['uaWebRootRole'],
+      if (attrs['uaWebRootName'] != null) 'webRootName': attrs['uaWebRootName'],
+    };
+  }
+
   bool _closed = false;
   int _revision = 0;
   Snapshot? _lastSnapshot;
@@ -126,6 +145,7 @@ class MacosDriver
   /// Whether [action] routes through the global OS event stream and is
   /// therefore bound by the focus contract (ADR 0064).
   static bool requiresForeground(AutomationAction action) => switch (action) {
+    ClickAtAction(:final windowId) when windowId != null => false,
     TypeAction() ||
     KeyPressAction() ||
     ScrollAction() ||
@@ -398,6 +418,7 @@ class MacosDriver
       maxDepth: snapshotDepth,
       maxNodes: snapshotMaxNodes,
       pid: pid,
+      preferWebContent: preferWebContent ? 1 : 0,
     );
     if (result.code == 7) {
       throw ElementNotFoundException('application', 'snapshot pid=$pid');
@@ -538,6 +559,18 @@ class MacosDriver
           );
         }
         await _elementAction(action, role: role, name: name);
+      case ClickAtAction(
+        :final x,
+        :final y,
+        :final windowId,
+        :final clickCount,
+      ) when windowId != null:
+        await _clickAtWindowSemantic(
+          windowId: windowId,
+          x: x,
+          y: y,
+          clickCount: clickCount,
+        );
       case ClickAtAction(
         :final x,
         :final y,
@@ -762,6 +795,45 @@ class MacosDriver
     if (_closed) return;
     _closed = true;
     bridge.releaseAll();
+  }
+
+
+  Future<void> _clickAtWindowSemantic({
+    required int windowId,
+    required double x,
+    required double y,
+    required int clickCount,
+  }) async {
+    final anchorPid = targetPid ?? _observedPid;
+    final windows = await this.windows(pid: anchorPid ?? 0);
+    MacosWindow? window;
+    for (final candidate in windows) {
+      if (candidate.windowId == windowId) {
+        window = candidate;
+        break;
+      }
+    }
+    if (window == null || window.bounds == null) {
+      throw ElementNotFoundException('window', '#$windowId');
+    }
+    final bounds = window.bounds!;
+    final screenX = bounds.left + x;
+    final screenY = bounds.top + y;
+    final node = await elementAtPosition(screenX, screenY);
+    final hitPid = int.tryParse(node.attributes['pid'] ?? '');
+    if (anchorPid != null && hitPid != null && hitPid != anchorPid) {
+      throw ProtocolException(
+        'window-local clickAt hit pid $hitPid, expected anchored pid $anchorPid',
+        code: 6,
+      );
+    }
+    final handle = int.tryParse(node.attributes['axid'] ?? '');
+    if (handle == null) {
+      throw ElementNotFoundException('position', '$x,$y');
+    }
+    for (var press = 1; press <= clickCount.clamp(1, 3); press++) {
+      _check(bridge.press(handle), 'press (window-local)');
+    }
   }
 
   Future<void> _click({String? role, String? name}) async {

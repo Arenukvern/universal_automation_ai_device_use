@@ -233,3 +233,11 @@ the toolkit or its native driver.
   artifacts under `--handles-dir`.
 - For hermetic tests, compose against the family's fake CDP server
   (`package:universal_browser_cdp/universal_browser_cdp_testing.dart`).
+
+
+## Background browser without CDP (macOS, ADR 0065)
+
+1. `automation_list_apps` → `app: {bundleId: "com.google.Chrome"}`
+2. `automation_observe` with `preferWebContent: true` (default) and a `view`
+3. `automation_preview` `{op: start, windowId, intervalMs, maxPx}` then `{op: frame, image: true}`
+4. `setValue` / `click` by locator, or `clickAt` with `windowId` for window-local semantic hits (no focus steal)

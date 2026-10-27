@@ -1,9 +1,11 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_automation_semantics/universal_automation_semantics.dart';
+import 'package:universal_driver_macos/universal_driver_macos.dart';
 import 'package:xsoulspace_permission_core/xsoulspace_permission_core.dart';
 
 import '../capture/capture_request.dart';
@@ -106,6 +108,7 @@ final class ToolkitMcpServer {
   /// Attribution for consent requests this server raises.
   final String consentOrigin;
   final Map<String, Observation> _lastObservations = {};
+  final Map<String, _WindowPreviewSession> _previewSessions = {};
   final String _jobsDirectory;
   SessionRegistry? _registry;
   JobQueue? _jobQueue;
@@ -246,6 +249,7 @@ final class ToolkitMcpServer {
         'automation_act' => _act(arguments),
         'automation_verify' => _verify(arguments),
         'automation_screenshot' => _screenshot(arguments),
+        'automation_preview' => _preview(arguments),
         'automation_list_apps' => _listApps(arguments),
         'automation_request_consent' => _requestConsent(arguments),
         'automation_validate_plan' => _validatePlan(arguments),
@@ -448,6 +452,7 @@ final class ToolkitMcpServer {
 
   Future<Map<String, Object?>> _observe(Map<String, Object?> arguments) async {
     final session = await _session(arguments);
+    _applyMacosObservePrefs(session.driver, arguments);
     final snapshot = await session.driver.snapshot();
     final base = {
       'endpoint':
@@ -460,7 +465,14 @@ final class ToolkitMcpServer {
     if (viewValue == null && at is! Map<Object?, Object?>) {
       // No view, no grounding point: the raw tree (counts + full
       // snapshot JSON).
-      return {...base, 'snapshot': snapshot.toJson()};
+      final macosMeta = session.driver is MacosDriver
+          ? (session.driver as MacosDriver).lastWalkMeta
+          : null;
+      return {
+        ...base,
+        'snapshot': snapshot.toJson(),
+        if (macosMeta != null) 'walkMeta': macosMeta,
+      };
     }
     // A view asked: the rendered observation + ref index replace the
     // raw tree (token economy; omit `view` for the raw form). An `at`
@@ -474,9 +486,13 @@ final class ToolkitMcpServer {
     final key = session.binding.name;
     final previous = arguments['diff'] == true ? _lastObservations[key] : null;
     _lastObservations[key] = observation;
+    final macosMeta = session.driver is MacosDriver
+        ? (session.driver as MacosDriver).lastWalkMeta
+        : null;
     return {
       ...base,
       'view': observation.toJson(),
+      if (macosMeta != null) 'walkMeta': macosMeta,
       if (previous != null) 'delta': observation.diff(previous).render(),
       if (at is Map<Object?, Object?> && at['x'] is num && at['y'] is num)
         'at': _groundedAt(
@@ -523,6 +539,7 @@ final class ToolkitMcpServer {
         actionBody['clickAt'] = {
           'x': arguments['x'],
           'y': arguments['y'],
+          if (arguments['windowId'] != null) 'windowId': arguments['windowId'],
           if (arguments['button'] != null) 'button': arguments['button'],
           if (arguments['clickCount'] != null)
             'clickCount': arguments['clickCount'],
@@ -758,6 +775,114 @@ final class ToolkitMcpServer {
             'the grant was not given; enable it in System Settings -> '
             'Privacy & Security',
     };
+  }
+
+
+  void _applyMacosObservePrefs(
+    AutomationDriver driver,
+    Map<String, Object?> arguments,
+  ) {
+    if (driver is! MacosDriver) return;
+    (driver as MacosDriver).preferWebContent =
+        arguments['preferWebContent'] != false;
+  }
+
+  Future<Map<String, Object?>> _preview(
+    Map<String, Object?> arguments,
+  ) async {
+    final op = arguments['op'] ?? 'frame';
+    if (op is! String) {
+      throw const McpToolError('automation_preview needs op start|frame|stop');
+    }
+    final session = await _session(arguments);
+    final driver = session.driver;
+    if (driver is! OsWindowCapture) {
+      throw const McpToolError(
+        'automation_preview needs the OS tier (transport "osAccessibility")',
+      );
+    }
+    final key = session.binding.name;
+    switch (op) {
+      case 'stop':
+        _previewSessions.remove(key)?.timer?.cancel();
+        return {'ok': true, 'op': 'stop'};
+      case 'start':
+        final windowId = arguments['windowId'];
+        if (windowId is! int) {
+          throw const McpToolError('automation_preview start needs windowId');
+        }
+        final intervalMs = arguments['intervalMs'] is int
+            ? arguments['intervalMs']! as int
+            : 500;
+        final maxPx = arguments['maxPx'] is int ? arguments['maxPx']! as int : 640;
+        _previewSessions.remove(key)?.timer?.cancel();
+        final capture = driver as OsWindowCapture;
+        final sessionPreview = _WindowPreviewSession(
+          windowId: windowId,
+          maxPx: maxPx,
+          intervalMs: intervalMs,
+          capture: capture,
+        );
+        _previewSessions[key] = sessionPreview;
+        await sessionPreview.captureOnce();
+        sessionPreview.timer = Timer.periodic(
+          Duration(milliseconds: intervalMs),
+          (_) => unawaited(sessionPreview.captureOnce()),
+        );
+        return {
+          'ok': true,
+          'op': 'start',
+          'windowId': windowId,
+          'intervalMs': intervalMs,
+          'maxPx': maxPx,
+        };
+      case 'frame':
+        final active = _previewSessions[key];
+        if (active == null) {
+          final windowId = arguments['windowId'];
+          if (windowId is! int) {
+            throw const McpToolError(
+              'automation_preview frame needs an active preview or windowId',
+            );
+          }
+          final maxPx = arguments['maxPx'] is int ? arguments['maxPx']! as int : 640;
+          final bytes = await (driver as OsWindowCapture).windowScreenshot(
+            windowId,
+            maxPx: maxPx,
+          );
+          return {
+            'ok': true,
+            'op': 'frame',
+            'windowId': windowId,
+            'bytes': bytes.length,
+            if (arguments['image'] == true)
+              '_imageContent': {
+                'type': 'image',
+                'mimeType': 'image/png',
+                'data': base64Encode(bytes),
+              },
+          };
+        }
+        final bytes = active.lastBytes;
+        if (bytes == null) {
+          await active.captureOnce();
+        }
+        final frame = active.lastBytes!;
+        return {
+          'ok': true,
+          'op': 'frame',
+          'windowId': active.windowId,
+          'bytes': frame.length,
+          if (arguments['image'] == true)
+            '_imageContent': {
+              'type': 'image',
+              'mimeType': 'image/png',
+              'data': base64Encode(frame),
+            },
+        };
+      default:
+        throw McpToolError('unknown automation_preview op: $op');
+    }
   }
 
   Future<Map<String, Object?>> _verify(Map<String, Object?> arguments) async {
@@ -1178,6 +1303,12 @@ final class ToolkitMcpServer {
                   'With view: also return the delta against this '
                   "session's previous viewed observation.",
             },
+            'preferWebContent': {
+              'type': 'boolean',
+              'description':
+                  'macOS OS tier: prefer AXWebArea subtree when walking '
+                  '(default true). Set false for full-application trees.',
+            },
           },
         },
       ),
@@ -1382,6 +1513,27 @@ final class ToolkitMcpServer {
             },
             ...transportOverride,
           },
+        },
+      ),
+      tool(
+        'automation_preview',
+        'Poll a window preview stream for background observation (ADR 0065). '
+            'op start begins interval capture; frame returns the latest PNG; '
+            'stop cancels the session poll.',
+        {
+          'type': 'object',
+          'properties': {
+            ...transportOverride,
+            'op': {
+              'type': 'string',
+              'enum': ['start', 'frame', 'stop'],
+            },
+            'windowId': {'type': 'integer'},
+            'intervalMs': {'type': 'integer'},
+            'maxPx': {'type': 'integer'},
+            'image': {'type': 'boolean'},
+          },
+          'required': ['op'],
         },
       ),
       tool(
@@ -1705,4 +1857,25 @@ final class _ConsentSession implements ResolvedSession {
 
   @override
   Future<void> detach() => _inner.detach();
+}
+
+
+final class _WindowPreviewSession {
+  _WindowPreviewSession({
+    required this.windowId,
+    required this.maxPx,
+    required this.intervalMs,
+    required this.capture,
+  });
+
+  final int windowId;
+  final int maxPx;
+  final int intervalMs;
+  final OsWindowCapture capture;
+  Timer? timer;
+  Uint8List? lastBytes;
+
+  Future<void> captureOnce() async {
+    lastBytes = await capture.windowScreenshot(windowId, maxPx: maxPx);
+  }
 }

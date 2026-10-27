@@ -53,6 +53,7 @@ abstract interface class AxDriverBridge {
     required int maxDepth,
     required int maxNodes,
     required int pid,
+    int preferWebContent = 1,
   });
 
   /// Serializes the running regular applications as a JSON array.
@@ -266,10 +267,11 @@ final class NativeAxDriverBridge
     required int maxDepth,
     required int maxNodes,
     required int pid,
+    int preferWebContent = 1,
   }) {
     final out = calloc<Pointer<Utf8>>();
     try {
-      final code = axdrvSnapshotAppJson(maxDepth, maxNodes, pid, out);
+      final code = axdrvSnapshotAppJson(maxDepth, maxNodes, pid, preferWebContent, out);
       final json = code == 0 ? copyAndFreeCString(out.value) : '';
       return (code: code, json: json);
     } finally {
