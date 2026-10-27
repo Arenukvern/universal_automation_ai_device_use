@@ -126,6 +126,15 @@ Close-on-exec pipe detects target exec failure before `started`.
   `unsettled`, not silent death certification. No stale-snapshot per-pid
   `killPid` fallback.
 
+## Host settlement (not leader)
+
+The reference host (`xsoulspace_tooling_runtime`) certifies owned-session death
+with repeated `ps -eo pid=,ppid=,stat=` snapshots (and PGID grouping for owned
+stops), not subreaper or session-leader `pgrp` listing alone. Each `ps`
+invocation is bounded (2s); hung `ps` children are killed. Processes that leave
+the observed PGID via `setsid`/`setpgid` after admission are outside this
+observation window — that limit is explicit, not silent certification.
+
 **Windows** is out of scope for this contract revision (macOS and Linux only).
 
 ## Graceful hook (optional)
