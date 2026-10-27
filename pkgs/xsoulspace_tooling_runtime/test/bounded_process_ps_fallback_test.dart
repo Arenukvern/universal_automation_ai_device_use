@@ -138,7 +138,7 @@ wait''',
           'sh',
           [
             '-c',
-            r'sleep 30 & sleep 30; wait',
+            r'sleep 30 & echo $! > member.pid; sleep 30; wait',
           ],
           workingDirectory: directory.path,
           deadline: const Duration(seconds: 5),
@@ -148,25 +148,38 @@ wait''',
         final root = await started.future;
         addTearDown(() async {
           boundedProcessGroupRowsOverride = null;
+          final member = File('${directory.path}/member.pid');
+          if (member.existsSync()) {
+            await Process.run('kill', [
+              '-CONT',
+              member.readAsStringSync().trim(),
+            ]);
+          }
           await stopOwnedGroup(root, grace: const Duration(seconds: 1));
           await running.timeout(const Duration(seconds: 6));
           directory.deleteSync(recursive: true);
         });
 
-        final observedDeadline = DateTime.now().add(const Duration(seconds: 10));
-        Set<int>? observed;
+        final memberFile = File('${directory.path}/member.pid');
+        final memberDeadline = DateTime.now().add(const Duration(seconds: 5));
+        while (!memberFile.existsSync() &&
+            DateTime.now().isBefore(memberDeadline)) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        final memberPid = int.parse(memberFile.readAsStringSync().trim());
+        expect((await Process.run('kill', ['-STOP', '$memberPid'])).exitCode, 0);
+
+        final observedDeadline = DateTime.now().add(const Duration(seconds: 5));
         while (DateTime.now().isBefore(observedDeadline)) {
-          observed = boundedProcessObservedMembersForRoot(root);
+          final observed = boundedProcessObservedMembersForRoot(root);
           if (observed != null && observed.length >= 2) break;
           await Future<void>.delayed(const Duration(milliseconds: 20));
         }
         expect(
-          observed?.length,
+          boundedProcessObservedMembersForRoot(root)?.length,
           greaterThanOrEqualTo(2),
           reason: 'need a live ps snapshot before arming cleared observation',
         );
-        final memberPid = observed!.firstWhere((pid) => pid != root);
-        expect((await Process.run('kill', ['-STOP', '$memberPid'])).exitCode, 0);
 
         var clearedOnce = false;
         var inStopReads = 0;

@@ -2,8 +2,30 @@
 library;
 
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:test/test.dart';
+
+Future<Uri> _workspacePackageConfig() async {
+  final entry = await Isolate.resolvePackageUri(
+    Uri.parse(
+      'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart',
+    ),
+  );
+  expect(entry, isNotNull);
+  var dir = File.fromUri(entry!).parent.parent;
+  while (true) {
+    final candidate = File('${dir.path}/.dart_tool/package_config.json');
+    if (candidate.existsSync()) {
+      return candidate.absolute.uri;
+    }
+    final parent = dir.parent;
+    if (parent.path == dir.path) {
+      fail('package_config.json not found above ${dir.path}');
+    }
+    dir = parent;
+  }
+}
 
 void main() {
   test(
@@ -11,9 +33,7 @@ void main() {
     () async {
       final directory = Directory.systemTemp.createTempSync('anchor-orphan-');
       addTearDown(() => directory.deleteSync(recursive: true));
-      final packageConfig = File(
-        '.dart_tool/package_config.json',
-      ).absolute.uri;
+      final packageConfig = await _workspacePackageConfig();
       final script = File('${directory.path}/driver.dart')
         ..writeAsStringSync('''
 import 'dart:io';
