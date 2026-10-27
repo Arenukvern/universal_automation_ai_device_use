@@ -308,62 +308,93 @@ Future<BoundedRunResult> runBounded(
       ? utf8.encode('$marker:started\n')
       : null;
   final failureBytes = utf8.encode('$marker:error:');
+  final postStartupErrBytes = <int>[];
+  bool ingestStartupFailure(List<int> bytes) {
+    final failed = _byteSequenceIndex(bytes, failureBytes);
+    if (failed < 0) return false;
+    final end = bytes.indexOf(10, failed);
+    if (end < 0) return false;
+    startupFailureReported = true;
+    startupError = utf8.decode(
+      bytes.sublist(failed + failureBytes.length, end),
+      allowMalformed: true,
+    );
+    err.add(bytes.sublist(0, failed));
+    err.add(bytes.sublist(end + 1));
+    return true;
+  }
+
+  void trimStatusTailForPartialMarker(List<int> bytes) {
+    if (bytes.length <= failureBytes.length + 64) return;
+    final keep = failureBytes.length + 64;
+    err.add(bytes.sublist(0, bytes.length - keep));
+    bytes.removeRange(0, bytes.length - keep);
+  }
+
+  int trailingPartialMarkerPrefix(List<int> bytes) {
+    var partialLen = 0;
+    for (var tail = 1; tail < failureBytes.length && tail <= bytes.length; tail++) {
+      final suffix = bytes.sublist(bytes.length - tail);
+      for (var start = 0; start <= failureBytes.length - tail; start++) {
+        var matches = true;
+        for (var j = 0; j < tail; j++) {
+          if (failureBytes[start + j] != suffix[j]) {
+            matches = false;
+            break;
+          }
+        }
+        if (matches) partialLen = tail;
+      }
+    }
+    return partialLen;
+  }
+
+  void flushPendingStatusCapture() {
+    if (statusBytes.isNotEmpty) {
+      err.add(statusBytes);
+      statusBytes.clear();
+    }
+    if (postStartupErrBytes.isNotEmpty) {
+      err.add(postStartupErrBytes);
+      postStartupErrBytes.clear();
+    }
+  }
+
   void captureStatus(List<int> chunk) {
     if (startup.isCompleted) {
       if (singleProcessSession && startupError == null) {
-        final failed = _byteSequenceIndex(chunk, failureBytes);
-        if (failed >= 0) {
-          final end = chunk.indexOf(10, failed);
-          if (end >= 0) {
-            startupFailureReported = true;
-            startupError = utf8.decode(
-              chunk.sublist(failed + failureBytes.length, end),
-              allowMalformed: true,
-            );
-          }
+        postStartupErrBytes.addAll(chunk);
+        if (ingestStartupFailure(postStartupErrBytes)) {
+          postStartupErrBytes.clear();
+        } else {
+          trimStatusTailForPartialMarker(postStartupErrBytes);
         }
+        return;
       }
       err.add(chunk);
       return;
     }
     if (channelStarted != null) {
-      final probe = [...statusBytes, ...chunk];
-      final failed = _byteSequenceIndex(probe, failureBytes);
-      if (failed >= 0) {
-        final end = probe.indexOf(10, failed);
-        if (end >= 0) {
-          startupFailureReported = true;
-          startupError = utf8.decode(
-            probe.sublist(failed + failureBytes.length, end),
-            allowMalformed: true,
-          );
-          err.add(probe.sublist(0, failed));
-          err.add(probe.sublist(end + 1));
-          statusBytes.clear();
-          startup.complete();
-          return;
-        }
-      }
-      statusBytes.clear();
-      err.add(chunk);
-      return;
-    }
-    statusBytes.addAll(chunk);
-    final failed = _byteSequenceIndex(statusBytes, failureBytes);
-    if (failed >= 0) {
-      final end = statusBytes.indexOf(10, failed);
-      if (end >= 0) {
-        startupFailureReported = true;
-        startupError = utf8.decode(
-          statusBytes.sublist(failed + failureBytes.length, end),
-          allowMalformed: true,
-        );
-        err.add(statusBytes.sublist(0, failed));
-        err.add(statusBytes.sublist(end + 1));
+      statusBytes.addAll(chunk);
+      if (ingestStartupFailure(statusBytes)) {
         statusBytes.clear();
         startup.complete();
         return;
       }
+      final partialLen = trailingPartialMarkerPrefix(statusBytes);
+      final flushUpTo = statusBytes.length - partialLen;
+      if (flushUpTo > 0) {
+        err.add(statusBytes.sublist(0, flushUpTo));
+        statusBytes.removeRange(0, flushUpTo);
+      }
+      trimStatusTailForPartialMarker(statusBytes);
+      return;
+    }
+    statusBytes.addAll(chunk);
+    if (ingestStartupFailure(statusBytes)) {
+      statusBytes.clear();
+      startup.complete();
+      return;
     }
     final started = startedBytes == null
         ? -1
@@ -418,6 +449,8 @@ Future<BoundedRunResult> runBounded(
         err.add(statusBytes);
         statusBytes.clear();
         startup.complete();
+      } else {
+        flushPendingStatusCapture();
       }
       if (!errDone.isCompleted) errDone.complete();
     },
@@ -531,6 +564,13 @@ Future<BoundedRunResult> runBounded(
   if (channelStarted != null && startupError == null) {
     await channelStarted.future;
     startupError = owned?.controlFailure;
+    if (startupError == null) {
+      flushPendingStatusCapture();
+    }
+  }
+  if (singleProcessSession && startupError == null) {
+    ingestStartupFailure(postStartupErrBytes);
+    flushPendingStatusCapture();
   }
   if (startupError == null) {
     deadlineTimer = Timer(deadline, () => stopOwned(deadlineExpired: true));
@@ -664,6 +704,7 @@ Future<BoundedRunResult> runBounded(
     survivors.add(process.pid);
     settlementProblem ??= 'spawned root exit was not observed';
   }
+  flushPendingStatusCapture();
   final text = err.text;
   if (startupError != null &&
       survivors.isEmpty &&
