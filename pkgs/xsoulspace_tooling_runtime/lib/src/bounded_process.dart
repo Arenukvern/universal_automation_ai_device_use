@@ -313,6 +313,24 @@ Future<BoundedRunResult> runBounded(
       return;
     }
     if (channelStarted != null) {
+      final probe = [...statusBytes, ...chunk];
+      final failed = _byteSequenceIndex(probe, failureBytes);
+      if (failed >= 0) {
+        final end = probe.indexOf(10, failed);
+        if (end >= 0) {
+          startupFailureReported = true;
+          startupError = utf8.decode(
+            probe.sublist(failed + failureBytes.length, end),
+            allowMalformed: true,
+          );
+          err.add(probe.sublist(0, failed));
+          err.add(probe.sublist(end + 1));
+          statusBytes.clear();
+          startup.complete();
+          return;
+        }
+      }
+      statusBytes.clear();
       err.add(chunk);
       return;
     }
@@ -326,19 +344,6 @@ Future<BoundedRunResult> runBounded(
       err.add(statusBytes.sublist(started + startedBytes!.length));
       statusBytes.clear();
       startup.complete();
-    } else if (failed >= 0) {
-      final end = statusBytes.indexOf(10, failed);
-      if (end >= 0) {
-        startupFailureReported = true;
-        startupError = utf8.decode(
-          statusBytes.sublist(failed + failureBytes.length, end),
-          allowMalformed: true,
-        );
-        err.add(statusBytes.sublist(0, failed));
-        err.add(statusBytes.sublist(end + 1));
-        statusBytes.clear();
-        startup.complete();
-      }
     } else if (statusBytes.length > maxCapturedBytes + 4096) {
       // Target output may precede the private successful-exec notice. Keep
       // capture bounded while retaining enough suffix for a split notice.
@@ -681,14 +686,15 @@ const _singleProcessSessionLaunch = r'''
 my $marker = shift @ARGV;
 select STDERR; $| = 1;
 my $sid = POSIX::setsid();
-if ($sid < 0) {
-  print STDERR "$marker:error:setsid: $!\n"; exit 127;
+if (!defined $sid || $sid < 0) {
+  print STDERR "$marker:error:setsid:" . ($! + 0) . "\n";
+  exit(1);
 }
 print STDERR "$marker:ready:$sid\n";
 print STDERR "$marker:started\n";
 exec { $ARGV[0] } @ARGV;
-print STDERR "target exec failed: $!\n";
-exit 127;
+print STDERR "$marker:error:exec:$!\n";
+exit(1);
 ''';
 
 int _byteSequenceIndex(List<int> bytes, List<int> needle) {
