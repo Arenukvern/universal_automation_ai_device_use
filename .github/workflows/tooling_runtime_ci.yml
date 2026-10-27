@@ -1,0 +1,44 @@
+name: universal_tooling_runtime CI
+
+on:
+  pull_request:
+    paths:
+      - 'pkgs/universal_tooling_runtime/**'
+      - '.github/workflows/tooling_runtime_ci.yml'
+      - '.github/workflows/publish_tooling_runtime.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'pkgs/universal_tooling_runtime/**'
+      - '.github/workflows/tooling_runtime_ci.yml'
+      - '.github/workflows/publish_tooling_runtime.yml'
+
+jobs:
+  ci:
+    name: Analyze, test, publish dry-run
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Analyze
+        run: dart analyze
+        working-directory: pkgs/universal_tooling_runtime
+
+      - name: Test
+        run: dart test --concurrency=1
+        working-directory: pkgs/universal_tooling_runtime
+
+      - name: Publish dry run
+        run: dart pub publish --dry-run
+        working-directory: pkgs/universal_tooling_runtime

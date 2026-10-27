@@ -8,14 +8,25 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  actions: write
 
 jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
       - name: Release Please
+        id: release
         uses: googleapis/release-please-action@v4
         with:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Dispatch pub.dev publish (universal_tooling_runtime)
+        if: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG='${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}'
+          echo "Dispatching publish_tooling_runtime.yml for tag ${TAG}"
+          gh workflow run publish_tooling_runtime.yml --ref "${TAG}"
