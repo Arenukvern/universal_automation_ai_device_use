@@ -21,8 +21,8 @@ Host coding harnesses and Last Answer need the same bounded runner:
 
 That logic lived in DFP at `pkgs/xsoulspace_tooling_runtime`, coupled to a large
 monorepo. Arenukvern/ecsai_harness and xsoulspace/last_answer already depend on
-the bounded-runner package (historically `xsoulspace_tooling_runtime` on pub.dev
-pins); they need a **hosted** copy that
+the bounded-runner via DFP path/git pins (`xsoulspace_tooling_runtime` was never
+published to pub.dev); they need a **hosted** copy that
 does not drag DFP or UA device drivers.
 
 [oka](https://github.com/Arenukvern/oka) owns long-lived process composition.
@@ -33,7 +33,8 @@ this package keeps inline Perl/session helpers for **0.2.0**.
 
 The P0 Perl owned-session leader (`tool/owned_session_p1_leader.pl`),
 `doc/owned_session_p1.md`, and the p1 conformance suite live in this workspace.
-**This repo is the canonical home** for the package (0.2.0). DFP PR
+**This repo is the canonical home** for the package; **0.2.0** is the first
+pub.dev release as `universal_tooling_runtime`. DFP PR
 [#5](https://github.com/xsoulspace/dart_flutter_packages/pull/5) is closed
 without merge; ports from branch `fix/harness-owned-pid-snapshot-5165` are
 folded here (tip **`f34e4cf`** on `cursor/move-tooling-runtime-0ca3` at last
@@ -43,8 +44,9 @@ full dfp sync).
 
 1. **Add** `pkgs/universal_tooling_runtime` to this workspace with
    `resolution: workspace`, pub name **`universal_tooling_runtime`** (renamed
-   from `xsoulspace_tooling_runtime` before first publish), version **0.2.0**
-   (minor bump for the relocation).
+   from `xsoulspace_tooling_runtime`; neither name was on pub.dev before this
+   cut), version **0.2.0** — **first pub.dev release** under
+   `universal_tooling_runtime` (minor bump for the relocation).
 2. **Dependencies (0.2.0):** **`meta` only** — no git/path pins. **`oka_process`
    is published** on pub.dev; **adoption is deferred** until oka ports the
    posix-perl backend into that package. **Agreed order:** merge UA PR #5 →
