@@ -58,6 +58,55 @@ void main() {
     });
   });
 
+  group('fetchReusableWorkflowYaml', () {
+    final call = ReusableWorkflowCall(
+      callerPath: 'x.yml',
+      jobName: 'publish',
+      owner: 'dart-lang',
+      repo: 'setup-dart',
+      workflowFile: 'publish.yml',
+      ref: 'v1',
+      withKeys: ['working-directory'],
+    );
+
+    test('does not retry 4xx client errors', () async {
+      var attempts = 0;
+      await expectLater(
+        fetchReusableWorkflowYaml(
+          call,
+          testResponseProvider: (_) async {
+            attempts++;
+            return (statusCode: 404, body: '');
+          },
+        ),
+        throwsA(
+          isA<WorkflowFetchException>()
+              .having((e) => e.retryable, 'retryable', isFalse)
+              .having((e) => e.message, 'message', contains('HTTP 404')),
+        ),
+      );
+      expect(attempts, 1);
+    });
+
+    test('retries 5xx then succeeds', () async {
+      var attempts = 0;
+      final yaml =
+          File('tool/testdata/reusable_publish_workflow.yml').readAsStringSync();
+      final body = await fetchReusableWorkflowYaml(
+        call,
+        testResponseProvider: (_) async {
+          attempts++;
+          if (attempts < 2) {
+            return (statusCode: 503, body: '');
+          }
+          return (statusCode: 200, body: yaml);
+        },
+      );
+      expect(body, yaml);
+      expect(attempts, 2);
+    });
+  });
+
   group('validateRepositoryWorkflows', () {
     test('propagates fetch failure instead of empty declared inputs', () async {
       final dir = Directory.systemTemp.createTempSync('rw_inputs_test');

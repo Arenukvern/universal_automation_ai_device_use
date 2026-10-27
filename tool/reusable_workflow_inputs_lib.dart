@@ -35,8 +35,11 @@ class ReusableWorkflowCall {
 }
 
 class WorkflowFetchException implements Exception {
-  WorkflowFetchException(this.message);
+  WorkflowFetchException(this.message, {this.retryable = true});
+
   final String message;
+  final bool retryable;
+
   @override
   String toString() => message;
 }
@@ -163,18 +166,31 @@ List<String> validateWithKeysAgainstDeclared(
   return errors;
 }
 
+/// For tests: return synthetic HTTP results instead of using [HttpClient].
+typedef ReusableWorkflowTestResponseProvider = Future<({int statusCode, String body})>
+    Function(Uri url);
+
 Future<String> fetchReusableWorkflowYaml(
   ReusableWorkflowCall call, {
   String? githubToken,
   HttpClient? httpClient,
+  ReusableWorkflowTestResponseProvider? testResponseProvider,
   int maxAttempts = 3,
   Duration requestTimeout = const Duration(seconds: 30),
   Duration connectTimeout = const Duration(seconds: 15),
 }) async {
-  final client = httpClient ?? HttpClient();
-  final ownsClient = httpClient == null;
-  client.connectionTimeout = connectTimeout;
-  client.idleTimeout = connectTimeout;
+  late final HttpClient fetchClient;
+  var closeFetchClient = false;
+  if (testResponseProvider == null) {
+    if (httpClient != null) {
+      fetchClient = httpClient;
+    } else {
+      fetchClient = HttpClient();
+      closeFetchClient = true;
+    }
+    fetchClient.connectionTimeout = connectTimeout;
+    fetchClient.idleTimeout = connectTimeout;
+  }
 
   try {
     Object? lastError;
@@ -185,13 +201,24 @@ Future<String> fetchReusableWorkflowYaml(
         );
       }
       try {
+        if (testResponseProvider != null) {
+          final synthetic = await testResponseProvider(Uri.parse(call.rawUrl));
+          return _responseBodyOrThrow(call, synthetic.statusCode, synthetic.body);
+        }
         return await _fetchOnce(
-          client,
+          fetchClient,
           call,
           githubToken: githubToken,
           requestTimeout: requestTimeout,
         );
-      } on Object catch (e) {
+      } on WorkflowFetchException catch (e) {
+        if (!e.retryable) {
+          rethrow;
+        }
+        lastError = e;
+      } on TimeoutException catch (e) {
+        lastError = e;
+      } on IOException catch (e) {
         lastError = e;
       }
     }
@@ -199,10 +226,36 @@ Future<String> fetchReusableWorkflowYaml(
       'could not fetch ${call.slug}: $lastError',
     );
   } finally {
-    if (ownsClient) {
-      client.close(force: true);
+    if (closeFetchClient) {
+      fetchClient.close(force: true);
     }
   }
+}
+
+String _responseBodyOrThrow(
+  ReusableWorkflowCall call,
+  int statusCode,
+  String body,
+) {
+  if (statusCode == 200) {
+    return body;
+  }
+  if (statusCode >= 400 && statusCode < 500) {
+    throw WorkflowFetchException(
+      'could not fetch ${call.slug} (HTTP $statusCode)',
+      retryable: false,
+    );
+  }
+  if (statusCode >= 500) {
+    throw WorkflowFetchException(
+      'could not fetch ${call.slug} (HTTP $statusCode)',
+      retryable: true,
+    );
+  }
+  throw WorkflowFetchException(
+    'could not fetch ${call.slug} (HTTP $statusCode)',
+    retryable: false,
+  );
 }
 
 Future<String> _fetchOnce(
@@ -221,11 +274,10 @@ Future<String> _fetchOnce(
   final response = await request.close().timeout(requestTimeout);
   if (response.statusCode != 200) {
     await response.drain<void>();
-    throw WorkflowFetchException(
-      'could not fetch ${call.slug} (HTTP ${response.statusCode})',
-    );
+    return _responseBodyOrThrow(call, response.statusCode, '');
   }
-  return await response.transform(utf8.decoder).join();
+  final body = await response.transform(utf8.decoder).join();
+  return _responseBodyOrThrow(call, response.statusCode, body);
 }
 
 typedef ReusableWorkflowYamlFetcher = Future<String> Function(
