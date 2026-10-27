@@ -27,6 +27,8 @@ jobs:
         run: dart run tool/sync_workspace_pub_constraints.dart --check
 
       - name: Check reusable workflow inputs
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: dart run tool/check_reusable_workflow_inputs.dart
 
       - name: Resolve workspace
