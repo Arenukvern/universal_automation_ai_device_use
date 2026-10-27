@@ -29,9 +29,10 @@ layer: who may run what, where, under which locks — not driver or browser code
 
 The P0 Perl owned-session leader (`tool/owned_session_p1_leader.pl`),
 `doc/owned_session_p1.md`, and the p1 conformance suite are maintained in this
-workspace on branch `cursor/move-tooling-runtime-0ca3`. Upstream DFP PR
-[#5](https://github.com/xsoulspace/dart_flutter_packages/pull/5) is the sibling
-source for cherry-picks; there is no separate patch artifact in this repo.
+workspace on branch `cursor/move-tooling-runtime-0ca3`. **This repo is the
+canonical home** for the package (0.2.0); DFP PR
+[#5](https://github.com/xsoulspace/dart_flutter_packages/pull/5) is closed
+without merge and historical cherry-picks are folded here.
 
 ## Decision
 
@@ -60,8 +61,8 @@ source for cherry-picks; there is no separate patch artifact in this repo.
 - DFP reverse dependency today: `xsoulspace_inference_mlx_native` (path + tools/
   tests). A DFP shim should re-export or path-pin to pub.dev and drop the in-tree
   copy once consumers migrate.
-- Follow-ups: merge DFP PR #5 and diff any post-merge fixes; adopt `oka_process`
-  when tagged; Windows Job Objects via oka, not ad hoc in this package.
+- Follow-ups: adopt `oka_process` when tagged on pub.dev; Windows Job Objects via
+  oka, not ad hoc in this package.
 
 ## References
 
