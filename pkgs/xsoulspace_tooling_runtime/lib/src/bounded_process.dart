@@ -1061,6 +1061,18 @@ BoundedProcessCause deadlineCause({
 /// first signal), TERM, wait up to [grace] while verifying death, then
 /// re-enumerate and KILL whatever remains. Returns every pid signaled,
 /// so callers can verify death themselves.
+///
+/// When [rootPid] is registered by an in-flight [runBounded] admission,
+/// the owned POSIX session ladder runs. Otherwise the root is routed to
+/// [stopUnownedPosixProcessTree] (enumerate from `ps`, TERM, grace with
+/// liveness polls, re-enumerate from `ps` before KILL, then verify death).
+/// Callers must pass only roots they own; foreign or shared subtrees are not
+/// filtered.
+///
+/// Pair signaled or reported survivor pids with [awaitProcessSettlement]:
+/// it returns `true` only when live `ps` shows every listed pid gone, and
+/// `false` when [awaitProcessSettlement]'s budget expires or observation
+/// cannot certify death while obligations remain.
 Future<List<int>> stopProcessTree(
   int rootPid, {
   Duration grace = const Duration(seconds: 5),
@@ -1073,7 +1085,20 @@ Future<List<int>> stopProcessTree(
   return stopUnownedPosixProcessTree(rootPid, grace: grace);
 }
 
-/// Legacy `ps` tree stop for processes **not** admitted by [runBounded].
+/// `ps` tree stop for processes **not** admitted by [runBounded].
+///
+/// Enumerates the descendant tree under [rootPid] (inclusive) from `ps`, signals
+/// TERM to that set, polls liveness until [grace] elapses or all are gone, then
+/// takes a fresh `ps` tree snapshot and signals KILL to the union of the
+/// original set and any newly visible descendants (children spawned under TERM
+/// are caught on the re-enumeration), polling again until [grace] or all are
+/// dead. Returns every pid signaled. The host must own [rootPid] and every pid
+/// in those enumerations; there is no authority boundary beyond caller
+/// discipline.
+///
+/// Used from [stopProcessTree] when no owned registration exists. After
+/// signaling, use [awaitProcessSettlement] on the returned pids (or reported
+/// survivors) and check the `bool` — never treat completion alone as proof.
 @visibleForTesting
 Future<List<int>> stopUnownedPosixProcessTree(
   int rootPid, {
