@@ -90,10 +90,11 @@ if ($child == 0) {
     print $write_error "exec pipe: $!";
     exit(1);
   };
-  exec { $ARGV[0] } @ARGV;
-  print $write_error "exec: $!";
-  close($write_error);
-  exit(1);
+  exec { $ARGV[0] } @ARGV or do {
+    print $write_error "exec: $!";
+    close($write_error);
+    exit(1);
+  };
 }
 my $main_status = 0;
 my $main_reported = 0;

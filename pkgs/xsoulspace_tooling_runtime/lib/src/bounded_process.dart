@@ -367,6 +367,12 @@ Future<BoundedRunResult> runBounded(
         if (ingestStartupFailure(postStartupErrBytes)) {
           postStartupErrBytes.clear();
         } else {
+          final partialLen = trailingPartialMarkerPrefix(postStartupErrBytes);
+          final flushUpTo = postStartupErrBytes.length - partialLen;
+          if (flushUpTo > 0) {
+            err.add(postStartupErrBytes.sublist(0, flushUpTo));
+            postStartupErrBytes.removeRange(0, flushUpTo);
+          }
           trimStatusTailForPartialMarker(postStartupErrBytes);
         }
         return;
