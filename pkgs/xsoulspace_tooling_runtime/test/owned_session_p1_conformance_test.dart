@@ -35,297 +35,280 @@ void main() {
           '${packageRoot.path}/tool/owned_session_p1_leader.pl';
       expect(File(leaderScript).existsSync(), isTrue);
       fixturesDir = '${packageRoot.path}/test/fixtures/owned_session_p1';
-      for (final name in ['graceful_ok.sh', 'graceful_slow.sh', 'graceful_fail.sh']) {
+      for (final name in [
+        'graceful_ok.sh',
+        'graceful_slow.sh',
+        'graceful_fail.sh',
+      ]) {
         await Process.run('chmod', ['+x', '$fixturesDir/$name']);
       }
     });
 
-    test(
-      'owned bootstrap: ready line, marker auth, started',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_bootstrap';
-        final stderr = <int>[];
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--',
-          'sleep',
-          '3600',
-        ]);
-        addTearDown(() async {
-          leader.kill();
-          await leader.exitCode.timeout(const Duration(seconds: 2));
-        });
-        leader.stderr.listen(stderr.addAll);
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(
-          await _readReadyLine(stderr, marker),
-          matches(RegExp('^$marker:ready:\\d+:p1:perl\$')),
-        );
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        client.writeln('kill');
-        await client.flush();
-        expect(await _expectKilledGroup(lines), 'killed-group');
-        await client.close();
-        await leader.exitCode.timeout(const Duration(seconds: 5));
-      },
-    );
+    test('owned bootstrap: ready line, marker auth, started', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_bootstrap';
+      final stderr = <int>[];
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sleep',
+        '3600',
+      ]);
+      addTearDown(() async {
+        leader.kill();
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+      });
+      leader.stderr.listen(stderr.addAll);
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(
+        await _readReadyLine(stderr, marker),
+        matches(RegExp('^$marker:ready:\\d+:p1:perl\$')),
+      );
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+      await leader.exitCode.timeout(const Duration(seconds: 5));
+    });
 
-    test(
-      'exec failure reports marker:error, not exit 127 contract',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_exec_fail';
-        final stderr = StringBuffer();
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--',
-          '/no/such/executable/for/p1/conformance',
-        ]);
-        leader.stderr.transform(utf8.decoder).listen(stderr.write);
-        final exitCode = await leader.exitCode.timeout(
-          const Duration(seconds: 5),
-        );
-        expect(exitCode, isNot(127));
-        expect(
-          stderr.toString(),
-          contains('$marker:error:exec:'),
-        );
-      },
-    );
+    test('exec failure reports marker:error, not exit 127 contract', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_exec_fail';
+      final stderr = StringBuffer();
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        '/no/such/executable/for/p1/conformance',
+      ]);
+      leader.stderr.transform(utf8.decoder).listen(stderr.write);
+      final exitCode = await leader.exitCode.timeout(
+        const Duration(seconds: 5),
+      );
+      expect(exitCode, isNot(127));
+      expect(stderr.toString(), contains('$marker:error:exec:'));
+    });
 
-    test(
-      'direct SIGTERM to leader is ignored; group does not receive TERM',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_leader_term_ignore';
-        final workDir = Directory.systemTemp.createTempSync('p1-leader-term-');
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--',
-          'sh',
-          '-c',
-          r'trap "touch got_term" TERM; sleep 3600 & echo $! > member.pid; wait',
-        ], workingDirectory: workDir.path);
-        addTearDown(() async {
-          leader.kill(ProcessSignal.sigkill);
-          await leader.exitCode.timeout(const Duration(seconds: 2));
-          if (workDir.existsSync()) {
-            workDir.deleteSync(recursive: true);
-          }
-        });
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        final memberPid = int.parse(
-          File('${workDir.path}/member.pid').readAsStringSync().trim(),
-        );
-        expect(
-          (await Process.run('kill', ['-TERM', '${leader.pid}'])).exitCode,
-          0,
-        );
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-        expect(
-          (await Process.run('kill', ['-0', '${leader.pid}'])).exitCode,
-          0,
-          reason: 'leader must ignore direct SIGTERM',
-        );
-        expect(
-          (await Process.run('kill', ['-0', '$memberPid'])).exitCode,
-          0,
-          reason: 'group member must stay up when only the leader was signaled',
-        );
-        expect(
-          File('${workDir.path}/got_term').existsSync(),
-          isFalse,
-          reason: 'target group must not receive SIGTERM from leader ignore',
-        );
-        client.writeln('kill');
-        await client.flush();
-        expect(await _expectKilledGroup(lines), 'killed-group');
-        await client.close();
-      },
-    );
+    test('direct SIGTERM to leader is ignored; group does not receive TERM', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_leader_term_ignore';
+      final workDir = Directory.systemTemp.createTempSync('p1-leader-term-');
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sh',
+        '-c',
+        r'trap "touch got_term" TERM; sleep 3600 & echo $! > member.pid; wait',
+      ], workingDirectory: workDir.path);
+      addTearDown(() async {
+        leader.kill(ProcessSignal.sigkill);
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+        if (workDir.existsSync()) {
+          workDir.deleteSync(recursive: true);
+        }
+      });
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final memberPid = int.parse(
+        File('${workDir.path}/member.pid').readAsStringSync().trim(),
+      );
+      expect(
+        (await Process.run('kill', ['-TERM', '${leader.pid}'])).exitCode,
+        0,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        (await Process.run('kill', ['-0', '${leader.pid}'])).exitCode,
+        0,
+        reason: 'leader must ignore direct SIGTERM',
+      );
+      expect(
+        (await Process.run('kill', ['-0', '$memberPid'])).exitCode,
+        0,
+        reason: 'group member must stay up when only the leader was signaled',
+      );
+      expect(
+        File('${workDir.path}/got_term').existsSync(),
+        isFalse,
+        reason: 'target group must not receive SIGTERM from leader ignore',
+      );
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+    });
 
-    test(
-      'term forwards SIGTERM+CONT to the group',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_term';
-        final workDir = Directory.systemTemp.createTempSync('p1-term-');
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--',
-          'sh',
-          '-c',
-          r'trap "" TERM; sleep 3600 & echo $! > member.pid; wait',
-        ], workingDirectory: workDir.path);
-        addTearDown(() async {
-          leader.kill();
-          await leader.exitCode.timeout(const Duration(seconds: 2));
-          if (workDir.existsSync()) {
-            workDir.deleteSync(recursive: true);
-          }
-        });
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        await Future<void>.delayed(const Duration(milliseconds: 200));
-        final memberPid = int.parse(
-          File('${workDir.path}/member.pid').readAsStringSync().trim(),
-        );
-        client.writeln('term');
-        await client.flush();
-        expect(await lines.next(), 'term-forwarded');
-        await Future<void>.delayed(const Duration(milliseconds: 300));
-        expect(
-          (await Process.run('kill', ['-0', '$memberPid'])).exitCode,
-          0,
-          reason: 'TERM-ignoring member stays up until KILL',
-        );
-        client.writeln('kill');
-        await client.flush();
-        expect(await _expectKilledGroup(lines), 'killed-group');
-        await client.close();
-      },
-    );
+    test('term forwards SIGTERM+CONT to the group', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_term';
+      final workDir = Directory.systemTemp.createTempSync('p1-term-');
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sh',
+        '-c',
+        r'trap "" TERM; sleep 3600 & echo $! > member.pid; wait',
+      ], workingDirectory: workDir.path);
+      addTearDown(() async {
+        leader.kill();
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+        if (workDir.existsSync()) {
+          workDir.deleteSync(recursive: true);
+        }
+      });
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final memberPid = int.parse(
+        File('${workDir.path}/member.pid').readAsStringSync().trim(),
+      );
+      client.writeln('term');
+      await client.flush();
+      expect(await lines.next(), 'term-forwarded');
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(
+        (await Process.run('kill', ['-0', '$memberPid'])).exitCode,
+        0,
+        reason: 'TERM-ignoring member stays up until KILL',
+      );
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+    });
 
-    test(
-      'graceful hook ok runs before term-forwarded',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_grace_ok';
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--graceful',
-          '$fixturesDir/graceful_ok.sh',
-          '--graceful-timeout',
-          '2',
-          '--',
-          'sleep',
-          '3600',
-        ]);
-        addTearDown(() async {
-          leader.kill();
-          await leader.exitCode.timeout(const Duration(seconds: 2));
-        });
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        client.writeln('term');
-        await client.flush();
-        expect(await lines.next(), 'graceful:ok');
-        expect(await lines.next(), 'term-forwarded');
-        client.writeln('kill');
-        await client.flush();
-        expect(await _expectKilledGroup(lines), 'killed-group');
-        await client.close();
-      },
-    );
+    test('graceful hook ok runs before term-forwarded', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_grace_ok';
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--graceful',
+        '$fixturesDir/graceful_ok.sh',
+        '--graceful-timeout',
+        '2',
+        '--',
+        'sleep',
+        '3600',
+      ]);
+      addTearDown(() async {
+        leader.kill();
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+      });
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      client.writeln('term');
+      await client.flush();
+      expect(await lines.next(), 'graceful:ok');
+      expect(await lines.next(), 'term-forwarded');
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+    });
 
-    test(
-      'graceful hook timeout still escalates with term-forwarded',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_grace_slow';
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--graceful',
-          '$fixturesDir/graceful_slow.sh',
-          '--graceful-timeout',
-          '1',
-          '--',
-          'sleep',
-          '3600',
-        ]);
-        addTearDown(() async {
-          leader.kill();
-          await leader.exitCode.timeout(const Duration(seconds: 2));
-        });
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        client.writeln('term');
-        await client.flush();
-        expect(await lines.next(), 'graceful:timeout');
-        expect(await lines.next(), 'term-forwarded');
-        client.writeln('kill');
-        await client.flush();
-        expect(await _expectKilledGroup(lines), 'killed-group');
-        await client.close();
-      },
-    );
+    test('graceful hook timeout still escalates with term-forwarded', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_grace_slow';
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--graceful',
+        '$fixturesDir/graceful_slow.sh',
+        '--graceful-timeout',
+        '1',
+        '--',
+        'sleep',
+        '3600',
+      ]);
+      addTearDown(() async {
+        leader.kill();
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+      });
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      client.writeln('term');
+      await client.flush();
+      expect(await lines.next(), 'graceful:timeout');
+      expect(await lines.next(), 'term-forwarded');
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+    });
 
     test(
       'graceful hook failure reports graceful:fail then term-forwarded',
@@ -408,8 +391,7 @@ void main() {
     });
 
     test('single syswrite term+kill (perl harness)', () async {
-      final harness =
-          '$fixturesDir/control_back_to_back.pl';
+      final harness = '$fixturesDir/control_back_to_back.pl';
       final result = await Process.run(perl, [harness, leaderScript]);
       expect(result.exitCode, 0, reason: result.stderr);
       expect(result.stdout, contains('term-forwarded'));
@@ -601,41 +583,44 @@ void main() {
       expect(stderr.toString(), contains('m_frac:error:args:graceful-timeout'));
     });
 
-    test('unknown control commands are ignored until a valid command', () async {
-      final binding = await _bindControl();
-      addTearDown(() => binding.dispose());
-      const marker = 'm_unknown_cmd';
-      final leader = await Process.start(perl, [
-        leaderScript,
-        '--protocol',
-        '1',
-        '--mode',
-        'owned',
-        '--marker',
-        marker,
-        '--control',
-        binding.socketPath,
-        '--',
-        'sleep',
-        '3600',
-      ]);
-      addTearDown(() async {
-        leader.kill(ProcessSignal.sigkill);
-        await leader.exitCode.timeout(const Duration(seconds: 2));
-      });
-      final client = await binding.server.first.timeout(
-        const Duration(seconds: 5),
-      );
-      final lines = _LineReader(client);
-      expect(await lines.next(), marker);
-      expect(await lines.next(), 'started');
-      client.writeln('not-a-command');
-      await client.flush();
-      client.writeln('kill');
-      await client.flush();
-      expect(await _expectKilledGroup(lines), 'killed-group');
-      await client.close();
-    });
+    test(
+      'unknown control commands are ignored until a valid command',
+      () async {
+        final binding = await _bindControl();
+        addTearDown(() => binding.dispose());
+        const marker = 'm_unknown_cmd';
+        final leader = await Process.start(perl, [
+          leaderScript,
+          '--protocol',
+          '1',
+          '--mode',
+          'owned',
+          '--marker',
+          marker,
+          '--control',
+          binding.socketPath,
+          '--',
+          'sleep',
+          '3600',
+        ]);
+        addTearDown(() async {
+          leader.kill(ProcessSignal.sigkill);
+          await leader.exitCode.timeout(const Duration(seconds: 2));
+        });
+        final client = await binding.server.first.timeout(
+          const Duration(seconds: 5),
+        );
+        final lines = _LineReader(client);
+        expect(await lines.next(), marker);
+        expect(await lines.next(), 'started');
+        client.writeln('not-a-command');
+        await client.flush();
+        client.writeln('kill');
+        await client.flush();
+        expect(await _expectKilledGroup(lines), 'killed-group');
+        await client.close();
+      },
+    );
 
     test('exit: and settle returns settled with clean exit code', () async {
       final binding = await _bindControl();
@@ -700,65 +685,66 @@ void main() {
       expect(await lines.next(), 'settled');
       await client.close();
       final code = await leader.exitCode.timeout(const Duration(seconds: 5));
-      expect(code, lessThan(0), reason: 'leader should die from re-raised signal');
+      expect(
+        code,
+        lessThan(0),
+        reason: 'leader should die from re-raised signal',
+      );
     });
 
-    test(
-      'control EOF kills the admitted target (host-death guard)',
-      () async {
-        final binding = await _bindControl();
-        addTearDown(() => binding.dispose());
-        const marker = 'conf_marker_eof';
-        final workDir = Directory.systemTemp.createTempSync('p1-eof-');
-        final leader = await Process.start(perl, [
-          leaderScript,
-          '--protocol',
-          '1',
-          '--mode',
-          'owned',
-          '--marker',
-          marker,
-          '--control',
-          binding.socketPath,
-          '--',
-          'sh',
-          '-c',
-          r'sleep 3600 & echo $! > child.pid; wait',
-        ], workingDirectory: workDir.path);
-        final client = await binding.server.first.timeout(
-          const Duration(seconds: 5),
-        );
-        final lines = _LineReader(client);
-        expect(await lines.next(), marker);
-        expect(await lines.next(), 'started');
-        await Future<void>.delayed(const Duration(milliseconds: 150));
-        final childPid = int.parse(
-          File('${workDir.path}/child.pid').readAsStringSync().trim(),
-        );
-        await client.close();
-        await leader.exitCode.timeout(const Duration(seconds: 5));
-        final deadline = DateTime.now().add(const Duration(seconds: 3));
-        var dead = false;
-        while (DateTime.now().isBefore(deadline)) {
-          if ((await Process.run('kill', ['-0', '$childPid'])).exitCode != 0) {
-            dead = true;
-            break;
-          }
-          await Future<void>.delayed(const Duration(milliseconds: 50));
+    test('control EOF kills the admitted target (host-death guard)', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'conf_marker_eof';
+      final workDir = Directory.systemTemp.createTempSync('p1-eof-');
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sh',
+        '-c',
+        r'sleep 3600 & echo $! > child.pid; wait',
+      ], workingDirectory: workDir.path);
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      await Future<void>.delayed(const Duration(milliseconds: 150));
+      final childPid = int.parse(
+        File('${workDir.path}/child.pid').readAsStringSync().trim(),
+      );
+      await client.close();
+      await leader.exitCode.timeout(const Duration(seconds: 5));
+      final deadline = DateTime.now().add(const Duration(seconds: 3));
+      var dead = false;
+      while (DateTime.now().isBefore(deadline)) {
+        if ((await Process.run('kill', ['-0', '$childPid'])).exitCode != 0) {
+          dead = true;
+          break;
         }
-        expect(dead, isTrue, reason: 'leader must kill group on host EOF');
-        addTearDown(() async {
-          try {
-            await Process.run('kill', ['-9', '$childPid']);
-          } on Object {
-            // Already dead.
-          }
-          if (workDir.existsSync()) {
-            workDir.deleteSync(recursive: true);
-          }
-        });
-      },
-    );
+        await Future<void>.delayed(const Duration(milliseconds: 50));
+      }
+      expect(dead, isTrue, reason: 'leader must kill group on host EOF');
+      addTearDown(() async {
+        try {
+          await Process.run('kill', ['-9', '$childPid']);
+        } on Object {
+          // Already dead.
+        }
+        if (workDir.existsSync()) {
+          workDir.deleteSync(recursive: true);
+        }
+      });
+    });
   });
 }
 
@@ -774,10 +760,12 @@ Future<String> _readReadyLine(List<int> stderrBytes, String marker) async {
   final deadline = DateTime.now().add(const Duration(seconds: 5));
   while (DateTime.now().isBefore(deadline)) {
     final text = utf8.decode(stderrBytes, allowMalformed: true);
-    final line = text.split('\n').firstWhere(
-      (row) => row.startsWith('$marker:ready:'),
-      orElse: () => '',
-    );
+    final line = text
+        .split('\n')
+        .firstWhere(
+          (row) => row.startsWith('$marker:ready:'),
+          orElse: () => '',
+        );
     if (line.isNotEmpty) return line;
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }

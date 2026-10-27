@@ -86,7 +86,8 @@ Future<void> _listenSessionControl(
         buffer.removeRange(0, index + 1);
         if (!authenticated) {
           if (line != marker) {
-            owned.controlFailure = 'owned session control authentication failed';
+            owned.controlFailure =
+                'owned session control authentication failed';
             if (!startup.isCompleted) startup.complete();
             if (!channelStarted.isCompleted) channelStarted.complete();
             return;

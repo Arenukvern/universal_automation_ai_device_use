@@ -117,7 +117,8 @@ final class BoundedRunResult {
       exitCode == 0 &&
       survivors.isEmpty &&
       settlementProblem == null &&
-      inputProblem == null && transportProblem == null;
+      inputProblem == null &&
+      transportProblem == null;
 }
 
 /// Runs [executable] with [arguments] under [deadline]: on timeout the
@@ -363,8 +364,9 @@ Future<BoundedRunResult> runBounded(
       final end = header.indexOf(10);
       if (end < 0) return;
       final first = utf8.decode(header.sublist(0, end), allowMalformed: true);
-      final readyOwned =
-          RegExp('^$marker:ready:(\\d+):p$_sessionProtocolVersion:perl\$');
+      final readyOwned = RegExp(
+        '^$marker:ready:(\\d+):p$_sessionProtocolVersion:perl\$',
+      );
       final readySingle = singleProcessSession
           ? first.startsWith('$marker:ready:')
           : readyOwned.hasMatch(first);
@@ -408,12 +410,9 @@ Future<BoundedRunResult> runBounded(
       }
       owned.controlSocket = socket;
       owned.controlSink = socket;
-      unawaited(_listenSessionControl(
-        owned,
-        channelStarted!,
-        startup,
-        marker: marker,
-      ));
+      unawaited(
+        _listenSessionControl(owned, channelStarted!, startup, marker: marker),
+      );
     }());
   }
   if (owned == null) startup.complete();
@@ -446,14 +445,17 @@ Future<BoundedRunResult> runBounded(
       }
     }());
   }
+
   duplex?._stop = () => stopOwned(deadlineExpired: false);
   Timer? deadlineTimer;
   final inputDone = Completer<void>();
   String? inputProblem;
   if (duplex != null) {
-    unawaited(duplex._inputClosed.future.then((_) {
-      inputDone.complete();
-    }));
+    unawaited(
+      duplex._inputClosed.future.then((_) {
+        inputDone.complete();
+      }),
+    );
   } else if (input == null) {
     inputDone.complete();
   } else {
@@ -493,6 +495,7 @@ Future<BoundedRunResult> runBounded(
       if (!inputDone.isCompleted) inputDone.complete();
     }
   }
+
   // Session acknowledgement is stripped from stderr; argv, target output and
   // working directory stay unchanged. Observers cannot cancel before capture
   // and the deadline own the complete process/pipe lifetime.
@@ -579,16 +582,11 @@ Future<BoundedRunResult> runBounded(
   if (owned != null && !singleProcessSession) {
     if (!owned.settleAcknowledged.isCompleted) {
       await _requestSessionSettle(owned);
-      await owned.settleAcknowledged.future.timeout(
-        grace,
-        onTimeout: () {},
-      );
+      await owned.settleAcknowledged.future.timeout(grace, onTimeout: () {});
     }
     await owned.disposeControl();
   }
-  final signaled = fired || ownerStopped
-      ? await ladder.future
-      : const <int>[];
+  final signaled = fired || ownerStopped ? await ladder.future : const <int>[];
   final streamsComplete = outDone.isCompleted && errDone.isCompleted;
   if (!streamsComplete) {
     await outSubscription.cancel();
@@ -775,10 +773,7 @@ Future<Set<int>?> _ownedGroupMembers(_OwnedProcessGroup owned) async {
   if (rows == null) return null;
   final members = <int>{
     for (final (pid, _, group, stat) in rows)
-      if (owned.ready &&
-          group == owned.process.pid &&
-          !stat.contains('Z'))
-        pid,
+      if (owned.ready && group == owned.process.pid && !stat.contains('Z')) pid,
   };
   if (owned.ready && owned.rootExited && members.isEmpty) {
     // Once the admitted group disappears, never reacquire a recycled ID.
@@ -873,7 +868,8 @@ Future<List<int>> _stopOwnedProcessGroupBody(
   if (!owned.rootExited) {
     final members = await _ownedGroupMembers(owned);
     final snapshot = Set<int>.from(owned.observedMembers);
-    final refuseRootKill = owned.clearedPsObservationStop ||
+    final refuseRootKill =
+        owned.clearedPsObservationStop ||
         members == null && snapshot.isEmpty ||
         (members != null && members.isEmpty && owned.ready) ||
         (members == null && owned.ready);
@@ -887,7 +883,8 @@ Future<List<int>> _stopOwnedProcessGroupBody(
 /// When set, replaces live owned-group `ps` enumeration and the pre-spawn
 /// `runBounded` observation probe for the whole isolate (`@visibleForTesting`).
 @visibleForTesting
-Future<List<(int, int, int, String)>?> Function()? boundedProcessGroupRowsOverride;
+Future<List<(int, int, int, String)>?> Function()?
+boundedProcessGroupRowsOverride;
 
 /// Live `ps` read without applying [boundedProcessGroupRowsOverride].
 @visibleForTesting
@@ -920,9 +917,10 @@ Future<List<(int, int, int, String)>?> _groupRows() async {
 }
 
 Future<List<(int, int, int, String)>?> _readGroupRowsFromPs() async {
-  final output = await _runPsObservation(
-    const ['-eo', 'pid=,ppid=,pgid=,stat='],
-  );
+  final output = await _runPsObservation(const [
+    '-eo',
+    'pid=,ppid=,pgid=,stat=',
+  ]);
   if (output == null) return null;
   final rows = <(int, int, int, String)>[];
   for (final line in output.split('\n')) {
