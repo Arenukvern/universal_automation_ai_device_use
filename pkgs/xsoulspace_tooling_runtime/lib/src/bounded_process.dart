@@ -310,6 +310,19 @@ Future<BoundedRunResult> runBounded(
   final failureBytes = utf8.encode('$marker:error:');
   void captureStatus(List<int> chunk) {
     if (startup.isCompleted) {
+      if (singleProcessSession && startupError == null) {
+        final failed = _byteSequenceIndex(chunk, failureBytes);
+        if (failed >= 0) {
+          final end = chunk.indexOf(10, failed);
+          if (end >= 0) {
+            startupFailureReported = true;
+            startupError = utf8.decode(
+              chunk.sublist(failed + failureBytes.length, end),
+              allowMalformed: true,
+            );
+          }
+        }
+      }
       err.add(chunk);
       return;
     }
@@ -336,10 +349,25 @@ Future<BoundedRunResult> runBounded(
       return;
     }
     statusBytes.addAll(chunk);
+    final failed = _byteSequenceIndex(statusBytes, failureBytes);
+    if (failed >= 0) {
+      final end = statusBytes.indexOf(10, failed);
+      if (end >= 0) {
+        startupFailureReported = true;
+        startupError = utf8.decode(
+          statusBytes.sublist(failed + failureBytes.length, end),
+          allowMalformed: true,
+        );
+        err.add(statusBytes.sublist(0, failed));
+        err.add(statusBytes.sublist(end + 1));
+        statusBytes.clear();
+        startup.complete();
+        return;
+      }
+    }
     final started = startedBytes == null
         ? -1
         : _byteSequenceIndex(statusBytes, startedBytes);
-    final failed = _byteSequenceIndex(statusBytes, failureBytes);
     if (started >= 0) {
       err.add(statusBytes.sublist(0, started));
       err.add(statusBytes.sublist(started + startedBytes!.length));
