@@ -30,6 +30,8 @@ import 'dart:math';
 
 import 'package:meta/meta.dart';
 
+import 'owned_session_launch_embed.dart';
+
 part 'bounded_duplex.dart';
 part 'bounded_session_protocol.dart';
 
@@ -115,8 +117,7 @@ final class BoundedRunResult {
       exitCode == 0 &&
       survivors.isEmpty &&
       settlementProblem == null &&
-      inputProblem == null &&
-      transportProblem == null;
+      inputProblem == null && transportProblem == null;
 }
 
 /// Runs [executable] with [arguments] under [deadline]: on timeout the
@@ -233,7 +234,7 @@ Future<BoundedRunResult> runBounded(
           : [
               '-MPOSIX',
               '-e',
-              _ownedSessionLaunch,
+              ownedSessionLaunchEmbed,
               '--',
               '--protocol',
               _sessionProtocolVersion,
@@ -273,6 +274,7 @@ Future<BoundedRunResult> runBounded(
           process,
           controlBinding: controlBinding,
           marker: marker,
+          tightDeadline: deadline < const Duration(seconds: 1),
         );
   if (owned != null) {
     _ownedProcessGroups[process.pid] = owned;
@@ -356,9 +358,8 @@ Future<BoundedRunResult> runBounded(
       final end = header.indexOf(10);
       if (end < 0) return;
       final first = utf8.decode(header.sublist(0, end), allowMalformed: true);
-      final readyOwned = RegExp(
-        '^$marker:ready:(\\d+):p$_sessionProtocolVersion:perl\$',
-      );
+      final readyOwned =
+          RegExp('^$marker:ready:(\\d+):p$_sessionProtocolVersion:perl\$');
       final readySingle = singleProcessSession
           ? first.startsWith('$marker:ready:')
           : readyOwned.hasMatch(first);
@@ -402,9 +403,12 @@ Future<BoundedRunResult> runBounded(
       }
       owned.controlSocket = socket;
       owned.controlSink = socket;
-      unawaited(
-        _listenSessionControl(owned, channelStarted!, startup, marker: marker),
-      );
+      unawaited(_listenSessionControl(
+        owned,
+        channelStarted!,
+        startup,
+        marker: marker,
+      ));
     }());
   }
   if (owned == null) startup.complete();
@@ -422,6 +426,9 @@ Future<BoundedRunResult> runBounded(
     if (finished || fired || ownerStopped) return;
     fired = deadlineExpired;
     ownerStopped = !deadlineExpired;
+    if (owned?.tightDeadline == true) {
+      owned!.deadlineArmed = false;
+    }
     unawaited(() async {
       try {
         ladder.complete(
@@ -434,17 +441,14 @@ Future<BoundedRunResult> runBounded(
       }
     }());
   }
-
   duplex?._stop = () => stopOwned(deadlineExpired: false);
-  final timer = Timer(deadline, () => stopOwned(deadlineExpired: true));
+  Timer? deadlineTimer;
   final inputDone = Completer<void>();
   String? inputProblem;
   if (duplex != null) {
-    unawaited(
-      duplex._inputClosed.future.then((_) {
-        inputDone.complete();
-      }),
-    );
+    unawaited(duplex._inputClosed.future.then((_) {
+      inputDone.complete();
+    }));
   } else if (input == null) {
     inputDone.complete();
   } else {
@@ -459,8 +463,18 @@ Future<BoundedRunResult> runBounded(
   Future<void> startAdmittedInput() async {
     if (input == null || duplex != null || inputDone.isCompleted) return;
     try {
-      process.stdin.add(input);
-      await process.stdin.flush();
+      const chunkSize = 64 * 1024;
+      for (var offset = 0; offset < input.length; offset += chunkSize) {
+        if (fired || ownerStopped) {
+          inputProblem ??= 'admitted stdin did not settle after deadline';
+          return;
+        }
+        final end = offset + chunkSize > input.length
+            ? input.length
+            : offset + chunkSize;
+        process.stdin.add(input.sublist(offset, end));
+        await process.stdin.flush();
+      }
       try {
         await process.stdin.close();
       } on Object catch (error) {
@@ -474,7 +488,6 @@ Future<BoundedRunResult> runBounded(
       if (!inputDone.isCompleted) inputDone.complete();
     }
   }
-
   // Session acknowledgement is stripped from stderr; argv, target output and
   // working directory stay unchanged. Observers cannot cancel before capture
   // and the deadline own the complete process/pipe lifetime.
@@ -483,8 +496,11 @@ Future<BoundedRunResult> runBounded(
     await channelStarted.future;
     startupError = owned?.controlFailure;
   }
+  if (startupError == null) {
+    deadlineTimer = Timer(deadline, () => stopOwned(deadlineExpired: true));
+  }
   if (startupError == null && input != null && duplex == null) {
-    await startAdmittedInput();
+    unawaited(startAdmittedInput());
   }
   if (startupError == null && duplex != null) {
     try {
@@ -514,7 +530,8 @@ Future<BoundedRunResult> runBounded(
           return;
         }
         final members = await _ownedGroupMembers(owned);
-        if (!owned.settleRequested &&
+        if (!owned._deadlineBlocksSettle &&
+            !owned.settleRequested &&
             owned.reportedWaitStatus != null &&
             members != null &&
             await _onlyLeaderRemainsLive(members, owned)) {
@@ -553,15 +570,20 @@ Future<BoundedRunResult> runBounded(
     }),
   ]);
   finished = true;
-  timer.cancel();
+  deadlineTimer?.cancel();
   if (owned != null && !singleProcessSession) {
     if (!owned.settleAcknowledged.isCompleted) {
       await _requestSessionSettle(owned);
-      await owned.settleAcknowledged.future.timeout(grace, onTimeout: () {});
+      await owned.settleAcknowledged.future.timeout(
+        grace,
+        onTimeout: () {},
+      );
     }
     await owned.disposeControl();
   }
-  final signaled = fired || ownerStopped ? await ladder.future : const <int>[];
+  final signaled = fired || ownerStopped
+      ? await ladder.future
+      : const <int>[];
   final streamsComplete = outDone.isCompleted && errDone.isCompleted;
   if (!streamsComplete) {
     await outSubscription.cancel();
@@ -669,131 +691,6 @@ print STDERR "target exec failed: $!\n";
 exit 127;
 ''';
 
-const _ownedSessionLaunch = r'''
-use Fcntl qw(F_SETFD FD_CLOEXEC);
-use IO::Socket::UNIX;
-use POSIX qw(WNOHANG);
-use Socket qw(SOCK_STREAM);
-sub emit_error {
-  my ($marker, $stage, $errno) = @_;
-  print STDERR "$marker:error:$stage:$errno\n";
-  exit(1);
-}
-my %opt;
-while (@ARGV && $ARGV[0] =~ /^--/) {
-  my $key = shift @ARGV;
-  if ($key eq '--protocol') { $opt{protocol} = shift @ARGV; }
-  elsif ($key eq '--mode') { $opt{mode} = shift @ARGV; }
-  elsif ($key eq '--marker') { $opt{marker} = shift @ARGV; }
-  elsif ($key eq '--control') { $opt{control} = shift @ARGV; }
-  elsif ($key eq '--') { last; }
-  else { shift @ARGV; }
-}
-my $marker = $opt{marker} || emit_error('', 'args', 'marker');
-emit_error($marker, 'protocol', 'version') unless ($opt{protocol} || '') eq '1';
-emit_error($marker, 'mode', 'owned') unless ($opt{mode} || '') eq 'owned';
-my $ctl_path = $opt{control} || emit_error($marker, 'control', 'path');
-select STDERR; $| = 1;
-my $sid = POSIX::setsid();
-emit_error($marker, 'setsid', $!+0) if $sid < 0;
-print STDERR "$marker:ready:$sid:p1:perl\n";
-my $sock = IO::Socket::UNIX->new(Type => SOCK_STREAM, Peer => $ctl_path);
-emit_error($marker, 'control', $!+0) unless $sock;
-print $sock "$marker\n";
-$sock->flush();
-pipe(my $read_error, my $write_error) or emit_error($marker, 'pipe', $!+0);
-my $child = fork();
-emit_error($marker, 'fork', $!+0) unless defined $child;
-if ($child == 0) {
-  close($read_error);
-  fcntl($write_error, F_SETFD, FD_CLOEXEC) or do {
-    print $write_error "exec pipe: $!"; exit(1);
-  };
-  exec { $ARGV[0] } @ARGV;
-  print $write_error "exec: $!";
-  close($write_error);
-  exit(1);
-}
-my $main_status = 0;
-my $main_reported = 0;
-my $exit_sent = 0;
-close($write_error);
-my $error = '';
-while (sysread($read_error, my $buffer, 4096)) { $error .= $buffer; }
-close($read_error);
-if (length($error)) {
-  emit_error($marker, 'exec', $error);
-}
-print $sock "started\n";
-$sock->flush();
-sub report_main_exit {
-  return if $exit_sent;
-  my $reaped = waitpid($child, WNOHANG());
-  return unless $reaped > 0;
-  $main_status = $?;
-  $main_reported = 1;
-  print $sock "exit:$main_status\n";
-  $sock->flush();
-  $exit_sent = 1;
-}
-report_main_exit();
-$SIG{TERM} = 'IGNORE';
-sub read_control_line {
-  my ($handle, $seconds) = @_;
-  my $rin = '';
-  vec($rin, fileno($handle), 1) = 1;
-  my $ready = select($rin, undef, undef, $seconds);
-  return '' if !defined $ready || $ready <= 0;
-  local $/ = "\n";
-  my $line = <$handle>;
-  return undef unless defined $line;
-  return $line;
-}
-my $settled = 0;
-while (!$settled) {
-  report_main_exit();
-  my $line = read_control_line($sock, 0.2);
-  last unless defined $line;
-  next if $line eq '';
-  chomp $line;
-  if ($line eq 'term') {
-    kill 15, 0;
-    kill 18, 0;
-    print $sock "term-forwarded\n";
-    $sock->flush();
-  } elsif ($line eq 'kill') {
-    print $sock "killed-group\n";
-    $sock->flush();
-    kill 9, 0;
-    $sock->flush();
-  } elsif ($line eq 'settle') {
-    print $sock "settled\n";
-    $sock->flush();
-    $settled = 1;
-  }
-}
-unless ($settled) {
-  kill 9, 0;
-  eval { print $sock "unsettled:host-eof\n"; $sock->flush(); };
-  exit(1);
-}
-if (!$main_reported) {
-  my $reaped = waitpid($child, WNOHANG());
-  if ($reaped > 0) {
-    $main_status = $?;
-    $main_reported = 1;
-  }
-}
-my $status = $main_reported ? $main_status : 0;
-if ($status & 127) {
-  my $sig = $status & 127;
-  $SIG{$sig} = 'DEFAULT';
-  kill $sig, $$;
-  exit(128 + $sig);
-}
-exit($status >> 8);
-''';
-
 int _byteSequenceIndex(List<int> bytes, List<int> needle) {
   outer:
   for (var i = 0; i <= bytes.length - needle.length; i++) {
@@ -807,8 +704,21 @@ int _byteSequenceIndex(List<int> bytes, List<int> needle) {
 
 final _ownedProcessGroups = <int, _OwnedProcessGroup>{};
 
+/// Non-zero while [_stopOwnedProcessGroup] is on the stack (`@visibleForTesting`).
+@visibleForTesting
+int ownedGroupStopInProgress = 0;
+
+/// Incremented at the start of each [_stopOwnedProcessGroupBody] (`@visibleForTesting`).
+@visibleForTesting
+int ownedGroupStopPass = 0;
+
 final class _OwnedProcessGroup {
-  _OwnedProcessGroup(this.process, {required this.marker, this.controlBinding});
+  _OwnedProcessGroup(
+    this.process, {
+    required this.marker,
+    this.controlBinding,
+    required this.tightDeadline,
+  }) : deadlineArmed = tightDeadline;
 
   final Process process;
   final String marker;
@@ -819,8 +729,14 @@ final class _OwnedProcessGroup {
   bool rootExited = false;
   bool externallyStopped = false;
   bool groupGone = false;
+  bool deferSigkillEscalation = false;
+  bool clearedPsObservationStop = false;
   bool settleRequested = false;
+  final bool tightDeadline;
+  bool deadlineArmed;
   final settleAcknowledged = Completer<void>();
+
+  bool get _deadlineBlocksSettle => tightDeadline && deadlineArmed;
   int? reportedWaitStatus;
   String? unsettledReason;
   String? controlFailure;
@@ -853,7 +769,10 @@ Future<Set<int>?> _ownedGroupMembers(_OwnedProcessGroup owned) async {
   if (rows == null) return null;
   final members = <int>{
     for (final (pid, _, group, stat) in rows)
-      if (owned.ready && group == owned.process.pid && !stat.contains('Z')) pid,
+      if (owned.ready &&
+          group == owned.process.pid &&
+          !stat.contains('Z'))
+        pid,
   };
   if (owned.ready && owned.rootExited && members.isEmpty) {
     // Once the admitted group disappears, never reacquire a recycled ID.
@@ -869,6 +788,19 @@ Future<List<int>> _stopOwnedProcessGroup(
   _OwnedProcessGroup owned, {
   required Duration grace,
 }) async {
+  ownedGroupStopInProgress++;
+  try {
+    return await _stopOwnedProcessGroupBody(owned, grace: grace);
+  } finally {
+    ownedGroupStopInProgress--;
+  }
+}
+
+Future<List<int>> _stopOwnedProcessGroupBody(
+  _OwnedProcessGroup owned, {
+  required Duration grace,
+}) async {
+  ownedGroupStopPass++;
   final signaled = <int>{};
   Future<bool> signal(ProcessSignal value) async {
     final snapshot = Set<int>.from(owned.observedMembers);
@@ -878,6 +810,7 @@ Future<List<int>> _stopOwnedProcessGroup(
       // Unavailable observation is not death certification (ADR 0066).
       if (owned.rootExited) return false;
       if (snapshot.isEmpty) return false;
+      if (owned.ready && owned.clearedPsObservationStop) return false;
       signaled.addAll(snapshot);
       if (!owned.rootExited && await _sendOwnedControl(owned, command)) {
         return true;
@@ -888,7 +821,16 @@ Future<List<int>> _stopOwnedProcessGroup(
       // Cleared observation with a live supervisor is not group death (ADR 0066).
       if (!owned.ready && !owned.rootExited) {
         if (owned.process.kill(value)) signaled.add(owned.process.pid);
+      } else if (!owned.rootExited && snapshot.isNotEmpty) {
+        signaled.addAll(snapshot);
+        owned.clearedPsObservationStop = true;
+        owned.deferSigkillEscalation = true;
+        return true;
       }
+      return signaled.isNotEmpty;
+    }
+    if (value == ProcessSignal.sigkill &&
+        await _onlyLeaderRemainsLive(members, owned)) {
       return signaled.isNotEmpty;
     }
     signaled.addAll(members);
@@ -912,7 +854,9 @@ Future<List<int>> _stopOwnedProcessGroup(
     }
     await Future<void>.delayed(const Duration(milliseconds: 20));
   }
-  await signal(ProcessSignal.sigkill);
+  if (!owned.clearedPsObservationStop) {
+    await signal(ProcessSignal.sigkill);
+  }
   end = DateTime.now().add(grace);
   while (DateTime.now().isBefore(end)) {
     if (owned.rootExited) break;
@@ -923,9 +867,10 @@ Future<List<int>> _stopOwnedProcessGroup(
   if (!owned.rootExited) {
     final members = await _ownedGroupMembers(owned);
     final snapshot = Set<int>.from(owned.observedMembers);
-    final refuseRootKill =
+    final refuseRootKill = owned.clearedPsObservationStop ||
         members == null && snapshot.isEmpty ||
-        (members != null && members.isEmpty && owned.ready);
+        (members != null && members.isEmpty && owned.ready) ||
+        (members == null && owned.ready);
     if (!refuseRootKill && owned.process.kill(ProcessSignal.sigkill)) {
       signaled.add(owned.process.pid);
     }
@@ -936,8 +881,7 @@ Future<List<int>> _stopOwnedProcessGroup(
 /// When set, replaces live owned-group `ps` enumeration and the pre-spawn
 /// `runBounded` observation probe for the whole isolate (`@visibleForTesting`).
 @visibleForTesting
-Future<List<(int, int, int, String)>?> Function()?
-boundedProcessGroupRowsOverride;
+Future<List<(int, int, int, String)>?> Function()? boundedProcessGroupRowsOverride;
 
 /// Live `ps` read without applying [boundedProcessGroupRowsOverride].
 @visibleForTesting
@@ -970,20 +914,12 @@ Future<List<(int, int, int, String)>?> _groupRows() async {
 }
 
 Future<List<(int, int, int, String)>?> _readGroupRowsFromPs() async {
-  final ProcessResult result;
-  try {
-    result = await Process.run('ps', const [
-      '-eo',
-      'pid=,ppid=,pgid=,stat=',
-    ]).timeout(_groupObservationBudget);
-  } on TimeoutException {
-    return null;
-  } on Object {
-    return null;
-  }
-  if (result.exitCode != 0) return null;
+  final output = await _runPsObservation(
+    const ['-eo', 'pid=,ppid=,pgid=,stat='],
+  );
+  if (output == null) return null;
   final rows = <(int, int, int, String)>[];
-  for (final line in (result.stdout as String).split('\n')) {
+  for (final line in output.split('\n')) {
     final parts = line.trim().split(RegExp(r'\s+'));
     if (parts.length != 4 || parts[3].startsWith('Z')) continue;
     final values = [for (final value in parts.take(3)) int.tryParse(value)];
@@ -1017,6 +953,15 @@ Future<List<int>> stopProcessTree(
     owned.externallyStopped = true;
     return _stopOwnedProcessGroup(owned, grace: grace);
   }
+  return const [];
+}
+
+/// Legacy `ps` tree stop for processes **not** admitted by [runBounded].
+@visibleForTesting
+Future<List<int>> stopUnownedPosixProcessTree(
+  int rootPid, {
+  Duration grace = const Duration(seconds: 5),
+}) async {
   final signaled = <int>{...await _processTree(rootPid)};
   _signalAll(signaled, ProcessSignal.sigterm);
   final graceEnd = DateTime.now().add(grace);
@@ -1026,8 +971,6 @@ Future<List<int>> stopProcessTree(
     alive = await _stillAlive(signaled);
   }
   if (alive.isEmpty) return signaled.toList()..sort();
-  // The KILL rung: re-enumerate BEFORE the signal (children spawned
-  // under TERM are caught too), then verify death — no fire-and-forget.
   final beforeKill = <int>{...signaled, ...await _processTree(rootPid)};
   _signalAll(beforeKill, ProcessSignal.sigkill);
   final killEnd = DateTime.now().add(grace);
@@ -1063,15 +1006,10 @@ Future<Set<int>> _processTree(int rootPid) async {
 /// excluded — a dead-but-unreaped pid is NOT alive. Null when `ps` is
 /// unavailable (Windows).
 Future<List<(int, int, String)>?> _psRows() async {
-  final ProcessResult result;
-  try {
-    result = await Process.run('ps', const ['-eo', 'pid=,ppid=,stat=']);
-  } on Object {
-    return null;
-  }
-  if (result.exitCode != 0) return null;
+  final output = await _runPsObservation(const ['-eo', 'pid=,ppid=,stat=']);
+  if (output == null) return null;
   final rows = <(int, int, String)>[];
-  for (final line in (result.stdout as String).split('\n')) {
+  for (final line in output.split('\n')) {
     final parts = line.trim().split(RegExp(r'\s+'));
     if (parts.length < 2) continue;
     final pid = int.tryParse(parts[0]);
@@ -1082,6 +1020,36 @@ Future<List<(int, int, String)>?> _psRows() async {
     rows.add((pid, ppid, stat));
   }
   return rows;
+}
+
+Future<String?> _runPsObservation(
+  List<String> args, {
+  Duration budget = _groupObservationBudget,
+}) async {
+  Process? process;
+  try {
+    process = await Process.start('ps', args);
+    final stdoutFuture = process.stdout.fold<List<int>>(
+      <int>[],
+      (previous, chunk) => [...previous, ...chunk],
+    );
+    final exitCode = await process.exitCode.timeout(
+      budget,
+      onTimeout: () {
+        process!.kill(ProcessSignal.sigkill);
+        return -999;
+      },
+    );
+    if (exitCode == -999 || exitCode != 0) {
+      process.kill(ProcessSignal.sigkill);
+      return null;
+    }
+    final buffer = await stdoutFuture;
+    return utf8.decode(buffer, allowMalformed: true);
+  } on Object {
+    process?.kill(ProcessSignal.sigkill);
+    return null;
+  }
 }
 
 void _signalAll(Iterable<int> pids, ProcessSignal signal) {
@@ -1112,10 +1080,17 @@ Future<Set<int>> _stillAlive(Iterable<int> pids) async {
 /// Retain ownership of reported survivors until observation proves settlement.
 /// This is a read-only wait, never another signal against a possibly reused
 /// identity. Unavailable observation cannot certify death.
-Future<void> awaitProcessSettlement(Iterable<int> ownedPids) async {
+Future<void> awaitProcessSettlement(
+  Iterable<int> ownedPids, {
+  Duration budget = const Duration(seconds: 30),
+}) async {
+  final end = DateTime.now().add(budget);
   var remaining = ownedPids.toSet();
-  while (remaining.isNotEmpty) {
-    remaining = await _stillAlive(remaining);
+  while (remaining.isNotEmpty && DateTime.now().isBefore(end)) {
+    final rows = await _psRows();
+    if (rows == null) return;
+    final live = rows.map((row) => row.$1).toSet();
+    remaining = remaining.intersection(live);
     if (remaining.isNotEmpty) {
       await Future<void>.delayed(const Duration(milliseconds: 100));
     }

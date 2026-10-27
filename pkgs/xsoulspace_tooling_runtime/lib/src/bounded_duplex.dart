@@ -14,12 +14,8 @@ final class BoundedDuplexLimits {
   final int maxInputBytes;
   final int maxWrites;
   final int maxQueuedFrames;
-  bool get valid =>
-      maxFrameBytes > 0 &&
-      maxOutputBytes > 0 &&
-      maxInputBytes > 0 &&
-      maxWrites > 0 &&
-      maxQueuedFrames > 0;
+  bool get valid => maxFrameBytes > 0 && maxOutputBytes > 0 &&
+      maxInputBytes > 0 && maxWrites > 0 && maxQueuedFrames > 0;
 }
 
 /// IO projection of the existing native process owner; grants no authority.
@@ -27,11 +23,9 @@ final class BoundedDuplexLimits {
 /// paused. Refusal enters the same owner termination/settlement ladder.
 final class BoundedDuplexHandle {
   BoundedDuplexHandle._(this._input, this.limits) {
-    unawaited(
-      _input.done.catchError((Object _) {
-        _refuse('duplex_input_failed');
-      }),
-    );
+    unawaited(_input.done.catchError((Object _) {
+      _refuse('duplex_input_failed');
+    }));
   }
   final IOSink _input;
   final BoundedDuplexLimits limits;
@@ -149,7 +143,6 @@ final class _DuplexStringSink implements StringSink {
   void write(Object? object) {
     unawaited(owner.send(utf8.encode('$object')).catchError((Object _) {}));
   }
-
   @override
   void writeln([Object? object = '']) => write('$object\n');
   @override

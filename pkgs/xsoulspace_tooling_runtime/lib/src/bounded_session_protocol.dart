@@ -86,8 +86,7 @@ Future<void> _listenSessionControl(
         buffer.removeRange(0, index + 1);
         if (!authenticated) {
           if (line != marker) {
-            owned.controlFailure =
-                'owned session control authentication failed';
+            owned.controlFailure = 'owned session control authentication failed';
             if (!startup.isCompleted) startup.complete();
             if (!channelStarted.isCompleted) channelStarted.complete();
             return;
@@ -133,7 +132,12 @@ void _handleSessionControlLine(
 }
 
 Future<void> _maybeSettleAfterTargetExit(_OwnedProcessGroup owned) async {
-  if (owned.reportedWaitStatus == null || owned.settleRequested) return;
+  if (owned.externallyStopped ||
+      owned.reportedWaitStatus == null ||
+      owned.settleRequested ||
+      owned._deadlineBlocksSettle) {
+    return;
+  }
   final members = await _ownedGroupMembers(owned);
   if (members == null) return;
   if (!await _onlyLeaderRemainsLive(members, owned)) return;
@@ -158,6 +162,10 @@ Future<void> _watchSessionSettle(_OwnedProcessGroup owned) async {
     if (owned.externallyStopped) {
       return;
     }
+    if (owned._deadlineBlocksSettle) {
+      await Future<void>.delayed(const Duration(milliseconds: 20));
+      continue;
+    }
     final members = await _ownedGroupMembers(owned);
     if (members == null) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
@@ -173,7 +181,7 @@ Future<void> _watchSessionSettle(_OwnedProcessGroup owned) async {
 }
 
 Future<void> _requestSessionSettle(_OwnedProcessGroup owned) async {
-  if (owned.settleRequested) return;
+  if (owned.externallyStopped || owned.settleRequested) return;
   owned.settleRequested = true;
   await _sendOwnedControl(owned, 'settle');
 }
