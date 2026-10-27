@@ -38,6 +38,7 @@ void main() {
         );
         final root = await started.future;
         addTearDown(() async {
+          await stopOwnedGroup(root, grace: const Duration(seconds: 2));
           boundedProcessGroupRowsOverride = null;
           final member = File('${directory.path}/member.pid');
           if (member.existsSync()) {
@@ -50,7 +51,6 @@ void main() {
               // Member may already be dead after SIGKILL.
             }
           }
-          await stopProcessTree(root, grace: const Duration(seconds: 2));
           directory.deleteSync(recursive: true);
         });
 
