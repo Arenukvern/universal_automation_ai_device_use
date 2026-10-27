@@ -516,6 +516,193 @@ void main() {
       },
     );
 
+    test('refuses bad protocol version on stderr', () async {
+      final stderr = StringBuffer();
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '2',
+        '--mode',
+        'owned',
+        '--marker',
+        'm_proto',
+        '--control',
+        '/no/such.sock',
+        '--',
+        'true',
+      ]);
+      leader.stderr.transform(utf8.decoder).listen(stderr.write);
+      final code = await leader.exitCode.timeout(const Duration(seconds: 5));
+      expect(code, isNot(0));
+      expect(stderr.toString(), contains('m_proto:error:protocol:'));
+    });
+
+    test('refuses --mode single on the owned leader', () async {
+      final stderr = StringBuffer();
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'single',
+        '--marker',
+        'm_mode',
+        '--control',
+        '/no/such.sock',
+        '--',
+        'true',
+      ]);
+      leader.stderr.transform(utf8.decoder).listen(stderr.write);
+      await leader.exitCode.timeout(const Duration(seconds: 5));
+      expect(stderr.toString(), contains('m_mode:error:mode:'));
+    });
+
+    test('refuses unknown flags', () async {
+      final stderr = StringBuffer();
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        'm_flag',
+        '--future-flag',
+        'value',
+        '--control',
+        '/no/such.sock',
+        '--',
+        'true',
+      ]);
+      leader.stderr.transform(utf8.decoder).listen(stderr.write);
+      await leader.exitCode.timeout(const Duration(seconds: 5));
+      expect(stderr.toString(), contains('m_flag:error:args:unknown-flag:'));
+    });
+
+    test('refuses fractional --graceful-timeout', () async {
+      final stderr = StringBuffer();
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        'm_frac',
+        '--graceful-timeout',
+        '0.5',
+        '--control',
+        '/no/such.sock',
+        '--',
+        'true',
+      ]);
+      leader.stderr.transform(utf8.decoder).listen(stderr.write);
+      await leader.exitCode.timeout(const Duration(seconds: 5));
+      expect(stderr.toString(), contains('m_frac:error:args:graceful-timeout'));
+    });
+
+    test('unknown control commands are ignored until a valid command', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'm_unknown_cmd';
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sleep',
+        '3600',
+      ]);
+      addTearDown(() async {
+        leader.kill(ProcessSignal.sigkill);
+        await leader.exitCode.timeout(const Duration(seconds: 2));
+      });
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      client.writeln('not-a-command');
+      await client.flush();
+      client.writeln('kill');
+      await client.flush();
+      expect(await _expectKilledGroup(lines), 'killed-group');
+      await client.close();
+    });
+
+    test('exit: and settle returns settled with clean exit code', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'm_settle';
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'true',
+      ]);
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      expect(await lines.next(), startsWith('exit:'));
+      client.writeln('settle');
+      await client.flush();
+      expect(await lines.next(), 'settled');
+      await client.close();
+      expect(await leader.exitCode.timeout(const Duration(seconds: 5)), 0);
+    });
+
+    test('signal-encoded child exit is re-raised by the leader', () async {
+      final binding = await _bindControl();
+      addTearDown(() => binding.dispose());
+      const marker = 'm_sig';
+      final leader = await Process.start(perl, [
+        leaderScript,
+        '--protocol',
+        '1',
+        '--mode',
+        'owned',
+        '--marker',
+        marker,
+        '--control',
+        binding.socketPath,
+        '--',
+        'sh',
+        '-c',
+        r'sleep 30 & (sleep 0.2; kill -TERM $$) & wait',
+      ]);
+      final client = await binding.server.first.timeout(
+        const Duration(seconds: 5),
+      );
+      final lines = _LineReader(client);
+      expect(await lines.next(), marker);
+      expect(await lines.next(), 'started');
+      final exitLine = await lines.next();
+      expect(exitLine, startsWith('exit:'));
+      client.writeln('settle');
+      await client.flush();
+      expect(await lines.next(), 'settled');
+      await client.close();
+      final code = await leader.exitCode.timeout(const Duration(seconds: 5));
+      expect(code, lessThan(0), reason: 'leader should die from re-raised signal');
+    });
+
     test(
       'control EOF kills the admitted target (host-death guard)',
       () async {
