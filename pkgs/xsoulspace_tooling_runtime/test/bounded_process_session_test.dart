@@ -40,36 +40,43 @@ void main() {
     );
   }
 
-  test('external cancellation after root exit preserves unrelated process', () async {
-    final unrelated = await Process.start('sleep', ['30']);
-    addTearDown(() async {
-      unrelated.kill();
-      await unrelated.exitCode;
-    });
-    final started = Completer<int>();
-    final running = runBounded(
-      'sh',
-      ['-c', r'sleep 30 & echo $!; exit 0'],
-      deadline: const Duration(seconds: 20),
-      onStarted: started.complete,
-    );
-    final root = await started.future;
-    // Target shell exited; the Perl supervisor stays until the group is empty.
-    expect((await Process.run('kill', ['-0', '$root'])).exitCode, 0);
-    final stopped = await stopProcessTree(
-      root,
-      grace: const Duration(milliseconds: 300),
-    );
-    final result = await running;
-    final child = int.parse(result.stdout.trim());
-    expect(stopped, contains(child));
-    expect(result.cause, BoundedProcessCause.signaled);
-    expect(result.ok, isFalse);
-    expect(result.survivors, isEmpty);
-    expect(result.settlementProblem, isNull);
-    expect((await Process.run('kill', ['-0', '$child'])).exitCode, isNot(0));
-    expect((await Process.run('kill', ['-0', '${unrelated.pid}'])).exitCode, 0);
-  }, skip: Platform.isWindows ? 'POSIX session ownership' : null);
+  test(
+    'external cancellation after root exit preserves unrelated process',
+    () async {
+      final unrelated = await Process.start('sleep', ['30']);
+      addTearDown(() async {
+        unrelated.kill();
+        await unrelated.exitCode;
+      });
+      final started = Completer<int>();
+      final running = runBounded(
+        'sh',
+        ['-c', r'sleep 30 & echo $!; exit 0'],
+        deadline: const Duration(seconds: 20),
+        onStarted: started.complete,
+      );
+      final root = await started.future;
+      // Target shell exited; the Perl supervisor stays until the group is empty.
+      expect((await Process.run('kill', ['-0', '$root'])).exitCode, 0);
+      final stopped = await stopProcessTree(
+        root,
+        grace: const Duration(milliseconds: 300),
+      );
+      final result = await running;
+      final child = int.parse(result.stdout.trim());
+      expect(stopped, contains(child));
+      expect(result.cause, BoundedProcessCause.signaled);
+      expect(result.ok, isFalse);
+      expect(result.survivors, isEmpty);
+      expect(result.settlementProblem, isNull);
+      expect((await Process.run('kill', ['-0', '$child'])).exitCode, isNot(0));
+      expect(
+        (await Process.run('kill', ['-0', '${unrelated.pid}'])).exitCode,
+        0,
+      );
+    },
+    skip: Platform.isWindows ? 'POSIX session ownership' : null,
+  );
 
   test('session handshake does not alter target argv or stderr', () async {
     final result = await runBounded('/bin/sh', [
