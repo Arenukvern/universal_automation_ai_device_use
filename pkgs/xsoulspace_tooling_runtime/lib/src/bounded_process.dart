@@ -333,7 +333,11 @@ Future<BoundedRunResult> runBounded(
 
   int trailingPartialMarkerPrefix(List<int> bytes) {
     var partialLen = 0;
-    for (var tail = 1; tail < failureBytes.length && tail <= bytes.length; tail++) {
+    for (
+      var tail = 1;
+      tail < failureBytes.length && tail <= bytes.length;
+      tail++
+    ) {
       final suffix = bytes.sublist(bytes.length - tail);
       for (var start = 0; start <= failureBytes.length - tail; start++) {
         var matches = true;

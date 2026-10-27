@@ -62,7 +62,8 @@ void main() {
     expect(
       firstStderrLine,
       matches(RegExp('^$marker:ready:\\d+:p1:perl\$')),
-      reason: 'host must parse ready as the first stderr line (no Perl warnings)',
+      reason:
+          'host must parse ready as the first stderr line (no Perl warnings)',
     );
     final client = await binding.server.first.timeout(
       const Duration(seconds: 5),
