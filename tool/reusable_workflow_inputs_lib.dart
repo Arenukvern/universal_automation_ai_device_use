@@ -179,12 +179,17 @@ Future<String> fetchReusableWorkflowYaml(
   Duration requestTimeout = const Duration(seconds: 30),
   Duration connectTimeout = const Duration(seconds: 15),
 }) async {
-  HttpClient? client;
-  final ownsClient = httpClient == null && testResponseProvider == null;
+  late final HttpClient fetchClient;
+  var closeFetchClient = false;
   if (testResponseProvider == null) {
-    client = httpClient ?? HttpClient();
-    client!.connectionTimeout = connectTimeout;
-    client.idleTimeout = connectTimeout;
+    if (httpClient != null) {
+      fetchClient = httpClient;
+    } else {
+      fetchClient = HttpClient();
+      closeFetchClient = true;
+    }
+    fetchClient.connectionTimeout = connectTimeout;
+    fetchClient.idleTimeout = connectTimeout;
   }
 
   try {
@@ -201,7 +206,7 @@ Future<String> fetchReusableWorkflowYaml(
           return _responseBodyOrThrow(call, synthetic.statusCode, synthetic.body);
         }
         return await _fetchOnce(
-          client!,
+          fetchClient,
           call,
           githubToken: githubToken,
           requestTimeout: requestTimeout,
@@ -221,8 +226,8 @@ Future<String> fetchReusableWorkflowYaml(
       'could not fetch ${call.slug}: $lastError',
     );
   } finally {
-    if (ownsClient) {
-      client?.close(force: true);
+    if (closeFetchClient) {
+      fetchClient.close(force: true);
     }
   }
 }
