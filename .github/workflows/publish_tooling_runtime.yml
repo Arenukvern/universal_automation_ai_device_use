@@ -4,7 +4,7 @@
 # dispatches this after each tooling_runtime release. We intentionally omit on.push.tags
 # so a RELEASE_PLEASE_TOKEN tag push cannot run publish twice (tag push + dispatch).
 # GITHUB_TOKEN tag pushes do not trigger workflows anyway; dispatch is the sole path.
-# Manual recovery: gh workflow run publish_tooling_runtime.yml --ref universal_tooling_runtime-vX.Y.Z
+# Manual recovery: see pkgs/universal_tooling_runtime/README.md (Publishing).
 
 name: Publish universal_tooling_runtime
 
@@ -63,7 +63,8 @@ jobs:
     needs: ci
     permissions:
       id-token: write
+    # dart-lang/setup-dart publish.yml@v1 workflow_call inputs: environment,
+    # working-directory (only). actionlint does not validate remote reusables.
     uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
     with:
       working-directory: pkgs/universal_tooling_runtime
-      use-flutter: false
