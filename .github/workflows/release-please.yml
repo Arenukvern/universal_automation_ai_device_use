@@ -26,7 +26,8 @@ jobs:
         if: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
         run: |
-          TAG='${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}'
           echo "Dispatching publish_tooling_runtime.yml for tag ${TAG}"
-          gh workflow run publish_tooling_runtime.yml --ref "${TAG}"
+          gh workflow run publish_tooling_runtime.yml --repo "${GH_REPO}" --ref "${TAG}"

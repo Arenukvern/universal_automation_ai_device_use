@@ -67,3 +67,13 @@ release certification. See
 [ADR 0006](../../docs/decisions/0006_tooling_runtime_into_ua_workspace.mdx) and
 the [qualification record](doc/evidence/2026-10-13/README.md) (imported from
 dart_flutter_packages).
+
+## Publishing
+
+Releases use [release-please](https://github.com/googleapis/release-please) with
+tag `universal_tooling_runtime-v{{version}}`. Pub.dev publish runs only via
+`workflow_dispatch` (dispatched from `.github/workflows/release-please.yml` on
+each release). There is no `on.push.tags` trigger, so a custom
+`RELEASE_PLEASE_TOKEN` cannot double-fire publish (tag push plus dispatch).
+Manual recovery: `gh workflow run publish_tooling_runtime.yml --ref
+universal_tooling_runtime-vX.Y.Z`.

@@ -1,14 +1,14 @@
 # Publish pkgs/universal_tooling_runtime to pub.dev (OIDC).
-# Triggered by tag push or workflow_dispatch with --ref pointing at the release tag.
-# release-please dispatches workflow_dispatch because GITHUB_TOKEN tag pushes do not
-# fire other workflows.
+#
+# Trigger: workflow_dispatch only (ref must be the release tag). release-please.yml
+# dispatches this after each tooling_runtime release. We intentionally omit on.push.tags
+# so a RELEASE_PLEASE_TOKEN tag push cannot run publish twice (tag push + dispatch).
+# GITHUB_TOKEN tag pushes do not trigger workflows anyway; dispatch is the sole path.
+# Manual recovery: gh workflow run publish_tooling_runtime.yml --ref universal_tooling_runtime-vX.Y.Z
 
 name: Publish universal_tooling_runtime
 
 on:
-  push:
-    tags:
-      - 'universal_tooling_runtime-v[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
 
 permissions:
