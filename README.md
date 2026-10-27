@@ -23,8 +23,10 @@
 laptop, phones and tablets, browsers, and the tiers you add next. The aim is an
 **optimistic, humane** future: people and agents collaborating on real software
 with **consent, receipts, and honest proof** — not unattended takeover of user
-devices. Dart contracts, platform drivers, capture/WebRTC plumbing, lexicon
-packs, plus an MCP + CLI toolkit.
+devices. Dart contracts, platform drivers, capture/WebRTC plumbing, plus an MCP
++ CLI toolkit. Lexicon packs:
+[`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon)
+in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages).
 
 - 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [DX FAQ](docs/DX_FAQ.mdx) + [llms.txt](llms.txt))
 - 🤝 **Contribute:** [guide](docs/contributing/contribution_guide.mdx) · [contributors](docs/contributing/contributors.mdx) · [code of conduct](CODE_OF_CONDUCT.md) · [security](SECURITY.md)
@@ -40,8 +42,8 @@ packs, plus an MCP + CLI toolkit.
 
 This monorepo holds the **universal automation** family: shared `AutomationDriver`
 contracts, semantic projections, conformance tests, platform drivers (macOS, Linux,
-Windows, CDP, WebDriver), screencast/capture helpers, WebRTC sidecars, and
-`universal_lexicon`. The agent-facing CLI and MCP server live in
+Windows, CDP, WebDriver), screencast/capture helpers, and WebRTC sidecars. The
+agent-facing CLI and MCP server live in
 [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/).
 
 ## Packages
@@ -56,7 +58,7 @@ Windows, CDP, WebDriver), screencast/capture helpers, WebRTC sidecars, and
 | `universal_browser_*` ([CDP](https://pub.dev/packages/universal_browser_cdp) · [WebDriver](https://pub.dev/packages/universal_browser_webdriver)) | Browser automation |
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
-| [`universal_lexicon`](pkgs/universal_lexicon/) | Lexicon packs (monorepo only — not on pub.dev yet) |
+| [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) | Lexicon packs in DFP (not vendored here) |
 | [`universal_tooling_runtime`](pkgs/universal_tooling_runtime/) | Bounded process runs, path policy, locks, macOS no-fork verify |
 
 Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).
@@ -105,7 +107,7 @@ steward map
 # Primary gate (also runs in CI):
 dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics \
   pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast \
-  pkgs/universal_lexicon pkgs/universal_webrtc_raw pkgs/universal_tooling_runtime
+  pkgs/universal_webrtc_raw pkgs/universal_tooling_runtime
 ```
 
 Full command list: `steward.yaml` → `stewardship.quality.validate`.

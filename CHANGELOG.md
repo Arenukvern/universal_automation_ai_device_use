@@ -4,6 +4,9 @@ Workspace-level notes. Per-package changelogs live under `pkgs/*/CHANGELOG.md`.
 
 ## Unreleased
 
+- **`universal_lexicon`:** removed from `pkgs/` (re-home to
+  [`dart_flutter_packages` `main`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon);
+  merge UA PR only after the DFP re-home PR lands).
 - **Pub resolution hygiene:** gitignore `pubspec_overrides.yaml`, add
   `pubspec_overrides.yaml.example` and `tool/overrides.sh` for local sibling
   `path:` overrides; CONTRIBUTING/DX FAQ point at overrides instead of

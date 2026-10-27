@@ -32,10 +32,9 @@ dependency_overrides:
   # universal_driver_macos:
   #   path: ../universal_automation_ai_device_use/pkgs/universal_driver_macos
 
-  # --- Unpublished from this repo (class c): use path until pub.dev cut, or ---
-  # --- pinned git ref after a release tag exists: ---
+  # --- Lexicon (dart_flutter_packages, not vendored in UA): ---
   # universal_lexicon:
   #   git:
-  #     url: https://github.com/Arenukvern/universal_automation_ai_device_use.git
+  #     url: https://github.com/xsoulspace/dart_flutter_packages.git
   #     path: pkgs/universal_lexicon
-  #     ref: universal_lexicon-v0.1.0   # example tag — create before adopting
+  #     ref: main   # or a release tag when published

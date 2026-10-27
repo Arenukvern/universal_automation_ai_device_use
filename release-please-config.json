@@ -85,13 +85,6 @@
       "include-component-in-tag": true,
       "bump-minor-pre-major": true
     },
-    "pkgs/universal_lexicon": {
-      "release-type": "dart",
-      "pull-request-title-pattern": "chore(${component}): release ${version}",
-      "package-name": "universal_lexicon",
-      "include-component-in-tag": true,
-      "bump-minor-pre-major": true
-    },
     "pkgs/universal_screencast": {
       "release-type": "dart",
       "pull-request-title-pattern": "chore(${component}): release ${version}",

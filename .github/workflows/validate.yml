@@ -33,6 +33,5 @@ jobs:
             pkgs/universal_automation_conformance \
             pkgs/universal_browser_cdp \
             pkgs/universal_screencast \
-            pkgs/universal_lexicon \
             pkgs/universal_webrtc_raw \
             pkgs/universal_tooling_runtime

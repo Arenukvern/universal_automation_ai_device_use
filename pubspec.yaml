@@ -1,7 +1,7 @@
 name: universal_automation_ai_device_use
 description: >-
   Open-source monorepo: universal automation contracts, drivers, capture,
-  WebRTC, lexicon, and the agent toolkit (MCP + CLI).
+  WebRTC, and the agent toolkit (MCP + CLI).
 publish_to: none
 
 environment:

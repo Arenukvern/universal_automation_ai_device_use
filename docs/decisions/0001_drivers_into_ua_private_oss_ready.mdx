@@ -15,15 +15,21 @@ dependency order when credentials allow.
 
 ## Stay in DFP
 
-- `universal_storage_*`, `universal_lexicon`
+- `universal_storage_*`
 - `xsoulspace_permission_core`, `xsoulspace_lints` (path/git overrides until
   consumers resolve hosted)
+
+**Amendment (2026-10-27, Anton):** `universal_lexicon` was briefly vendored in
+this workspace; it **moves back** to
+[`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon).
+UA drops its copy once the DFP re-home PR lands; it
+is not part of the automation driver family hosted here.
 
 ## Non-goals
 
 - Flipping GitHub visibility to public
 - Renaming the repository
-- Moving storage / lexicon families
+- Moving the storage family (lexicon re-homed to DFP per amendment above)
 
 ## Publish order
 
