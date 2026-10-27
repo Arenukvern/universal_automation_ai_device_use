@@ -3,7 +3,7 @@ description: >-
   FrameSource over a running Flutter app's MCP toolkit screenshots: paced
   polling of `ext.mcp.toolkit.view_screenshots` through the Dart VM
   service, feeding the universal_screencast pipeline.
-version: 0.2.0
+version: 0.2.1
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues

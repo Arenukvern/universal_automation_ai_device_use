@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.2.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.0...universal_capture_flutter-v0.2.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **train:** conformance 0.3.0 (interface ^0.3.0) + its dependents' constraints ([8396f32](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/8396f320216483faf9ce747e22da6664104b5443))
+
 ## 0.2.0
 
 - Family train: `universal_automation_interface` moves to `^0.3.0` (coordinate-tier actions join the sealed action set) and `universal_automation_conformance` to `^0.3.0`; dependency constraints widen accordingly (constraint-widening minor bump).

@@ -3,7 +3,7 @@ description: >-
   Agent-facing surface for the universal automation family: declarative
   plans with a fail-closed runner, an observe/act/verify CLI, and an MCP
   stdio server. One binary, two faces. No Flutter, no process lifecycle.
-version: 0.2.0
+version: 0.3.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
