@@ -3,7 +3,7 @@ description: >-
   Composition-root SDK over the universal automation toolkit: flows and
   versioned commands that compile to AutomationPlan, budgets as enforceable
   components, and a rule/guide envelope whose content stays world data.
-version: 0.1.1
+version: 0.2.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues

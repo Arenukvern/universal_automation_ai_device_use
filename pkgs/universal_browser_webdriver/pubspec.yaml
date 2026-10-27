@@ -2,7 +2,7 @@ name: universal_browser_webdriver
 description: >-
   Pure-Dart W3C WebDriver client with a safaridriver endpoint adapter for
   Safari automation. No Java, no Node, no Selenium grid.
-version: 0.2.0
+version: 0.3.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues

@@ -5,7 +5,7 @@ description: >-
   synthesis over CGEvent. Pure Dart through native-assets build hooks
   (swiftc-compiled code asset, @Native bindings). No Flutter, no plugin
   surface.
-version: 0.3.0
+version: 0.4.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
