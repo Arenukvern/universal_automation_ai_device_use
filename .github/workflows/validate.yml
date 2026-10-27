@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  # GITHUB_TOKEN pushes to release-please--branches--main do not trigger pull_request.
+  workflow_dispatch:
 
 jobs:
   analyze:
@@ -20,6 +22,9 @@ jobs:
         uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
+
+      - name: Check intra-workspace pub constraints
+        run: dart run tool/sync_workspace_pub_constraints.dart --check
 
       - name: Resolve workspace
         run: dart pub get

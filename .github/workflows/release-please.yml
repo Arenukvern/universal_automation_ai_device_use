@@ -5,15 +5,21 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
-  pull-requests: write
-  actions: write
-
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      tooling_runtime_release_created: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] }}
+      tooling_runtime_tag_name: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@v4
@@ -22,12 +28,74 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      - name: Dispatch pub.dev publish (universal_tooling_runtime)
-        if: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] == 'true' }}
+  sync-release-pr-constraints:
+    needs: release-please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # Only pushes to main trigger this workflow; sync pushes to
+      # release-please--branches--main cannot re-enter release-please.
+      - name: Sync intra-workspace pub constraints on release PR
+        id: sync_constraints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --heads origin release-please--branches--main | grep -q .; then
+            echo "No release-please branch; skipping constraint sync"
+            echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch origin release-please--branches--main
+          git checkout -B release-please--branches--main origin/release-please--branches--main
+          dart run tool/sync_workspace_pub_constraints.dart --write
+          if git diff --quiet -- pkgs; then
+            echo "Workspace pub constraints already in sync"
+            echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkgs/*/pubspec.yaml
+          git commit -m "chore: sync intra-workspace pub dependency constraints"
+          git push origin HEAD:release-please--branches--main
+          echo "sync_pushed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch CI on release PR branch
+        if: ${{ steps.sync_constraints.outputs.sync_pushed == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
+          RELEASE_BRANCH: release-please--branches--main
+        run: |
+          echo "Dispatching Validate and tooling_runtime CI for ${RELEASE_BRANCH}"
+          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
+          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
+
+  dispatch-tooling-runtime-publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.tooling_runtime_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Dispatch pub.dev publish (universal_tooling_runtime)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ needs.release-please.outputs.tooling_runtime_tag_name }}
         run: |
           echo "Dispatching publish_tooling_runtime.yml for tag ${TAG}"
           gh workflow run publish_tooling_runtime.yml --repo "${GH_REPO}" --ref "${TAG}"

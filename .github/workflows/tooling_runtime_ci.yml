@@ -13,6 +13,8 @@ on:
       - 'pkgs/universal_tooling_runtime/**'
       - '.github/workflows/tooling_runtime_ci.yml'
       - '.github/workflows/publish_tooling_runtime.yml'
+  # Dispatched from release-please.yml after constraint sync (see Validate).
+  workflow_dispatch:
 
 jobs:
   ci:
@@ -27,6 +29,9 @@ jobs:
         uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
+
+      - name: Check intra-workspace pub constraints
+        run: dart run tool/sync_workspace_pub_constraints.dart --check
 
       - name: Resolve workspace
         run: dart pub get
