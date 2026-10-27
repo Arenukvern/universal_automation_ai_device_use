@@ -19,7 +19,7 @@
   #5 → publish 0.2.0 → oka backend → tooling_runtime switches.
 - Scope: **macOS and Linux** POSIX behavior. Windows Job Objects (including this
   repo's Windows UI Automation sidecar) remain **deferred**.
-- Linux gate: `dart test --concurrency=1` — **53/53** (Windows-only skips);
+- Linux gate: `dart test --concurrency=1` — **60/60** (Windows-only skips);
   `tool/run_p1_oka_probes.sh`.
 - `stopProcessTree` routes non–`runBounded` roots through
   `stopUnownedPosixProcessTree` (whole descendant tree; caller-owned roots only).
