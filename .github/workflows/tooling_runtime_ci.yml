@@ -28,6 +28,9 @@ jobs:
         with:
           sdk: stable
 
+      - name: Check intra-workspace pub constraints
+        run: dart run tool/sync_workspace_pub_constraints.dart --check
+
       - name: Resolve workspace
         run: dart pub get
 

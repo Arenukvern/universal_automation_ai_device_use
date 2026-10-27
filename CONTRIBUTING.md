@@ -46,6 +46,21 @@ Per-package tests (when you touch a package):
 cd pkgs/<package> && dart pub get && dart test
 ```
 
+### Release Please and workspace constraints
+
+[release-please](https://github.com/googleapis/release-please) bumps each
+package’s `version:` but not dependent `^` constraints. Pub workspaces require
+every intra-repo dependency constraint to accept the workspace copy of that
+package. After version bumps (or before opening a release PR locally), run:
+
+```sh
+dart run tool/sync_workspace_pub_constraints.dart --write
+```
+
+CI runs `--check` before `dart pub get`. The Release Please workflow also syncs
+and commits constraints on the `release-please--branches--main` branch when a
+release PR is open.
+
 ## Skill Steward
 
 1. `steward doctor --json`

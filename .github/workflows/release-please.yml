@@ -14,6 +14,11 @@ jobs:
   release-please:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
       - name: Release Please
         id: release
         uses: googleapis/release-please-action@v4
@@ -21,6 +26,28 @@ jobs:
           token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+
+      - name: Sync intra-workspace pub constraints on release PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --heads origin release-please--branches--main | grep -q .; then
+            echo "No release-please branch; skipping constraint sync"
+            exit 0
+          fi
+          git fetch origin release-please--branches--main
+          git checkout -B release-please--branches--main origin/release-please--branches--main
+          dart run tool/sync_workspace_pub_constraints.dart --write
+          if git diff --quiet -- pkgs; then
+            echo "Workspace pub constraints already in sync"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkgs/*/pubspec.yaml
+          git commit -m "chore: sync intra-workspace pub dependency constraints"
+          git push origin HEAD:release-please--branches--main
 
       - name: Dispatch pub.dev publish (universal_tooling_runtime)
         if: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] == 'true' }}
