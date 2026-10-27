@@ -10,7 +10,10 @@ class WebDriverException extends ProtocolException {
   }) : super(
          message,
          code: httpStatus,
-         details: {'error': error, 'status': ?httpStatus},
+         details: {
+           'error': error,
+           'status': ?httpStatus,
+         },
        );
 
   /// Maps a W3C error string onto the family exception hierarchy.

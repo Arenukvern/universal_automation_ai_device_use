@@ -13,11 +13,7 @@ CommandSpec _spec({int revision = 1, List<CommandParam>? params}) =>
             const CommandParam('submit', type: 'bool', defaultValue: true),
           ],
       build: (args) => [
-        typeText(
-          args.string('text'),
-          css: '#email',
-          submit: args.flag('submit'),
-        ),
+        typeText(args.string('text'), css: '#email', submit: args.flag('submit')),
       ],
     );
 
@@ -41,7 +37,10 @@ void main() {
   });
 
   test('duplicate command names fail the registry at construction', () {
-    expect(() => CommandRegistry([_spec(), _spec()]), throwsFormatException);
+    expect(
+      () => CommandRegistry([_spec(), _spec()]),
+      throwsFormatException,
+    );
   });
 
   test('declaration violations name the offending param', () {
@@ -52,7 +51,11 @@ void main() {
         params: [
           const CommandParam('a', type: 'blob'),
           const CommandParam('a', type: 'string'),
-          CommandParam('b', type: 'int', defaultValue: 'nope'),
+          CommandParam(
+            'b',
+            type: 'int',
+            defaultValue: 'nope',
+          ),
         ],
         build: (_) => [],
       ),
@@ -74,7 +77,10 @@ void main() {
   test('expand collects every codec violation at once', () {
     final registry = CommandRegistry([_spec()]);
     final (steps, violations) = registry.expand(
-      const CommandRef('fill-email', args: {'submit': 'yes', 'extra': 1}),
+      const CommandRef('fill-email', args: {
+        'submit': 'yes',
+        'extra': 1,
+      }),
     );
     expect(steps, isEmpty);
     expect(violations, hasLength(3));

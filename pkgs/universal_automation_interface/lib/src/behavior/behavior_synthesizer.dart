@@ -267,8 +267,7 @@ BehaviorPlan synthesizeBehavior(
     case KeyPressAction(:final key, :final modifiers):
       final keyCode = namedVirtualKeyCode(key);
       if (keyCode == null) {
-        final message =
-            'KeyPressAction key "$key" has no synthesis '
+        final message = 'KeyPressAction key "$key" has no synthesis '
             'code; extend namedVirtualKeyCode or use TypeAction';
         throw SpecViolationException([message]);
       }
@@ -294,7 +293,7 @@ BehaviorPlan synthesizeBehavior(
     case InvokeAction(:final name):
       throw SpecViolationException([
         'InvokeAction("$name") carries its own dispatch; behavioral '
-            'synthesis does not apply to catalog actions',
+        'synthesis does not apply to catalog actions',
       ]);
   }
 
@@ -347,8 +346,7 @@ final class BehaviorProjection {
 }
 
 SpecViolationException _badDirection(String direction) {
-  final message =
-      'ScrollAction direction "$direction" is not one of '
+  final message = 'ScrollAction direction "$direction" is not one of '
       'up, down, left, or right';
   return SpecViolationException([message]);
 }

@@ -21,4 +21,4 @@
 
 - https://github.com/Arenukvern/mcp_flutter
 - https://github.com/Arenukvern/skill_steward
-- https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon
+- https://github.com/xsoulspace/dart_flutter_packages (universal_lexicon on ag-c; TODO main after DFP merge)

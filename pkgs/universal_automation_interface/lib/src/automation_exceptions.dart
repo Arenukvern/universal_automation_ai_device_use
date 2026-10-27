@@ -110,16 +110,16 @@ class ForegroundRequiredException extends AutomationException {
     required this.targetPid,
     required this.frontmostPid,
   }) : super(
-         'foreground required for "$verb": the event stream would reach '
-         'pid $frontmostPid, not the anchored pid $targetPid — activate '
-         'the target first (or use a semantic verb: click / setValue / '
-         'elementAction, which act below the focus layer)',
-         details: {
-           'verb': verb,
-           'targetPid': targetPid,
-           'frontmostPid': frontmostPid,
-         },
-       );
+          'foreground required for "$verb": the event stream would reach '
+          'pid $frontmostPid, not the anchored pid $targetPid — activate '
+          'the target first (or use a semantic verb: click / setValue / '
+          'elementAction, which act below the focus layer)',
+          details: {
+            'verb': verb,
+            'targetPid': targetPid,
+            'frontmostPid': frontmostPid,
+          },
+        );
 
   @override
   String get kind => 'foregroundRequired';

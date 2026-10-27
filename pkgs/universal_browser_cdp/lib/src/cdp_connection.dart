@@ -123,7 +123,13 @@ class CdpConnection implements CdpTransport {
     final id = ++_nextId;
     final completer = Completer<Map<String, Object?>>();
     _pending[id] = completer;
-    _socket.add(jsonEncode({'id': id, 'method': method, 'params': ?params}));
+    _socket.add(
+      jsonEncode({
+        'id': id,
+        'method': method,
+        'params': ?params,
+      }),
+    );
     final future = completer.future;
     if (timeout != null) return future.timeout(timeout);
     return future;
@@ -242,7 +248,8 @@ final class CdpFlatSession implements CdpTransport {
   Stream<CdpEvent> on(String method) => connection
       .on(method)
       .where(
-        (event) => event.sessionId == null || event.sessionId == sessionId,
+        (event) =>
+            event.sessionId == null || event.sessionId == sessionId,
       );
 
   @override

@@ -100,10 +100,10 @@ class WebDriverClient {
     final value = decoded['value'];
     if (value is Map<String, Object?> && value['error'] is String) {
       throw WebDriverException.fromEnvelope(
-        value['error']! as String,
-        value['message'] as String? ?? '',
-        response.statusCode,
-      );
+            value['error']! as String,
+            value['message'] as String? ?? '',
+            response.statusCode,
+          );
     }
     return {'status': response.statusCode, 'value': value};
   }
@@ -127,9 +127,8 @@ class WebDriverClient {
       throw const ProtocolException('webdriver returned no sessionId');
     }
     _sessionId = id;
-    final sessionCapabilities = value is Map<String, Object?>
-        ? value['capabilities']
-        : null;
+    final sessionCapabilities =
+        value is Map<String, Object?> ? value['capabilities'] : null;
     if (sessionCapabilities is Map<String, Object?>) {
       final wsUrl = sessionCapabilities['webSocketUrl'];
       if (wsUrl is String && wsUrl.isNotEmpty) {
@@ -248,7 +247,9 @@ class WebDriverClient {
 
   /// Runs a full multi-source W3C Actions dispatch — the chord shape:
   /// a keyboard source holding modifiers alongside the pointer source.
-  Future<void> runInputSources(List<Map<String, Object?>> sources) async {
+  Future<void> runInputSources(
+    List<Map<String, Object?>> sources,
+  ) async {
     await _send('POST', '/actions', {'actions': sources});
   }
 

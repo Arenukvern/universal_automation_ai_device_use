@@ -39,9 +39,10 @@ final class BackgroundJob {
     submittedAt: DateTime.parse(json['submittedAt']! as String),
     status: json['status']! as String,
     scenario: json['scenario'] as String?,
-    overrides: (json['set'] as Map<Object?, Object?>? ?? const {}).map(
-      (key, value) => MapEntry('$key', '$value'),
-    ),
+    overrides:
+        (json['set'] as Map<Object?, Object?>? ?? const {}).map(
+          (key, value) => MapEntry('$key', '$value'),
+        ),
     outDir: json['out'] as String?,
     startedAt: json['startedAt'] is String
         ? DateTime.parse(json['startedAt']! as String)
@@ -162,8 +163,7 @@ final class JobQueue {
     String? outDir,
   }) {
     final job = BackgroundJob._(
-      id:
-          'job-${DateTime.now().millisecondsSinceEpoch}-'
+      id: 'job-${DateTime.now().millisecondsSinceEpoch}-'
           '${_seq++}',
       planPath: planPath,
       submittedAt: DateTime.now().toUtc(),
@@ -181,7 +181,8 @@ final class JobQueue {
 
   /// The record for [jobId]: memory first, then the persisted receipts
   /// (readable across serve restarts).
-  BackgroundJob? status(String jobId) => _jobs[jobId] ?? _readPersisted(jobId);
+  BackgroundJob? status(String jobId) =>
+      _jobs[jobId] ?? _readPersisted(jobId);
 
   Future<void> _drain() async {
     if (_draining) return;
@@ -201,16 +202,15 @@ final class JobQueue {
     _persist(job);
     try {
       final plan = await AutomationPlan.load(queued.planPath);
-      final report =
-          await PlanRunner(
-            factories: factories,
-            handleBaseDirectory: handlesDirectory,
-          ).run(
-            plan,
-            scenarioName: queued.scenario,
-            sessionOverrides: queued.overrides,
-            outDir: queued.outDir,
-          );
+      final report = await PlanRunner(
+        factories: factories,
+        handleBaseDirectory: handlesDirectory,
+      ).run(
+        plan,
+        scenarioName: queued.scenario,
+        sessionOverrides: queued.overrides,
+        outDir: queued.outDir,
+      );
       job = job.copyWith(
         status: report.ok ? 'succeeded' : 'failed',
         finishedAt: DateTime.now(),

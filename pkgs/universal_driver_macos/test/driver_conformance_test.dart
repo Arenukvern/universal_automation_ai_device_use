@@ -9,7 +9,9 @@ void main() {
   // no-op: conformance must never open a real browser (ADR 0003 seam).
   automationDriverConformanceTests(
     'MacosDriver(fake bridge)',
-    createDriver: () async =>
-        MacosDriver(bridge: FakeBridge(), openUrl: (_) async {}),
+    createDriver: () async => MacosDriver(
+      bridge: FakeBridge(),
+      openUrl: (_) async {},
+    ),
   );
 }

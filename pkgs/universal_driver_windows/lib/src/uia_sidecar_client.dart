@@ -104,17 +104,14 @@ final class ProcessUiaSidecarTransport implements UiaSidecarTransport {
 class UiaSidecarClient {
   /// Creates a client over [transport].
   UiaSidecarClient(this._transport) {
-    _subscription = _transport.lines.listen(
-      _onLine,
-      onDone: () {
-        if (!_handshake.isCompleted) {
-          _handshake.completeError(
-            const UiaSidecarException('sidecar closed before handshake'),
-          );
-        }
-        _failAll(const UiaSidecarException('sidecar closed'));
-      },
-    );
+    _subscription = _transport.lines.listen(_onLine, onDone: () {
+      if (!_handshake.isCompleted) {
+        _handshake.completeError(
+          const UiaSidecarException('sidecar closed before handshake'),
+        );
+      }
+      _failAll(const UiaSidecarException('sidecar closed'));
+    });
   }
 
   final UiaSidecarTransport _transport;
@@ -140,7 +137,11 @@ class UiaSidecarClient {
     final id = ++_nextId;
     final completer = Completer<Map<String, Object?>>();
     _pending[id] = completer;
-    final message = {'id': id, 'op': op, if (params != null) ...params};
+    final message = {
+      'id': id,
+      'op': op,
+      if (params != null) ...params,
+    };
     return _transport
         .writeLine(jsonEncode(message))
         .then((_) => completer.future);
@@ -151,9 +152,8 @@ class UiaSidecarClient {
     if (_closed) return;
     _closed = true;
     try {
-      await _transport.writeLine(
-        jsonEncode({'id': ++_nextId, 'op': 'shutdown'}),
-      );
+      await _transport
+          .writeLine(jsonEncode({'id': ++_nextId, 'op': 'shutdown'}));
       await Future<void>.delayed(const Duration(milliseconds: 50));
     } on Object {
       // The sidecar may already be gone.

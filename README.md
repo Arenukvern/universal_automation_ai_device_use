@@ -25,8 +25,9 @@ laptop, phones and tablets, browsers, and the tiers you add next. The aim is an
 with **consent, receipts, and honest proof** — not unattended takeover of user
 devices. Dart contracts, platform drivers, capture/WebRTC plumbing, plus an MCP
 + CLI toolkit. Lexicon packs:
-[`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon)
-in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages).
+[`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/ag-c/pkgs/universal_lexicon)
+in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages)
+(re-home on `ag-c`; TODO: link `main/...` after DFP merge).
 
 - 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [DX FAQ](docs/DX_FAQ.mdx) + [llms.txt](llms.txt))
 - 🤝 **Contribute:** [guide](docs/contributing/contribution_guide.mdx) · [contributors](docs/contributing/contributors.mdx) · [code of conduct](CODE_OF_CONDUCT.md) · [security](SECURITY.md)
@@ -58,7 +59,7 @@ agent-facing CLI and MCP server live in
 | `universal_browser_*` ([CDP](https://pub.dev/packages/universal_browser_cdp) · [WebDriver](https://pub.dev/packages/universal_browser_webdriver)) | Browser automation |
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
-| [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) | Lexicon packs ([`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages), not vendored here) |
+| [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/ag-c/pkgs/universal_lexicon) | Lexicon packs in DFP (`ag-c`; TODO: `main` after merge — not vendored here) |
 | [`universal_tooling_runtime`](pkgs/universal_tooling_runtime/) | Bounded process runs, path policy, locks, macOS no-fork verify |
 
 Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).

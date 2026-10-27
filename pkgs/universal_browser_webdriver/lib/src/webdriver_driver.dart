@@ -109,13 +109,17 @@ class WebDriverDriver implements AutomationDriver, ConfigurableCapture {
         // W3C pointer actions carry no click state; multi-clicks are
         // adjacent down/up pairs, which remotes fold into their
         // double/triple-click recognition.
-        await _dispatchPointerChord(_client, modifiers, [
-          _pointerMove(x, y),
-          for (var press = 1; press <= clickCount.clamp(1, 3); press++) ...[
-            {'type': 'pointerDown', 'button': _w3cButton(button)},
-            {'type': 'pointerUp', 'button': _w3cButton(button)},
+        await _dispatchPointerChord(
+          _client,
+          modifiers,
+          [
+            _pointerMove(x, y),
+            for (var press = 1; press <= clickCount.clamp(1, 3); press++) ...[
+              {'type': 'pointerDown', 'button': _w3cButton(button)},
+              {'type': 'pointerUp', 'button': _w3cButton(button)},
+            ],
           ],
-        ]);
+        );
       case MoveAction(:final x, :final y):
         await _client.runPointerActions([_pointerMove(x, y)]);
       case DragAction(
@@ -126,12 +130,16 @@ class WebDriverDriver implements AutomationDriver, ConfigurableCapture {
         :final button,
         :final modifiers,
       ):
-        await _dispatchPointerChord(_client, modifiers, [
-          _pointerMove(fromX, fromY),
-          {'type': 'pointerDown', 'button': _w3cButton(button)},
-          _pointerMove(toX, toY),
-          {'type': 'pointerUp', 'button': _w3cButton(button)},
-        ]);
+        await _dispatchPointerChord(
+          _client,
+          modifiers,
+          [
+            _pointerMove(fromX, fromY),
+            {'type': 'pointerDown', 'button': _w3cButton(button)},
+            _pointerMove(toX, toY),
+            {'type': 'pointerUp', 'button': _w3cButton(button)},
+          ],
+        );
       case InvokeAction(:final name):
         throw DriverUnsupportedException(
           'the WebDriver tier has no surface action registry; '

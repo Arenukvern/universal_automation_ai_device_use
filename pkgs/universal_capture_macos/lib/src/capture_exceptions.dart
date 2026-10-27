@@ -16,11 +16,11 @@ class CaptureBridgeException extends AutomationException {
 class CapturePermissionDeniedException extends AutomationException {
   /// Creates the exception with a remediation path in the message.
   CapturePermissionDeniedException()
-    : super(
-        'screen recording permission missing; call '
-        'CaptureBridge.requestScreenPermission() as an explicit '
-        'user action, or grant it in System Settings',
-      );
+      : super(
+          'screen recording permission missing; call '
+          'CaptureBridge.requestScreenPermission() as an explicit '
+          'user action, or grant it in System Settings',
+        );
 
   @override
   String get kind => 'capturePermissionDenied';

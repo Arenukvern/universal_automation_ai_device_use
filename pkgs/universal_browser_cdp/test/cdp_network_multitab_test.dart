@@ -26,7 +26,10 @@ void main() {
 
       server.emit('Network.requestWillBeSent', {
         'requestId': 'r1',
-        'request': {'url': 'https://example.test/api', 'method': 'GET'},
+        'request': {
+          'url': 'https://example.test/api',
+          'method': 'GET',
+        },
         'type': 'XHR',
       });
       await pump();
@@ -130,7 +133,9 @@ void main() {
       await browser.closePage(second);
       expect(browser.pages, [page]);
       expect(
-        server.methods.where((method) => method == 'Target.closeTarget').length,
+        server.methods
+            .where((method) => method == 'Target.closeTarget')
+            .length,
         1,
       );
       expect(second.isClosed, isTrue);
@@ -140,25 +145,23 @@ void main() {
       expect(browser.pages, isEmpty);
     });
 
-    test(
-      'switchTo returns the named page driver and rejects foreign pages',
-      () async {
-        final browser = await CdpBrowser.connect(server.httpBase);
-        final page = await browser.attachFirstPage();
-        final driver = browser.switchTo(page);
-        expect(driver.page, same(page));
+    test('switchTo returns the named page driver and rejects foreign pages',
+        () async {
+      final browser = await CdpBrowser.connect(server.httpBase);
+      final page = await browser.attachFirstPage();
+      final driver = browser.switchTo(page);
+      expect(driver.page, same(page));
 
-        final stranger = await CdpBrowserSession.attach(server.httpBase);
-        expect(
-          () => browser.switchTo(stranger.page),
-          throwsA(isA<ArgumentError>()),
-        );
-        // switchTo mutated nothing: the original pages list is intact.
-        expect(browser.pages, [page]);
-        await browser.close();
-        await stranger.detach();
-      },
-    );
+      final stranger = await CdpBrowserSession.attach(server.httpBase);
+      expect(
+        () => browser.switchTo(stranger.page),
+        throwsA(isA<ArgumentError>()),
+      );
+      // switchTo mutated nothing: the original pages list is intact.
+      expect(browser.pages, [page]);
+      await browser.close();
+      await stranger.detach();
+    });
 
     test('targetDestroyed marks the page closed', () async {
       final browser = await CdpBrowser.connect(server.httpBase);

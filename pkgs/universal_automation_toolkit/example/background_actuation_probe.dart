@@ -54,8 +54,7 @@ Future<void> main(List<String> args) async {
         .where((app) => app.bundleId == 'com.apple.TextEdit')
         .map((app) => app.pid)
         .firstOrNull;
-    if (pid == null)
-      await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (pid == null) await Future<void>.delayed(const Duration(milliseconds: 300));
   }
   check('textEditRunning', pid != null, 'pid=$pid');
   if (pid == null) exit(1);
@@ -67,15 +66,19 @@ Future<void> main(List<String> args) async {
       (node) => node.role == 'textbox',
       orElse: () => throw StateError('no textbox in the TextEdit tree'),
     );
-    check('backgroundObservation', true, {
-      'pid': pid,
-      'nodeCount': snapshot.nodes.length,
-      'textboxName': textbox.name,
-      'axActionsSample': [
-        for (final node in snapshot.nodes.take(200))
-          if (node.attributes['axActions'] case final actions?) actions,
-      ].take(3).toList(),
-    });
+    check(
+      'backgroundObservation',
+      true,
+      {
+        'pid': pid,
+        'nodeCount': snapshot.nodes.length,
+        'textboxName': textbox.name,
+        'axActionsSample': [
+          for (final node in snapshot.nodes.take(200))
+            if (node.attributes['axActions'] case final actions?) actions,
+        ].take(3).toList(),
+      },
+    );
 
     // -- 3. Background semantic write: setValue, then verify by diff. --
     final marker = 'bg-actuation ${DateTime.now().toUtc().toIso8601String()}';
@@ -118,16 +121,16 @@ Future<void> main(List<String> args) async {
 
     // -- 6. Focus never moved. --
     final frontmostAfter = await driver.frontmost();
-    check('focusUnchanged', frontmostAfter.pid == frontmostBefore.pid, {
-      'before': frontmostBefore.name,
-      'after': frontmostAfter.name,
-    });
+    check(
+      'focusUnchanged',
+      frontmostAfter.pid == frontmostBefore.pid,
+      {'before': frontmostBefore.name, 'after': frontmostAfter.name},
+    );
 
     // -- 7. Resident job plane: the same write as a submitted, detached
     //       plan run; the client polls until the receipt is terminal. --
     final plan = File('$evidenceDir/bg-job-plan.yaml');
-    final jobMarker =
-        'resident-job ${DateTime.now().toUtc().toIso8601String()}';
+    final jobMarker = 'resident-job ${DateTime.now().toUtc().toIso8601String()}';
     plan.writeAsStringSync('''
 sessions:
   textedit:
@@ -155,8 +158,8 @@ scenarios:
       },
     });
     final submittedPayload = jsonDecode(
-      (((submitted!['result'] as Map)['content'] as List).single as Map)['text']
-          as String,
+      (((submitted!['result'] as Map)['content'] as List).single
+          as Map)['text'] as String,
     ) as Map<String, Object?>;
     final jobId = submittedPayload['jobId'] as String;
     Map<String, Object?>? job;
@@ -173,8 +176,7 @@ scenarios:
       });
       job = jsonDecode(
         (((response!['result'] as Map)['content'] as List).single
-                as Map)['text']
-            as String,
+            as Map)['text'] as String,
       ) as Map<String, Object?>;
       if (job['status'] == 'succeeded' || job['status'] == 'failed') break;
       await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -199,8 +201,9 @@ scenarios:
     await driver.close();
   }
 
-  File('$evidenceDir/evidence.json')
-      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(evidence));
+  File('$evidenceDir/evidence.json').writeAsStringSync(
+    const JsonEncoder.withIndent('  ').convert(evidence),
+  );
   stderr.writeln('evidence: $evidenceDir/evidence.json');
   exit(failures.isEmpty ? 0 : 1);
 }

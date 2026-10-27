@@ -111,11 +111,7 @@ final class AutomationPlan {
     required List<Scenario> scenarios,
   }) : sessions = _namedMap(sessions, (session) => session.name, 'session'),
        intents = intents ?? IntentRegistry(const []),
-       scenarios = _namedMap(
-         scenarios,
-         (scenario) => scenario.name,
-         'scenario',
-       );
+       scenarios = _namedMap(scenarios, (scenario) => scenario.name, 'scenario');
 
   static Map<String, T> _namedMap<T>(
     List<T> values,
@@ -193,7 +189,9 @@ final class AutomationPlan {
       if (parent == null) break;
       cursor = parent;
     }
-    return [for (final scenario in chain.reversed) ...scenario.steps];
+    return [
+      for (final scenario in chain.reversed) ...scenario.steps,
+    ];
   }
 
   /// Collects every violation; empty means executable.
@@ -252,7 +250,7 @@ final class AutomationPlan {
       ];
       return [
         '$label: unknown intent "${step.app}/${step.name}" '
-            '(declared: ${declared.isEmpty ? 'none' : declared.join('; ')})',
+        '(declared: ${declared.isEmpty ? 'none' : declared.join('; ')})',
       ];
     }
     final violations = [
@@ -310,7 +308,9 @@ class _PlanLoader {
       ]),
     };
     if (decoded is! Map<Object?, Object?>) {
-      throw SpecViolationException(['plan document must be a mapping: $path']);
+      throw SpecViolationException([
+        'plan document must be a mapping: $path',
+      ]);
     }
     return _plain(decoded) as Map<Object?, Object?>;
   }
@@ -347,11 +347,9 @@ class _PlanLoader {
           'include entries must be paths (got $entry in $documentPath)',
         ]);
       }
-      final includedPath = File(
-        entry.startsWith('/')
-            ? entry
-            : '${File(documentPath).parent.path}/$entry',
-      );
+      final includedPath = File(entry.startsWith('/')
+          ? entry
+          : '${File(documentPath).parent.path}/$entry');
       final included = await load(includedPath.path);
       for (final section in const ['sessions', 'profiles', 'scenarios']) {
         final source = included[section];

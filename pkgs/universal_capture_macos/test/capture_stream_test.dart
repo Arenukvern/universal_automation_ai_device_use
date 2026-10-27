@@ -15,11 +15,9 @@ void main() {
         return;
       }
       final source = CaptureKitFrameSource(fps: 10);
-      final frames = source
-          .start()
-          .take(3)
-          .toList()
-          .timeout(const Duration(seconds: 20));
+      final frames = source.start().take(3).toList().timeout(
+            const Duration(seconds: 20),
+          );
       final received = await frames;
       await source.stop();
       expect(received, hasLength(3));

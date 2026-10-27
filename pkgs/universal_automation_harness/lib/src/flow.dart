@@ -11,7 +11,12 @@ import 'package:universal_automation_toolkit/compose.dart';
 final class Flow {
   /// Creates a flow; [steps] may embed [runCommand] references, expanded
   /// by the owning assembly at compile time.
-  const Flow(this.name, {this.extend, this.session, this.steps = const []});
+  const Flow(
+    this.name, {
+    this.extend,
+    this.session,
+    this.steps = const [],
+  });
 
   /// Stable, unique within an assembly.
   final String name;

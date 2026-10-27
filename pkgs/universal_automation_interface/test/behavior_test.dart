@@ -6,14 +6,10 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 void main() {
   group('canonical encoding', () {
     test('sha256 matches published vectors', () {
-      expect(
-        sha256Hex(''.codeUnits),
-        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      );
-      expect(
-        sha256Hex('abc'.codeUnits),
-        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
-      );
+      expect(sha256Hex(''.codeUnits),
+          'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
+      expect(sha256Hex('abc'.codeUnits),
+          'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad');
     });
 
     test('sorts map keys and rejects doubles', () {
@@ -83,11 +79,15 @@ void main() {
         const PiecewiseTiming(boundariesUs: [10, 5]).validate(),
         isNotEmpty,
       );
-      expect(const FixedTiming(micros: -1).validate(), isNotEmpty);
       expect(
-        TimingDistribution.fromJson(
-          const UniformTiming(minMicros: 1, maxMicros: 2).toJson(),
-        ),
+        const FixedTiming(micros: -1).validate(),
+        isNotEmpty,
+      );
+      expect(
+        TimingDistribution.fromJson(const UniformTiming(
+          minMicros: 1,
+          maxMicros: 2,
+        ).toJson()),
         const UniformTiming(minMicros: 1, maxMicros: 2),
       );
     });
@@ -95,12 +95,10 @@ void main() {
 
   group('BehaviorPlan', () {
     test('sorts steps and round-trips with a stable hash', () {
-      final plan = BehaviorPlan(
-        steps: const [
-          PointerUpStep(plannedAtUs: 900),
-          PointerDownStep(plannedAtUs: 100),
-        ],
-      );
+      final plan = BehaviorPlan(steps: const [
+        PointerUpStep(plannedAtUs: 900),
+        PointerDownStep(plannedAtUs: 100),
+      ]);
       expect(plan.steps.first.plannedAtUs, 100);
       final restored = BehaviorPlan.fromJson(plan.toJson());
       expect(restored.hash, plan.hash);
@@ -109,8 +107,7 @@ void main() {
         () => BehaviorPlan(
           steps: [const DwellStep(plannedAtUs: -1, durationUs: 1)],
         ),
-        throwsA(isA<SpecViolationException>()),
-      );
+          throwsA(isA<SpecViolationException>()));
     });
   });
 
@@ -124,7 +121,9 @@ void main() {
 
     test('construction fails closed on invalid facets', () {
       expect(
-        () => BehaviorProfile(reaction: const ReactionDelay(floorUs: -5)),
+        () => BehaviorProfile(
+          reaction: const ReactionDelay(floorUs: -5),
+        ),
         throwsA(isA<SpecViolationException>()),
       );
     });
@@ -150,7 +149,9 @@ void main() {
     });
 
     test('copyWith replaces only the given facet', () {
-      const rhythm = ActionRhythm(beforeAction: FixedTiming(micros: 42));
+      const rhythm = ActionRhythm(
+        beforeAction: FixedTiming(micros: 42),
+      );
       final profile = BehaviorProfile.agentImmediate.copyWith(rhythm: rhythm);
       expect(profile.rhythm, rhythm);
       expect(profile.reaction, BehaviorProfile.agentImmediate.reaction);
@@ -177,11 +178,10 @@ void main() {
         target: const AxBounds(left: 0, top: 0, width: 120, height: 48),
       );
       expect(plan.totalDurationUs, 0);
-      expect(plan.steps.map((step) => step.kind).toList(), [
-        'pointerMove',
-        'pointerDown',
-        'pointerUp',
-      ]);
+      expect(
+        plan.steps.map((step) => step.kind).toList(),
+        ['pointerMove', 'pointerDown', 'pointerUp'],
+      );
       final move = plan.steps.whereType<PointerMoveStep>().single;
       expect(move.durationUs, 0);
       expect(move.x, 60);
@@ -189,7 +189,8 @@ void main() {
     });
 
     group('modifier chords (ADR 0053)', () {
-      test('shift+click lowers to key steps around a flagged press', () async {
+      test('shift+click lowers to key steps around a flagged press',
+          () async {
         final plan = synthesizeBehavior(
           BehaviorProfile.agentImmediate,
           1,
@@ -221,17 +222,12 @@ void main() {
         final kinds = plan.steps.map((step) => step.kind).toList();
         expect(kinds.first, 'pointerMove');
         expect(kinds, containsAll(['keyDown', 'pointerDown', 'keyUp']));
+        expect(kinds.indexOf('keyDown'), lessThan(kinds.indexOf('pointerDown')));
+        expect(kinds.lastIndexOf('keyUp'), greaterThan(kinds.indexOf('pointerUp')));
         expect(
-          kinds.indexOf('keyDown'),
-          lessThan(kinds.indexOf('pointerDown')),
+          plan.steps.whereType<PointerUpStep>().single.modifiers,
+          ['meta'],
         );
-        expect(
-          kinds.lastIndexOf('keyUp'),
-          greaterThan(kinds.indexOf('pointerUp')),
-        );
-        expect(plan.steps.whereType<PointerUpStep>().single.modifiers, [
-          'meta',
-        ]);
       });
 
       test('control+Tab is a key chord around the key', () async {
@@ -275,10 +271,8 @@ void main() {
       final kinds = plan.steps.map((step) => step.kind).toList();
       expect(kinds.first, 'dwell');
       expect(kinds, contains('pointerMove'));
-      expect(
-        kinds.where((kind) => kind == 'pointerMove').length,
-        greaterThan(1),
-      );
+      expect(kinds.where((kind) => kind == 'pointerMove').length,
+          greaterThan(1));
       expect(kinds.last, 'pointerUp');
       expect(plan.totalDurationUs, greaterThan(0));
       // Landing point is the element center.
@@ -299,10 +293,8 @@ void main() {
       // carried path animated between them.
       expect(kinds.where((kind) => kind == 'pointerDown').length, 1);
       expect(kinds.where((kind) => kind == 'pointerUp').length, 1);
-      expect(
-        kinds.indexOf('pointerDown'),
-        lessThan(kinds.lastIndexOf('pointerMove')),
-      );
+      expect(kinds.indexOf('pointerDown'),
+          lessThan(kinds.lastIndexOf('pointerMove')));
       expect(kinds.last, 'pointerUp');
       final moves = plan.steps.whereType<PointerMoveStep>().toList();
       // The bezier approach departs near the from-point (curvature
@@ -351,12 +343,10 @@ void main() {
         const TypeAction('Hi!', submit: true),
       );
       final keyDowns = plan.steps.whereType<KeyDownStep>().toList();
-      expect(keyDowns.map((step) => step.key).toList(), [
-        'H',
-        'i',
-        '!',
-        'Enter',
-      ]);
+      expect(
+        keyDowns.map((step) => step.key).toList(),
+        ['H', 'i', '!', 'Enter'],
+      );
       expect(keyDowns.first.keyCode, 72); // ASCII H
     });
 

@@ -9,17 +9,16 @@ Future<void> main(List<String> args) async {
     name: 'fill-email',
     revision: 1,
     params: [
-      const CommandParam(
-        'text',
-        type: 'string',
-        required: true,
-        doc: 'address',
-      ),
+      const CommandParam('text', type: 'string', required: true, doc: 'address'),
       const CommandParam('submit', type: 'bool', defaultValue: true),
     ],
     doc: 'types an email into #email and submits',
     build: (args) => [
-      typeText(args.string('text'), css: '#email', submit: args.flag('submit')),
+      typeText(
+        args.string('text'),
+        css: '#email',
+        submit: args.flag('submit'),
+      ),
     ],
   );
 

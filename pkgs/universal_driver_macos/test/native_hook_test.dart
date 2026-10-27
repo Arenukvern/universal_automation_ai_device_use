@@ -48,7 +48,7 @@ dependency_overrides:
   universal_automation_interface:
     path: ${interface.path}
 ''');
-      File('${consumer.path}/main.dart').writeAsStringSync(r'''
+    File('${consumer.path}/main.dart').writeAsStringSync(r'''
 import 'package:universal_driver_macos/universal_driver_macos.dart';
 Future<void> main() async {
   final driver = MacosDriver();

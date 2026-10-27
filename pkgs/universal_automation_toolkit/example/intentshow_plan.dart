@@ -21,7 +21,9 @@ import 'package:universal_automation_toolkit/universal_automation_toolkit.dart';
 Future<void> main() async {
   final showcaseDir = '${Directory.current.path}/showcase';
   final registry = IntentRegistry.fromMcpToolsList(
-    jsonDecode(File('$showcaseDir/intentshow.capture.json').readAsStringSync()),
+    jsonDecode(
+      File('$showcaseDir/intentshow.capture.json').readAsStringSync(),
+    ),
     app: 'page',
   );
 
@@ -55,30 +57,23 @@ Future<void> main() async {
     sessions: [cdp('chrome', uri: chrome)],
     intents: registry,
     scenarios: [
-      scenario(
-        'works',
-        steps: [
-          navigate(page),
-          waitFor([exists(role: 'heading', name: 'intent showcase')]),
-          intent(
-            'page',
-            'page_fill_email',
-            args: {'text': 'antonio@example.com'},
-          ),
-          verifyThat([value('Email', equals: 'antonio@example.com')]),
-          intent('page', 'page_buy'),
-          verifyThat([exists(nameContains: 'bought')]),
-          intent('page', 'page_checkout', args: {'sku': 'SKU-1'}),
-          verifyThat([exists(nameContains: 'checked-out:SKU-1')]),
-          intent('page', 'page_stamp'),
-          verifyThat([exists(nameContains: 'stamped')]),
-          intent('page', 'page_buy', session: 'chrome'),
-          verifyThat([exists(nameContains: 'bought')]),
-          intent('page', 'page_fill_email', args: {'text': 'x'}),
-          intent('page', 'page_submit_email'),
-          verifyThat([exists(nameContains: 'submitted')]),
-        ],
-      ),
+      scenario('works', steps: [
+        navigate(page),
+        waitFor([exists(role: 'heading', name: 'intent showcase')]),
+        intent('page', 'page_fill_email', args: {'text': 'antonio@example.com'}),
+        verifyThat([value('Email', equals: 'antonio@example.com')]),
+        intent('page', 'page_buy'),
+        verifyThat([exists(nameContains: 'bought')]),
+        intent('page', 'page_checkout', args: {'sku': 'SKU-1'}),
+        verifyThat([exists(nameContains: 'checked-out:SKU-1')]),
+        intent('page', 'page_stamp'),
+        verifyThat([exists(nameContains: 'stamped')]),
+        intent('page', 'page_buy', session: 'chrome'),
+        verifyThat([exists(nameContains: 'bought')]),
+        intent('page', 'page_fill_email', args: {'text': 'x'}),
+        intent('page', 'page_submit_email'),
+        verifyThat([exists(nameContains: 'submitted')]),
+      ]),
     ],
   );
   final worksReport = await PlanRunner(
@@ -90,14 +85,11 @@ Future<void> main() async {
     sessions: [cdp('chrome', uri: chrome)],
     intents: registry,
     scenarios: [
-      scenario(
-        'breaks',
-        steps: [
-          navigate(page),
-          soft(intent('page', 'page_ghost_click')),
-          soft(intent('page', 'page_ghost_invoke')),
-        ],
-      ),
+      scenario('breaks', steps: [
+        navigate(page),
+        soft(intent('page', 'page_ghost_click')),
+        soft(intent('page', 'page_ghost_invoke')),
+      ]),
     ],
   );
   final breaksReport = await PlanRunner(
@@ -114,12 +106,14 @@ Future<void> main() async {
     ],
   );
   final validateViolations = validateBreaks.validate();
-  final validateRefusal = validateViolations.isEmpty
-      ? ''
-      : validateViolations.first;
+  final validateRefusal =
+      validateViolations.isEmpty ? '' : validateViolations.first;
 
   // —— The matrix ————————————————————————————————————————————————————
-  final expectedBreaks = {1: 'elementNotFound', 2: 'protocol'};
+  final expectedBreaks = {
+    1: 'elementNotFound',
+    2: 'protocol',
+  };
   final matrix = <String, Object?>{
     'works': [
       for (final step in worksReport.steps)
@@ -141,9 +135,12 @@ Future<void> main() async {
     ],
     'validateRefusal': validateRefusal,
   };
-  File('$showcaseDir/last-run.json')
-      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(matrix));
-  File('$showcaseDir/intentshow.snapshot.json').writeAsStringSync(
+  File(
+    '$showcaseDir/last-run.json',
+  ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(matrix));
+  File(
+    '$showcaseDir/intentshow.snapshot.json',
+  ).writeAsStringSync(
     const JsonEncoder.withIndent('  ').convert(planDocument(works)),
   );
 
@@ -152,10 +149,8 @@ Future<void> main() async {
     if (!step.ok) {
       failures++;
       // ignore: avoid_print
-      print(
-        '✗ WORKS step ${step.index} (${step.kind}) failed: '
-        '${step.errorKind}: ${step.errorMessage}',
-      );
+      print('✗ WORKS step ${step.index} (${step.kind}) failed: '
+          '${step.errorKind}: ${step.errorMessage}');
     }
   }
   for (final entry in expectedBreaks.entries) {
@@ -163,10 +158,8 @@ Future<void> main() async {
     if (step.ok || step.errorKind != entry.value) {
       failures++;
       // ignore: avoid_print
-      print(
-        '✗ BREAK step ${entry.key} expected ${entry.value}, got '
-        '${step.ok ? "passed" : step.errorKind}',
-      );
+      print('✗ BREAK step ${entry.key} expected ${entry.value}, got '
+          '${step.ok ? "passed" : step.errorKind}');
     }
   }
   if (!validateRefusal.contains('text')) {
@@ -176,12 +169,10 @@ Future<void> main() async {
   }
 
   // ignore: avoid_print
-  print(
-    'matrix: '
-    '${worksReport.steps.where((s) => s.ok).length} works / '
-    '${expectedBreaks.length} known-breaks; '
-    'refusal: $validateRefusal',
-  );
+  print('matrix: '
+      '${worksReport.steps.where((s) => s.ok).length} works / '
+      '${expectedBreaks.length} known-breaks; '
+      'refusal: $validateRefusal');
   if (failures > 0) {
     exit(1);
   }

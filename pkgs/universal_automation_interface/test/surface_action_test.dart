@@ -49,7 +49,10 @@ void main() {
       expect(SurfaceActionDescriptor.fromJson(null), isNull);
       expect(SurfaceActionDescriptor.fromJson('nope'), isNull);
       expect(SurfaceActionDescriptor.fromJson(const {}), isNull);
-      expect(SurfaceActionDescriptor.fromJson({'name': ''}), isNull);
+      expect(
+        SurfaceActionDescriptor.fromJson({'name': ''}),
+        isNull,
+      );
     });
   });
 

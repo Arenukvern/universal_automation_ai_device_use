@@ -18,7 +18,8 @@ void main() {
     );
   });
 
-  test('the guard refuses admission while the concurrency budget is full', () {
+  test('the guard refuses admission while the concurrency budget is full',
+      () {
     final guard = BudgetGuard(const ServeBudgets(maxConcurrentJobs: 1));
     expect(guard.tryAcquire(), isTrue);
     expect(guard.tryAcquire(), isFalse);

@@ -36,15 +36,15 @@ void main() {
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario(
-          's',
-          steps: [
-            code((context) async {
+        scenario('s', steps: [
+          code(
+            (context) async {
               final snapshot = await context.driver.snapshot();
               return {'nodes': snapshot.nodes.length};
-            }, label: 'count-nodes'),
-          ],
-        ),
+            },
+            label: 'count-nodes',
+          ),
+        ]),
       ],
     );
 
@@ -71,20 +71,20 @@ void main() {
     final report = await PlanRunner().run(failing);
     expect(report.ok, isFalse);
     expect(report.steps.single.errorKind, 'codeStepFailed');
-    expect((report.steps.single.errorMessage ?? '').contains('exited'), isTrue);
+    expect(
+      (report.steps.single.errorMessage ?? '').contains('exited'),
+      isTrue,
+    );
   });
 
   test('planDocument refuses snapshots carrying code steps', () async {
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario(
-          's',
-          steps: [
-            observe(),
-            exec('true', session: 'browser'),
-          ],
-        ),
+        scenario('s', steps: [
+          observe(),
+          exec('true', session: 'browser'),
+        ]),
       ],
     );
     expect(
@@ -100,9 +100,7 @@ void main() {
     // Without the code step the snapshot exports cleanly.
     final exportable = AutomationPlan(
       sessions: plan.sessions.values.toList(),
-      scenarios: [
-        scenario('s', steps: [observe()]),
-      ],
+      scenarios: [scenario('s', steps: [observe()])],
     );
     expect(planDocument(exportable)['scenarios'], isNotNull);
   });
@@ -134,94 +132,96 @@ scenarios:
     );
   });
 
-  test('record captures the fake screencast stream into artifacts', () async {
+  test('record captures the fake screencast stream into artifacts',
+      () async {
     final outDir = Directory.systemTemp.createTempSync('uat-record');
     addTearDown(() => outDir.deleteSync(recursive: true));
 
     final plan = AutomationPlan(
       sessions: [cdp('browser', uri: endpoint)],
       scenarios: [
-        scenario(
-          's',
-          steps: [
-            record(
-              const Duration(milliseconds: 300),
-              outDir.path,
-              base: 'demo',
-            ),
-          ],
-        ),
+        scenario('s', steps: [
+          record(
+            const Duration(milliseconds: 300),
+            outDir.path,
+            base: 'demo',
+          ),
+        ]),
       ],
     );
 
     final report = await PlanRunner().run(plan);
     expect(report.ok, isTrue);
     expect(report.steps.single.detail['frames'], greaterThanOrEqualTo(1));
-    expect(File('${outDir.path}/demo.mjpeg').existsSync(), isTrue);
-    expect(File('${outDir.path}/demo.meta.jsonl').existsSync(), isTrue);
+    expect(
+      File('${outDir.path}/demo.mjpeg').existsSync(),
+      isTrue,
+    );
+    expect(
+      File('${outDir.path}/demo.meta.jsonl').existsSync(),
+      isTrue,
+    );
   });
 
   test('handles-dir artifacts resolve handle bindings', () async {
     final handles = Directory.systemTemp.createTempSync('uat-handles');
     addTearDown(() => handles.deleteSync(recursive: true));
-    File('${handles.path}/session-staged-handle')
-        .writeAsStringSync('$endpoint\n');
+    File(
+      '${handles.path}/session-staged-handle',
+    ).writeAsStringSync('$endpoint\n');
 
     final plan = AutomationPlan(
       sessions: [cdp('staged', handle: 'session-staged-handle')],
-      scenarios: [
-        scenario('s', steps: [observe()]),
-      ],
+      scenarios: [scenario('s', steps: [observe()])],
     );
 
-    final report = await PlanRunner(handleBaseDirectory: handles.path)
-        .run(plan);
+    final report = await PlanRunner(
+      handleBaseDirectory: handles.path,
+    ).run(plan);
     expect(report.ok, isTrue);
   });
 
-  test(
-    'injected DriverFactory extends the registry (the Flutter-tier seam)',
-    () async {
-      final plan = AutomationPlan(
-        sessions: [
-          SessionBinding(
-            name: 'app',
-            transport: AutomationTransport.vmService,
-            uri: Uri.parse('ws://127.0.0.1:12345/ws'),
-          ),
-        ],
-        scenarios: [
-          scenario('s', steps: [observe()]),
-        ],
-      );
+  test('injected DriverFactory extends the registry (the Flutter-tier seam)',
+      () async {
+    final plan = AutomationPlan(
+      sessions: [
+        SessionBinding(
+          name: 'app',
+          transport: AutomationTransport.vmService,
+          uri: Uri.parse('ws://127.0.0.1:12345/ws'),
+        ),
+      ],
+      scenarios: [scenario('s', steps: [observe()])],
+    );
 
-      // Without a factory: loud.
-      final loud = await PlanRunner().run(plan);
-      expect(loud.ok, isFalse);
-      expect(loud.steps.single.errorKind, 'transportNotLinked');
+    // Without a factory: loud.
+    final loud = await PlanRunner().run(plan);
+    expect(loud.ok, isFalse);
+    expect(loud.steps.single.errorKind, 'transportNotLinked');
 
-      // With a composition-registered factory: the tier participates.
-      // (PlanRunner does not expose the registry; drive the registry API
-      // directly for the seam proof.)
-      final registry = SessionRegistry(bindings: plan.sessions)
-        ..registerFactory(AutomationTransport.vmService, (
-          binding,
-          endpoint,
-          timeout,
-        ) async {
-          expect(endpoint, plan.sessions['app']!.uri);
-          return _FakeResolvedSession();
-        });
-      final session = await registry.attach('app');
-      expect(session.binding.name, 'app');
-      await registry.detachAll();
-    },
-  );
+    // With a composition-registered factory: the tier participates.
+    // (PlanRunner does not expose the registry; drive the registry API
+    // directly for the seam proof.)
+    final registry = SessionRegistry(
+      bindings: plan.sessions,
+    )..registerFactory(AutomationTransport.vmService, (
+        binding,
+        endpoint,
+        timeout,
+      ) async {
+        expect(endpoint, plan.sessions['app']!.uri);
+        return _FakeResolvedSession();
+      });
+    final session = await registry.attach('app');
+    expect(session.binding.name, 'app');
+    await registry.detachAll();
+  });
 
   test('attachFocused caches the endpoint-free desktop session', () async {
     var builds = 0;
-    final registry = SessionRegistry(bindings: const {})
-      ..registerFactory(AutomationTransport.osAccessibility, (
+    final registry = SessionRegistry(
+      bindings: const {},
+    )..registerFactory(AutomationTransport.osAccessibility, (
         binding,
         endpoint,
         timeout,
@@ -265,8 +265,7 @@ final class _FakeResolvedSession implements ResolvedSession {
 
 final class _Driver implements AutomationDriver {
   @override
-  DriverCapabilities get capabilities =>
-      const DriverCapabilities(a11yTree: true);
+  DriverCapabilities get capabilities => const DriverCapabilities(a11yTree: true);
 
   @override
   Future<Snapshot> snapshot() async => Snapshot(

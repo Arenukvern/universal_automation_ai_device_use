@@ -54,7 +54,11 @@ void main() {
     // Full walk: window, toolbar, New, Open, Email, Buy = 6 nodes.
     expect(observation.walkedCount, 6);
     // Shown: toolbar + two buttons — but refs stay full-walk.
-    expect(observation.nodes.map((n) => n.ref).toList(), ['s_1', 's_2', 's_3']);
+    expect(observation.nodes.map((n) => n.ref).toList(), [
+      's_1',
+      's_2',
+      's_3',
+    ]);
     final rendered = observation.render();
     expect(rendered, contains('# observation rev=7 walked=6 shown=3'));
     expect(rendered, contains('s_2 button "New"'));
@@ -75,7 +79,8 @@ void main() {
     expect(rendered, isNot(contains('value=')));
   });
 
-  test('trimming hides the tail, admits it in the header, never renumbers', () {
+  test('trimming hides the tail, admits it in the header, never renumbers',
+      () {
     final observation = Observation.of(
       _fixture(),
       const SemanticView(maxNodes: 2),
@@ -90,7 +95,9 @@ void main() {
       _fixture(),
       const SemanticView(
         maxNodes: 1, // main shows only the window
-        panes: {'toolbar': SemanticView(subtreeOf: 's_1')},
+        panes: {
+          'toolbar': SemanticView(subtreeOf: 's_1'),
+        },
       ),
     );
     final rendered = observation.render();
@@ -101,10 +108,13 @@ void main() {
     expect(observation.walkedCount, 6 + 3); // main walk + pane subtree
   });
 
-  test('a pane selector naming an absent node renders an empty section', () {
+  test('a pane selector naming an absent node renders an empty section',
+      () {
     final observation = Observation.of(
       _fixture(),
-      const SemanticView(panes: {'ghost': SemanticView(subtreeOf: 's_99')}),
+      const SemanticView(panes: {
+        'ghost': SemanticView(subtreeOf: 's_99'),
+      }),
     );
     final rendered = observation.render();
     expect(rendered, contains('# pane ghost'));
@@ -141,11 +151,7 @@ void main() {
       view,
     );
     final delta = after.diff(before);
-    expect(delta.renderedNames(), {
-      'added': ['Save'],
-      'removed': ['Open'],
-      'changed': ['Email'],
-    });
+    expect(delta.renderedNames(), {'added': ['Save'], 'removed': ['Open'], 'changed': ['Email']});
     expect(delta.render(), contains('+ '));
     expect(delta.render(), contains('- '));
     expect(delta.render(), contains('~ '));
@@ -162,23 +168,20 @@ void main() {
 
   test('identified siblings match across reordering (keyed diffing)', () {
     final view = const SemanticView();
-    AxNode toolbarNode({required List<AxNode> children}) =>
-        _node('toolbar', identifier: 'toolbar', children: children);
+    AxNode toolbarNode({required List<AxNode> children}) => _node(
+      'toolbar',
+      identifier: 'toolbar',
+      children: children,
+    );
     final before = Observation.of(
       Snapshot(
         roots: [
-          _node(
-            'window',
-            name: 'Main',
-            children: [
-              toolbarNode(
-                children: [
-                  _node('button', name: 'Save', identifier: 'btn.save'),
-                  _node('button', name: 'Open', identifier: 'btn.open'),
-                ],
-              ),
-            ],
-          ),
+          _node('window', name: 'Main', children: [
+            toolbarNode(children: [
+              _node('button', name: 'Save', identifier: 'btn.save'),
+              _node('button', name: 'Open', identifier: 'btn.open'),
+            ]),
+          ]),
         ],
         capturedAt: DateTime.parse('2026-10-08T12:00:00Z'),
         revision: 1,
@@ -189,18 +192,12 @@ void main() {
     final after = Observation.of(
       Snapshot(
         roots: [
-          _node(
-            'window',
-            name: 'Main',
-            children: [
-              toolbarNode(
-                children: [
-                  _node('button', name: 'Open', identifier: 'btn.open'),
-                  _node('button', name: 'Save', identifier: 'btn.save'),
-                ],
-              ),
-            ],
-          ),
+          _node('window', name: 'Main', children: [
+            toolbarNode(children: [
+              _node('button', name: 'Open', identifier: 'btn.open'),
+              _node('button', name: 'Save', identifier: 'btn.save'),
+            ]),
+          ]),
         ],
         capturedAt: DateTime.parse('2026-10-08T12:00:01Z'),
         revision: 2,
@@ -216,12 +213,8 @@ void main() {
       'window',
       name: 'Main',
       children: [
-        _node(
-          'textbox',
-          name: 'Title',
-          value: saveValue,
-          identifier: 'field.title',
-        ),
+        _node('textbox', name: 'Title', value: saveValue,
+            identifier: 'field.title'),
         _node('button', name: 'Buy', identifier: 'btn.buy'),
       ],
     );
@@ -238,19 +231,11 @@ void main() {
         roots: [
           // Reordered: the button moved before the field; the field's
           // value changed. Keyed matching reports one ~ row, not churn.
-          _node(
-            'window',
-            name: 'Main',
-            children: [
-              _node('button', name: 'Buy', identifier: 'btn.buy'),
-              _node(
-                'textbox',
-                name: 'Title',
-                value: 'hello',
-                identifier: 'field.title',
-              ),
-            ],
-          ),
+          _node('window', name: 'Main', children: [
+            _node('button', name: 'Buy', identifier: 'btn.buy'),
+            _node('textbox', name: 'Title', value: 'hello',
+                identifier: 'field.title'),
+          ]),
         ],
         capturedAt: DateTime.parse('2026-10-08T12:00:01Z'),
         revision: 2,
@@ -315,9 +300,7 @@ void main() {
 
   test('unknown fields and non-integer caps fail closed', () {
     expect(
-      () => SemanticView.fromJson({
-        'fields': ['role', 'aura'],
-      }),
+      () => SemanticView.fromJson({'fields': ['role', 'aura']}),
       throwsA(isA<FormatException>()),
     );
     expect(

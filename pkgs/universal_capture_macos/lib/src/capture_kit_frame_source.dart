@@ -30,31 +30,34 @@ class CaptureKitFrameSource implements FrameSource {
   String get id => 'capturekit-macos';
 
   @override
-  SourceCapabilities get capabilities =>
-      SourceCapabilities(contentTypes: const ['image/jpeg'], maxFps: fps);
+  SourceCapabilities get capabilities => SourceCapabilities(
+        contentTypes: const ['image/jpeg'],
+        maxFps: fps,
+      );
 
   @override
   Stream<Frame> start() {
     if (_stopped) throw StateError('CaptureKitFrameSource is stopped');
     if (_started) return _frames.stream;
     _started = true;
-    _subscription = _stream.start(displayId: displayId, fps: fps).listen((
-      captureFrame,
-    ) {
-      _frames.add(
-        Frame(
-          sourceId: id,
-          sequence: ++_sequence,
-          revision: 0,
-          bytes: captureFrame.bytes,
-          contentType: 'image/jpeg',
-          capturedAt: DateTime.fromMicrosecondsSinceEpoch(
-            captureFrame.timestampUs,
-            isUtc: true,
+    _subscription = _stream.start(displayId: displayId, fps: fps).listen(
+      (captureFrame) {
+        _frames.add(
+          Frame(
+            sourceId: id,
+            sequence: ++_sequence,
+            revision: 0,
+            bytes: captureFrame.bytes,
+            contentType: 'image/jpeg',
+            capturedAt: DateTime.fromMicrosecondsSinceEpoch(
+              captureFrame.timestampUs,
+              isUtc: true,
+            ),
           ),
-        ),
-      );
-    }, onError: _frames.addError);
+        );
+      },
+      onError: _frames.addError,
+    );
     return _frames.stream;
   }
 

@@ -13,19 +13,19 @@ Future<Map<String, Object?>?> call(
   int id,
   String method, [
   Object? params,
-]) => server.handle({
-  'jsonrpc': '2.0',
-  'id': id,
-  'method': method,
-  if (params != null) 'params': params,
-});
+]) =>
+    server.handle({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': method,
+      if (params != null) 'params': params,
+    });
 
 Map<String, Object?> payloadOf(Map<String, Object?>? response) => jsonDecode(
-  (((response!['result'] as Map<String, Object?>)['content'] as List<Object?>)
-              .first
-          as Map<String, Object?>)['text']
-      as String,
-) as Map<String, Object?>;
+      (((response!['result'] as Map<String, Object?>)['content']
+                  as List<Object?>)
+              .first as Map<String, Object?>)['text'] as String,
+    ) as Map<String, Object?>;
 
 List<Object?> contentOf(Map<String, Object?>? response) =>
     (response!['result'] as Map<String, Object?>)['content'] as List<Object?>;
@@ -36,8 +36,10 @@ final class _RecordingOsDriver implements AutomationDriver {
   final actions = <AutomationAction>[];
 
   @override
-  DriverCapabilities get capabilities =>
-      const DriverCapabilities(a11yTree: true, navigate: true);
+  DriverCapabilities get capabilities => const DriverCapabilities(
+    a11yTree: true,
+    navigate: true,
+  );
 
   @override
   Future<Snapshot> snapshot() async => Snapshot(
@@ -53,8 +55,7 @@ final class _RecordingOsDriver implements AutomationDriver {
         'AX cannot evaluate expressions; evaluation is an '
         'instrumented-tier capability',
         details: {
-          'remedy':
-              'configure a browser tier and re-send with '
+          'remedy': 'configure a browser tier and re-send with '
               'transport "cdp"',
         },
       );
@@ -94,51 +95,46 @@ void main() {
     },
   );
 
-  test(
-    'automation_capabilities reports tiers, probe, routing, schemes',
-    () async {
-      final server = osDefaultServer(
-        endpoints: {AutomationTransport.cdp: cdpEndpoint},
-      );
-      final payload = payloadOf(
-        await call(server, 1, 'tools/call', {
-          'name': 'automation_capabilities',
-          'arguments': {},
-        }),
-      );
-      final serve = payload['serve'] as Map<String, Object?>;
-      expect(serve['defaultTransport'], 'osAccessibility');
-      expect(serve['platform'], Platform.operatingSystem);
-      final tiers = payload['tiers'] as Map<String, Object?>;
-      final cdp = tiers['cdp'] as Map<String, Object?>;
-      expect(cdp['configured'], true);
-      expect(cdp['endpoint'], '$cdpEndpoint');
-      final probe = cdp['probe'] as Map<String, Object?>;
-      expect(probe['reachable'], true);
-      expect(probe['browser'], isNotNull);
-      expect(
-        (tiers['osAccessibility'] as Map<String, Object?>)['endpointFree'],
-        true,
-      );
-      final routing = payload['routing'] as Map<String, Object?>;
-      expect(routing['browserTierConfigured'], true);
-      expect((routing['instrumentedAffinityVerbs'] as List<Object?>).toSet(), {
-        'navigate',
-        'evaluate',
-        'invoke',
-      });
-      expect(
-        ((payload['openUrl'] as Map<String, Object?>)['schemes'] as List)
-            .contains('https'),
-        true,
-      );
-    },
-  );
+  test('automation_capabilities reports tiers, probe, routing, schemes',
+      () async {
+    final server = osDefaultServer(endpoints: {AutomationTransport.cdp: cdpEndpoint});
+    final payload = payloadOf(
+      await call(server, 1, 'tools/call', {
+        'name': 'automation_capabilities',
+        'arguments': {},
+      }),
+    );
+    final serve = payload['serve'] as Map<String, Object?>;
+    expect(serve['defaultTransport'], 'osAccessibility');
+    expect(serve['platform'], Platform.operatingSystem);
+    final tiers = payload['tiers'] as Map<String, Object?>;
+    final cdp = tiers['cdp'] as Map<String, Object?>;
+    expect(cdp['configured'], true);
+    expect(cdp['endpoint'], '$cdpEndpoint');
+    final probe = cdp['probe'] as Map<String, Object?>;
+    expect(probe['reachable'], true);
+    expect(probe['browser'], isNotNull);
+    expect((tiers['osAccessibility'] as Map<String, Object?>)['endpointFree'],
+        true);
+    final routing = payload['routing'] as Map<String, Object?>;
+    expect(routing['browserTierConfigured'], true);
+    expect(
+      (routing['instrumentedAffinityVerbs'] as List<Object?>).toSet(),
+      {'navigate', 'evaluate', 'invoke'},
+    );
+    expect(
+      ((payload['openUrl'] as Map<String, Object?>)['schemes'] as List)
+          .contains('https'),
+      true,
+    );
+  });
 
   test('unconfigured tiers report configured:false; probe failure is a '
       'fact, not an error', () async {
     final server = osDefaultServer(
-      endpoints: {AutomationTransport.cdp: Uri.parse('http://127.0.0.1:1')},
+      endpoints: {
+        AutomationTransport.cdp: Uri.parse('http://127.0.0.1:1'),
+      },
     );
     final payload = payloadOf(
       await call(server, 1, 'tools/call', {
@@ -177,7 +173,8 @@ void main() {
       'ADR 0003) when no --cdp endpoint exists', () async {
     final handlesDir = await Directory.systemTemp.createTemp('uatk-handles');
     addTearDown(() => handlesDir.delete(recursive: true));
-    await File('${handlesDir.path}/moli').writeAsString('$cdpEndpoint');
+    await File('${handlesDir.path}/moli')
+        .writeAsString('$cdpEndpoint');
     final server = osDefaultServer(
       handlesDirectory: handlesDir.path,
       browserHandle: 'moli',
@@ -230,11 +227,14 @@ void main() {
     final content = contentOf(response);
     expect((content.first as Map)['text'], contains('driverUnsupported'));
     // The structured block: kind + remedy survive the boundary.
-    final details = jsonDecode(
-      (content[1] as Map)['text'] as String,
-    ) as Map<String, Object?>;
+    final details =
+        jsonDecode((content[1] as Map)['text'] as String)
+            as Map<String, Object?>;
     expect(details['kind'], 'driverUnsupported');
-    expect('$details', contains('configure a browser tier'));
+    expect(
+      '$details',
+      contains('configure a browser tier'),
+    );
   });
 }
 

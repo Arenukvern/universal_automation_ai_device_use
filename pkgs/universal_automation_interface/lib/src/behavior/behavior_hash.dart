@@ -63,7 +63,8 @@ String sha256Hex(List<int> bytes) {
     }
     for (var t = 16; t < 64; t++) {
       final s0 = _rotr(w[t - 15], 7) ^ _rotr(w[t - 15], 18) ^ (w[t - 15] >>> 3);
-      final s1 = _rotr(w[t - 2], 17) ^ _rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
+      final s1 =
+          _rotr(w[t - 2], 17) ^ _rotr(w[t - 2], 19) ^ (w[t - 2] >>> 10);
       w[t] = (w[t - 16] + s0 + w[t - 7] + s1) & 0xffffffff;
     }
 

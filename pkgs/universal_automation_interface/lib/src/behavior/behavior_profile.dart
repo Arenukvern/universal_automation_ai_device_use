@@ -72,14 +72,12 @@ final class BezierPath extends PathModel {
   List<String> validate() {
     final violations = <String>[];
     if (curvature.abs() > 0.5) {
-      final message =
-          'BezierPath.curvature must satisfy '
+      final message = 'BezierPath.curvature must satisfy '
           '|curvature| <= 0.5 (got $curvature)';
       violations.add(message);
     }
     if (overshootPx < 0 || overshootPx > 64) {
-      final message =
-          'BezierPath.overshootPx must be within '
+      final message = 'BezierPath.overshootPx must be within '
           '[0, 64] px (got $overshootPx)';
       violations.add(message);
     }
@@ -203,7 +201,10 @@ final class KeystrokeCadence extends TypedSpec {
   final TimingDistribution hold;
 
   @override
-  List<String> validate() => [...digraph.validate(), ...hold.validate()];
+  List<String> validate() => [
+    ...digraph.validate(),
+    ...hold.validate(),
+  ];
 
   /// Canonical JSON shape.
   Map<String, Object?> toJson() => {
@@ -244,7 +245,9 @@ final class ActionRhythm extends TypedSpec {
   List<String> validate() => beforeAction.validate();
 
   /// Canonical JSON shape.
-  Map<String, Object?> toJson() => {'beforeAction': beforeAction.toJson()};
+  Map<String, Object?> toJson() => {
+    'beforeAction': beforeAction.toJson(),
+  };
 
   @override
   bool operator ==(Object other) =>
@@ -327,8 +330,7 @@ final class SessionPacing extends TypedSpec {
   List<String> validate() {
     final violations = <String>[];
     if (noiseEventRate < 0 || noiseEventRate > 1) {
-      final message =
-          'SessionPacing.noiseEventRate must be within '
+      final message = 'SessionPacing.noiseEventRate must be within '
           '[0, 1] (got $noiseEventRate)';
       violations.add(message);
     }
@@ -367,6 +369,7 @@ final class SessionPacing extends TypedSpec {
 /// either as the default (ADR 0044).
 @immutable
 final class BehaviorProfile extends TypedSpec {
+
   /// Creates and validates a profile.
   factory BehaviorProfile({
     ActionRhythm rhythm = const ActionRhythm(),
@@ -374,9 +377,8 @@ final class BehaviorProfile extends TypedSpec {
     SessionPacing pacing = const SessionPacing(),
     PointerMotion pointer = const PointerMotion(),
     KeystrokeCadence cadence = const KeystrokeCadence(),
-  }) =>
-      BehaviorProfile._(rhythm, reaction, pacing, pointer, cadence)
-        ..ensureValid();
+  }) => BehaviorProfile._(rhythm, reaction, pacing, pointer, cadence)
+      ..ensureValid();
 
   /// Samples a per-session human-prior profile from broad ranges.
   ///
@@ -418,7 +420,6 @@ final class BehaviorProfile extends TypedSpec {
       ),
     );
   }
-
   /// Creates a profile; fails closed via `ensureValid` in the factory
   /// constructors — use [validate] results through [ensure] when
   /// composing programmatically.
@@ -431,17 +432,20 @@ final class BehaviorProfile extends TypedSpec {
   );
 
   /// Deserializes a profile from its canonical JSON shape.
-  factory BehaviorProfile.fromJson(
-    Map<String, Object?> json,
-  ) => BehaviorProfile(
-    rhythm: ActionRhythm.fromJson(json['rhythm']! as Map<String, Object?>),
-    reaction: ReactionDelay.fromJson(json['reaction']! as Map<String, Object?>),
-    pacing: SessionPacing.fromJson(json['pacing']! as Map<String, Object?>),
-    pointer: PointerMotion.fromJson(json['pointer']! as Map<String, Object?>),
-    cadence: KeystrokeCadence.fromJson(
-      json['cadence']! as Map<String, Object?>,
-    ),
-  );
+  factory BehaviorProfile.fromJson(Map<String, Object?> json) =>
+      BehaviorProfile(
+        rhythm: ActionRhythm.fromJson(json['rhythm']! as Map<String, Object?>),
+        reaction: ReactionDelay.fromJson(
+          json['reaction']! as Map<String, Object?>,
+        ),
+        pacing: SessionPacing.fromJson(json['pacing']! as Map<String, Object?>),
+        pointer: PointerMotion.fromJson(
+          json['pointer']! as Map<String, Object?>,
+        ),
+        cadence: KeystrokeCadence.fromJson(
+          json['cadence']! as Map<String, Object?>,
+        ),
+      );
 
   /// The canonical degenerate profile: zero timing, direct paths — today's
   /// teleporting delivery, made explicit. Survives `synthesize` and
@@ -451,9 +455,23 @@ final class BehaviorProfile extends TypedSpec {
 
   /// Decile boundaries (µs) for inter-key intervals, scaled per session.
   static List<int> _scaledDigraph(BehaviorRng rng) {
-    const base = [34, 52, 68, 84, 102, 124, 152, 192, 258, 368, 540];
+    const base = [
+      34,
+      52,
+      68,
+      84,
+      102,
+      124,
+      152,
+      192,
+      258,
+      368,
+      540,
+    ];
     final scale = rng.nextBetween(80, 125) / 100;
-    return [for (final micros in base) (micros * 1000 * scale).round()];
+    return [
+      for (final micros in base) (micros * 1000 * scale).round(),
+    ];
   }
 
   /// Dwell before each dispatched action.

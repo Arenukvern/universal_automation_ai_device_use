@@ -77,9 +77,7 @@ void main() {
           IntentHint.fromJson({
             'driver': 'toolkit',
             'locator': {'name': 'Buy'},
-            'view': {
-              'fields': ['aura'],
-            },
+            'view': {'fields': ['aura']},
           }),
           isNull,
         );
@@ -157,9 +155,8 @@ void main() {
       // Plain tools are skipped, not failed.
       expect(registry.intent('shop', 'fmt_plain_tool'), isNull);
       // inputSchema.properties map onto declared parameters.
-      final sku = buyItem.parameters.firstWhere(
-        (parameter) => parameter['name'] == 'sku',
-      );
+      final sku = buyItem.parameters
+          .firstWhere((parameter) => parameter['name'] == 'sku');
       expect(sku['required'], true);
       expect(sku['type'], 'string');
       expect(
@@ -173,12 +170,7 @@ void main() {
         sessions: [cdp('browser', uri: Uri.parse('http://127.0.0.1:1'))],
         intents: registry,
         scenarios: [
-          scenario(
-            's',
-            steps: [
-              intent('shop', 'app_buy_item', args: {'sku': 'SKU-1'}),
-            ],
-          ),
+          scenario('s', steps: [intent('shop', 'app_buy_item', args: {'sku': 'SKU-1'})]),
         ],
       );
       expect(plan.validate(), isEmpty);
@@ -196,11 +188,14 @@ void main() {
       )..writeAsStringSync(jsonEncode(document));
       addTearDown(file.deleteSync);
       final reloaded = IntentRegistry.fromFiles([file.path]);
-      expect(reloaded.intent('shop', 'app_buy_item')!.hint.toJson(), {
-        'driver': 'toolkit',
-        'action': 'click',
-        'locator': {'name': 'Buy'},
-      });
+      expect(
+        reloaded.intent('shop', 'app_buy_item')!.hint.toJson(),
+        {
+          'driver': 'toolkit',
+          'action': 'click',
+          'locator': {'name': 'Buy'},
+        },
+      );
     });
 
     test('ingests the REAL flutter_mcp_toolkit_server capture', () {

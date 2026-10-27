@@ -11,14 +11,8 @@ typedef XsStreamFrameCallbackNative = Void Function(
   Pointer<Void> userData,
 );
 
-@Native<
-  Int32 Function(
-    Uint32,
-    Int32,
-    Pointer<NativeFunction<XsStreamFrameCallbackNative>>,
-    Pointer<Void>,
-  )
->(
+@Native<Int32 Function(Uint32, Int32,
+    Pointer<NativeFunction<XsStreamFrameCallbackNative>>, Pointer<Void>)>(
   symbol: 'xs_capture_stream_start',
   assetId: 'package:universal_capture_macos/xs_capture_bridge',
 )

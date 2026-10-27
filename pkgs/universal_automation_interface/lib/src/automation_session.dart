@@ -209,8 +209,9 @@ abstract interface class ResolvedSession {
 /// seam of every session registry. Composition roots (the instrumented
 /// Flutter tier, a mobile self-widget-tree driver, a WebView tier)
 /// register factories without touching the toolkit.
-typedef DriverFactory = Future<ResolvedSession> Function(
-  SessionBinding binding,
-  Uri endpoint,
-  Duration attachTimeout,
-);
+typedef DriverFactory =
+    Future<ResolvedSession> Function(
+      SessionBinding binding,
+      Uri endpoint,
+      Duration attachTimeout,
+    );

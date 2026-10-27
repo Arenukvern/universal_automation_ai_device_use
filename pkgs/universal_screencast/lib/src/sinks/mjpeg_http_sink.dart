@@ -90,7 +90,10 @@ class MjpegHttpSink implements FrameSink {
       HttpHeaders.contentTypeHeader,
       'multipart/x-mixed-replace; boundary=frame',
     );
-    response.headers.set(HttpHeaders.cacheControlHeader, 'no-cache, private');
+    response.headers.set(
+      HttpHeaders.cacheControlHeader,
+      'no-cache, private',
+    );
     _streams.add(response);
     // dart:io's HttpClient completes the request only when the first body
     // chunk arrives, so the boundary preamble goes out immediately.

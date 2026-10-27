@@ -98,8 +98,7 @@ final class DispatchedStep {
   };
 
   @override
-  String toString() =>
-      'DispatchedStep(#$sequence ${step.kind}, '
+  String toString() => 'DispatchedStep(#$sequence ${step.kind}, '
       'drift ${driftUs}us)';
 }
 
@@ -141,8 +140,7 @@ final class BehaviorOutcome {
   };
 
   @override
-  String toString() =>
-      'BehaviorOutcome(${verdict.name}'
+  String toString() => 'BehaviorOutcome(${verdict.name}'
       '${cause == null ? '' : ', ${cause!.name}'}, '
       '${dispatched.length}/${plan.steps.length} dispatched)';
 }
@@ -187,11 +185,13 @@ final class ProfiledDriver implements BehavioralDriver {
     AutomationAction action,
     BehaviorProfile profile, {
     int? seed,
-  }) => _inner.performWith(action, profile, seed: seed);
+  }) =>
+      _inner.performWith(action, profile, seed: seed);
 
   /// Performs [action] under this wrapper's default profile.
   Future<BehaviorOutcome> performProfiled(
     AutomationAction action, {
     int? seed,
-  }) => performWith(action, _defaultProfile, seed: seed);
+  }) =>
+      performWith(action, _defaultProfile, seed: seed);
 }

@@ -53,10 +53,8 @@ void main() {
       throwsA(isA<DriverUnsupportedException>()),
     );
     expect(openedUrls, [url]);
-    await expectLater(
-      driver.screenshot(),
-      throwsA(isA<DriverUnsupportedException>()),
-    );
+    await expectLater(driver.screenshot(),
+        throwsA(isA<DriverUnsupportedException>()));
   });
 
   test('sidecar errors surface as UiaSidecarException', () async {

@@ -67,8 +67,7 @@ final class NetworkEntry {
   };
 
   @override
-  String toString() =>
-      'NetworkEntry(#$method $url '
+  String toString() => 'NetworkEntry(#$method $url '
       '${status?.toString() ?? '…'}${failed ? ' (failed)' : ''})';
 }
 
@@ -127,9 +126,10 @@ final class CdpNetworkLog {
   /// Fetches the response body for [requestId]: decoded text (malformed
   /// UTF-8 tolerated) when the browser still buffers it, else `null`.
   Future<String?> responseBody(String requestId) async {
-    final result = await _connection.send('Network.getResponseBody', {
-      'requestId': requestId,
-    });
+    final result = await _connection.send(
+      'Network.getResponseBody',
+      {'requestId': requestId},
+    );
     final body = result['body'];
     if (body is! String) return null;
     if (result['base64Encoded'] == true) {
@@ -216,7 +216,8 @@ final class CdpNetworkLog {
   }
 
   void _onFinished(CdpEvent event) {
-    final entry = _byRequestId[event.params['requestId'] as String?];
+    final entry =
+        _byRequestId[event.params['requestId'] as String?];
     if (entry == null || entry.finished || entry.failed) return;
     _touch();
     entry.finished = true;

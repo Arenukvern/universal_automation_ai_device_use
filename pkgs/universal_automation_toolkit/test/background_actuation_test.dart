@@ -13,20 +13,20 @@ Future<Map<String, Object?>?> call(
   int id,
   String method, [
   Object? params,
-]) => server.handle({
-  'jsonrpc': '2.0',
-  'id': id,
-  'method': method,
-  if (params != null) 'params': params,
-});
+]) =>
+    server.handle({
+      'jsonrpc': '2.0',
+      'id': id,
+      'method': method,
+      if (params != null) 'params': params,
+    });
 
 /// Decodes the text content payload of a tools/call result.
 Map<String, Object?> payloadOf(Map<String, Object?>? response) => jsonDecode(
-  (((response!['result'] as Map<String, Object?>)['content'] as List<Object?>)
-              .single
-          as Map<String, Object?>)['text']
-      as String,
-) as Map<String, Object?>;
+      (((response!['result'] as Map<String, Object?>)['content']
+              as List<Object?>)
+          .single as Map<String, Object?>)['text'] as String,
+    ) as Map<String, Object?>;
 
 /// Records every bridge call and replays scripted observations — the
 /// macOS-driver test's FakeBridge pattern, trimmed to what the anchor
@@ -224,10 +224,9 @@ const _finderJson =
 /// The plain text content of an isError tool result (not JSON) — the
 /// prose block; structured details ride as a second block (ADR 0003).
 String errorTextOf(Map<String, Object?>? response) =>
-    (((response!['result'] as Map<String, Object?>)['content'] as List<Object?>)
-                .first
-            as Map<String, Object?>)['text']
-        as String;
+    (((response!['result'] as Map<String, Object?>)['content']
+                as List<Object?>)
+            .first as Map<String, Object?>)['text'] as String;
 
 void main() {
   group('SessionRegistry.attachApp (ADR 0064 anchoring)', () {
@@ -242,7 +241,10 @@ void main() {
           },
         },
       );
-      await registry.attachApp(AutomationTransport.osAccessibility, pid: 4242);
+      await registry.attachApp(
+        AutomationTransport.osAccessibility,
+        pid: 4242,
+      );
       await registry.attachApp(
         AutomationTransport.osAccessibility,
         bundleId: 'com.apple.finder',
@@ -251,11 +253,10 @@ void main() {
         AutomationTransport.osAccessibility,
         name: 'Finder',
       );
-      expect(endpoints.map((uri) => '$uri').toList(), [
-        'ax://pid/4242',
-        'ax://bundle/com.apple.finder',
-        'ax://name/Finder',
-      ]);
+      expect(
+        endpoints.map((uri) => '$uri').toList(),
+        ['ax://pid/4242', 'ax://bundle/com.apple.finder', 'ax://name/Finder'],
+      );
     });
 
     test('no anchor falls back to the focused sentinel', () async {
@@ -276,7 +277,10 @@ void main() {
     test('non-OS transports refuse the anchor vocabulary loudly', () {
       final registry = SessionRegistry(bindings: const {});
       expect(
-        () => registry.attachApp(AutomationTransport.cdp, pid: 4242),
+        () => registry.attachApp(
+          AutomationTransport.cdp,
+          pid: 4242,
+        ),
         throwsA(isA<DriverUnsupportedException>()),
       );
     });
@@ -317,11 +321,8 @@ void main() {
       final driver = session.driver;
       expect(driver, isA<MacosDriver>());
       expect(driver, isA<BehavioralMacosDriver>());
-      expect(
-        (driver as MacosDriver).targetPid,
-        4242,
-        reason: 'observations route to the anchored pid, not focus',
-      );
+      expect((driver as MacosDriver).targetPid, 4242,
+          reason: 'observations route to the anchored pid, not focus');
     });
   });
 
@@ -333,13 +334,10 @@ void main() {
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
               Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(
-                    bridge: bridge,
-                    targetPid: _anchorPid(endpoint),
-                  ),
-                ),
+                _StubSession(binding, driver: BehavioralMacosDriver(
+                  bridge: bridge,
+                  targetPid: _anchorPid(endpoint),
+                )),
               ),
         },
       );
@@ -362,12 +360,10 @@ void main() {
         defaultTransport: AutomationTransport.osAccessibility,
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
-              Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(bridge: bridge),
-                ),
-              ),
+              Future<ResolvedSession>.value(_StubSession(
+                binding,
+                driver: BehavioralMacosDriver(bridge: bridge),
+              )),
         },
       );
       final response = await call(server, 2, 'tools/call', {
@@ -390,12 +386,10 @@ void main() {
         defaultTransport: AutomationTransport.osAccessibility,
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
-              Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(bridge: bridge),
-                ),
-              ),
+              Future<ResolvedSession>.value(_StubSession(
+                binding,
+                driver: BehavioralMacosDriver(bridge: bridge),
+              )),
         },
       );
       final response = await call(server, 3, 'tools/call', {
@@ -419,12 +413,13 @@ void main() {
         defaultTransport: AutomationTransport.osAccessibility,
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
-              Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(bridge: bridge, targetPid: 42),
+              Future<ResolvedSession>.value(_StubSession(
+                binding,
+                driver: BehavioralMacosDriver(
+                  bridge: bridge,
+                  targetPid: 42,
                 ),
-              ),
+              )),
         },
       );
 
@@ -439,7 +434,10 @@ void main() {
         },
       });
       expect(payloadOf(typed)['ok'], true);
-      expect(bridge.pidTypedText.single, (pid: 42, text: 'yes'));
+      expect(
+        bridge.pidTypedText.single,
+        (pid: 42, text: 'yes'),
+      );
       expect(bridge.lastActivatedPid, isNull);
 
       // Pointer verbs carry global screen coordinates: still refuse,
@@ -452,7 +450,10 @@ void main() {
           'app': {'pid': 42},
         },
       });
-      expect((refused!['result'] as Map<String, Object?>)['isError'], true);
+      expect(
+        (refused!['result'] as Map<String, Object?>)['isError'],
+        true,
+      );
       expect(errorTextOf(refused), contains('foregroundRequired'));
       expect(bridge.lastActivatedPid, isNull);
 
@@ -472,18 +473,17 @@ void main() {
       expect(bridge.lastActivatedPid, 42);
     });
 
-    test('automation_list_apps enumerates the anchorable record', () async {
+    test('automation_list_apps enumerates the anchorable record',
+        () async {
       final bridge = FakeAxDriverBridge();
       final server = ToolkitMcpServer(
         defaultTransport: AutomationTransport.osAccessibility,
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
-              Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(bridge: bridge),
-                ),
-              ),
+              Future<ResolvedSession>.value(_StubSession(
+                binding,
+                driver: BehavioralMacosDriver(bridge: bridge),
+              )),
         },
       );
       final response = await call(server, 6, 'tools/call', {
@@ -510,7 +510,8 @@ void main() {
       jobsDir.deleteSync(recursive: true);
     });
 
-    test('submit-and-detach: a failing plan lands a durable receipt', () async {
+    test('submit-and-detach: a failing plan lands a durable receipt',
+        () async {
       final plan = File('${jobsDir.parent.path}/unreachable-plan.yaml')
         ..writeAsStringSync('''
 sessions:
@@ -537,11 +538,8 @@ scenarios:
         await Future<void>.delayed(const Duration(milliseconds: 20));
       }
       expect(current!.status, 'failed');
-      expect(
-        current.report?['ok'],
-        false,
-        reason: 'the step failure rides the run report',
-      );
+      expect(current.report?['ok'], false,
+          reason: 'the step failure rides the run report');
       expect(current.report?['steps'], isNotNull);
 
       // The receipt is on disk and re-readable (survives restarts).
@@ -553,7 +551,8 @@ scenarios:
       expect(restored.status, 'failed');
     });
 
-    test('a passing plan lands the full run report in the receipt', () async {
+    test('a passing plan lands the full run report in the receipt',
+        () async {
       final bridge = FakeAxDriverBridge();
       final plan = File('${jobsDir.parent.path}/anchor-plan.yaml')
         ..writeAsStringSync('''
@@ -570,15 +569,13 @@ scenarios:
         directory: jobsDir.path,
         factories: {
           AutomationTransport.osAccessibility: (binding, endpoint, timeout) =>
-              Future<ResolvedSession>.value(
-                _StubSession(
-                  binding,
-                  driver: BehavioralMacosDriver(
-                    bridge: bridge,
-                    targetPid: _anchorPid(endpoint),
-                  ),
+              Future<ResolvedSession>.value(_StubSession(
+                binding,
+                driver: BehavioralMacosDriver(
+                  bridge: bridge,
+                  targetPid: _anchorPid(endpoint),
                 ),
-              ),
+              )),
         },
       );
       final job = queue.submit(planPath: plan.path);
@@ -593,11 +590,8 @@ scenarios:
       }
       expect(current!.status, 'succeeded');
       expect(current.report?['ok'], true);
-      expect(
-        bridge.lastSnapshotPid,
-        4242,
-        reason: 'the plan session anchored by uri drives the anchored pid',
-      );
+      expect(bridge.lastSnapshotPid, 4242,
+          reason: 'the plan session anchored by uri drives the anchored pid');
     });
   });
 }
@@ -633,7 +627,9 @@ final class _NullDriver implements AutomationDriver {
 
   @override
   Future<Snapshot> snapshot() async => Snapshot(
-    roots: [const AxNode(role: 'application', name: 'stub')],
+    roots: [
+      const AxNode(role: 'application', name: 'stub'),
+    ],
     capturedAt: DateTime.now().toUtc(),
     revision: 1,
   );

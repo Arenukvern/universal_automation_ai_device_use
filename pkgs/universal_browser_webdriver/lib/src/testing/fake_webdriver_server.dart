@@ -94,7 +94,8 @@ class FakeWebDriverServer {
     final id = message['id'];
     if (id is! int) return;
     final method = message['method'] as String? ?? '';
-    final params = (message['params'] as Map<String, Object?>? ?? const {});
+    final params =
+        (message['params'] as Map<String, Object?>? ?? const {});
     bidiCommands.add(method);
     switch (method) {
       case 'session.subscribe':
@@ -105,43 +106,35 @@ class FakeWebDriverServer {
         }
         socket.add(jsonEncode({'type': 'result', 'id': id, 'result': {}}));
       case 'browsingContext.getTree':
-        socket.add(
-          jsonEncode({
-            'type': 'result',
-            'id': id,
-            'result': {'contexts': bidiTree},
-          }),
-        );
+        socket.add(jsonEncode({
+          'type': 'result',
+          'id': id,
+          'result': {'contexts': bidiTree},
+        }));
       case 'script.evaluate':
-        socket.add(
-          jsonEncode({
-            'type': 'result',
-            'id': id,
-            'result': {
-              'result': {'type': 'number', 'value': bidiEvaluateValue},
-              'realm': 'realm-1',
-            },
-          }),
-        );
+        socket.add(jsonEncode({
+          'type': 'result',
+          'id': id,
+          'result': {
+            'result': {'type': 'number', 'value': bidiEvaluateValue},
+            'realm': 'realm-1',
+          },
+        }));
       default:
-        socket.add(
-          jsonEncode({
-            'type': 'error',
-            'id': id,
-            'error': 'unknown command',
-            'message': method,
-          }),
-        );
+        socket.add(jsonEncode({
+          'type': 'error',
+          'id': id,
+          'error': 'unknown command',
+          'message': method,
+        }));
     }
   }
 
   /// Delivers a BiDi event to every connected session socket.
   void emitBidiEvent(String method, Map<String, Object?> params) {
-    final payload = jsonEncode({
-      'type': 'event',
-      'method': method,
-      'params': params,
-    });
+    final payload = jsonEncode(
+      {'type': 'event', 'method': method, 'params': params},
+    );
     for (final socket in List.of(_bidiSockets)) {
       socket.add(payload);
     }
@@ -194,7 +187,9 @@ class FakeWebDriverServer {
     } else if (request.method == 'POST' && path == '/session') {
       final id = 'session-${sessions.length + 1}';
       sessions.add(id);
-      _bidiWsUri ??= Uri.parse('ws://127.0.0.1:${_server!.port}/session/$id');
+      _bidiWsUri ??= Uri.parse(
+        'ws://127.0.0.1:${_server!.port}/session/$id',
+      );
       await ok({
         'sessionId': id,
         'capabilities': {
@@ -247,7 +242,8 @@ class FakeWebDriverServer {
         final inputs = actions?['actions'] as List<Object?>? ?? const [];
         for (final input in inputs) {
           final inputMap = input as Map<String, Object?>?;
-          final keys = inputMap?['actions'] as List<Object?>? ?? const [];
+          final keys =
+              inputMap?['actions'] as List<Object?>? ?? const [];
           for (final key in keys) {
             final map = key as Map<String, Object?>?;
             if (inputMap?['type'] == 'pointer' && map != null) {

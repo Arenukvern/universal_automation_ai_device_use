@@ -1,5 +1,4 @@
 import 'dart:async';
-
 import 'package:test/test.dart';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_browser_cdp/testing.dart';

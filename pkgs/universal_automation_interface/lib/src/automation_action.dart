@@ -110,7 +110,8 @@ final class ScrollAction extends AutomationAction {
   final double? distance;
 
   @override
-  String toString() => 'ScrollAction($direction, ${distance ?? 'default'})';
+  String toString() =>
+      'ScrollAction($direction, ${distance ?? 'default'})';
 }
 
 /// Evaluate a read-only expression in the live surface.
@@ -275,7 +276,10 @@ final class SetValueAction extends AutomationAction {
 final class ElementAction extends AutomationAction {
   /// Creates an element action. At least one locator must be set.
   const ElementAction(this.action, {this.css, this.role, this.name})
-    : assert(action != '', 'action must not be empty'),
+    : assert(
+        action != '',
+        'action must not be empty',
+      ),
       assert(
         css != null || role != null || name != null,
         'ElementAction needs a css selector, role, or name',

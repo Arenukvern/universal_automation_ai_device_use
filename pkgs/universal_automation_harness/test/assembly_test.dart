@@ -8,7 +8,8 @@ final _fillEmail = CommandSpec(
   params: [
     const CommandParam('text', type: 'string', required: true, doc: 'address'),
   ],
-  build: (args) => [typeText(args.string('text'), css: '#email', submit: true)],
+  build:
+      (args) => [typeText(args.string('text'), css: '#email', submit: true)],
 );
 
 AutomationAssembly _assembly() => AutomationAssembly(
@@ -32,10 +33,7 @@ AutomationAssembly _assembly() => AutomationAssembly(
       ],
     ),
   ],
-  budgets: const ServeBudgets(
-    maxConcurrentJobs: 2,
-    jobTimeout: Duration(minutes: 5),
-  ),
+  budgets: const ServeBudgets(maxConcurrentJobs: 2, jobTimeout: Duration(minutes: 5)),
 );
 
 void main() {
@@ -43,7 +41,10 @@ void main() {
     final plan = _assembly().compile();
     expect(plan.scenarios, containsPair('checkout', isNotNull));
     final steps = plan.effectiveSteps('checkout');
-    expect(steps.map((step) => step.kind), ['act', 'wait', 'act', 'verify']);
+    expect(
+      steps.map((step) => step.kind),
+      ['act', 'wait', 'act', 'verify'],
+    );
     final commandStep = steps[2] as ActStep;
     expect(commandStep.session, 'web');
     expect(commandStep.action, isA<TypeAction>());
@@ -64,11 +65,13 @@ void main() {
         Flow('cart', steps: []),
         Flow(
           'cart',
-          steps: [
-            runCommand('broken', args: {'nope': 1}),
-          ],
+          steps: [runCommand('broken', args: {'nope': 1})],
         ),
-        Flow('loop', extend: 'loop', steps: []),
+        Flow(
+          'loop',
+          extend: 'loop',
+          steps: [],
+        ),
         Flow('orphan', extend: 'ghost', steps: []),
       ],
       budgets: const ServeBudgets(maxConcurrentJobs: 0),
@@ -107,14 +110,12 @@ void main() {
     }
   });
 
-  test('compile catches toolkit-level violations over the expanded shape', () {
+  test('compile catches toolkit-level violations over the expanded shape',
+      () {
     final assembly = AutomationAssembly(
       sessions: [cdp('web', uri: Uri.parse('http://127.0.0.1:9222'))],
       flows: [
-        Flow(
-          'two',
-          steps: [navigate(Uri.parse('https://example.com'), session: 'ghost')],
-        ),
+        Flow('two', steps: [navigate(Uri.parse('https://example.com'), session: 'ghost')]),
       ],
     );
     expect(
@@ -138,12 +139,7 @@ void main() {
     final assembly = AutomationAssembly(
       sessions: [cdp('web', uri: Uri.parse('http://127.0.0.1:9222'))],
       flows: [
-        Flow(
-          'with-code',
-          steps: [
-            code((context) async => {'ok': true}),
-          ],
-        ),
+        Flow('with-code', steps: [code((context) async => {'ok': true})]),
       ],
     );
     expect(() => assembly.snapshot(), throwsA(isA<SpecViolationException>()));

@@ -64,7 +64,8 @@ scenarios:
       expect(plan.validate(), isEmpty);
     });
 
-    test('collects every violation before anything runs (fail closed)', () async {
+    test('collects every violation before anything runs (fail closed)',
+        () async {
       final file = File(
         '${Directory.systemTemp.path}/uat-plan-bad-${DateTime.now().microsecondsSinceEpoch}.yaml',
       );
@@ -166,15 +167,9 @@ scenarios:
               typeText('hi', css: '#q', submit: true),
               keyPress('Escape'),
               scrollBy(distance: 120),
-              verifyThat([
-                exists(role: 'button'),
-                absent(name: 'Err'),
-                value('Email', contains: '@'),
-                urlContains('/x'),
-              ]),
-              waitFor([
-                exists(name: 'Done'),
-              ], timeout: const Duration(seconds: 3)),
+              verifyThat([exists(role: 'button'), absent(name: 'Err'),
+                  value('Email', contains: '@'), urlContains('/x')]),
+              waitFor([exists(name: 'Done')], timeout: const Duration(seconds: 3)),
               shot('/tmp/x.png'),
               intent('app', 'go'),
             ],
@@ -191,18 +186,11 @@ scenarios:
 
       final reloaded = await AutomationPlan.load(file.path);
       expect(reloaded.validate(), isEmpty);
-      expect(reloaded.effectiveSteps('s').map((step) => step.kind).toList(), [
-        'observe',
-        'act',
-        'act',
-        'act',
-        'act',
-        'act',
-        'verify',
-        'wait',
-        'screenshot',
-        'intent',
-      ]);
+      expect(
+        reloaded.effectiveSteps('s').map((step) => step.kind).toList(),
+        ['observe', 'act', 'act', 'act', 'act', 'act', 'verify', 'wait',
+            'screenshot', 'intent'],
+      );
     });
 
     test('intent hints lower to actions with invocation args', () {
@@ -211,7 +199,10 @@ scenarios:
         verb: IntentVerb.type,
         locator: {'css': '#email'},
       );
-      final action = hint.lowerToAction(args: {'text': 'a@b.c'}, label: 'test');
+      final action = hint.lowerToAction(
+        args: {'text': 'a@b.c'},
+        label: 'test',
+      );
       expect(action, isA<TypeAction>());
       expect((action as TypeAction).css, '#email');
 

@@ -17,7 +17,8 @@ AutomationPlan _plan() => AutomationAssembly(
 ).compile();
 
 void main() {
-  test('the guard refuses a run while the concurrency budget is exhausted', () {
+  test('the guard refuses a run while the concurrency budget is exhausted',
+      () {
     final guard = BudgetGuard(const ServeBudgets(maxConcurrentJobs: 1));
     guard.tryAcquire(); // simulates another run in flight
     final runner = HarnessRunner(guard: guard);
@@ -35,9 +36,7 @@ void main() {
   });
 
   test('a run is admitted, accounted, and released', () async {
-    final guard = BudgetGuard(
-      const ServeBudgets(jobTimeout: Duration(hours: 1)),
-    );
+    final guard = BudgetGuard(const ServeBudgets(jobTimeout: Duration(hours: 1)));
     final runner = HarnessRunner(guard: guard);
     // No CDP endpoint exists behind the `browser` handle in this test
     // process: the first step fails on attach, the deadline never fires —

@@ -31,7 +31,8 @@ void main() {
       expect(server.methods, contains('Page.bringToFront'));
     });
 
-    test('insertText sends one Input.insertText with the full text', () async {
+    test('insertText sends one Input.insertText with the full text',
+        () async {
       await session.page.insertText('mesh-pair/v1 code');
       final inserts = server.inputEvents
           .where((event) => event.containsKey('text'))
@@ -40,18 +41,21 @@ void main() {
       expect(inserts.single['text'], 'mesh-pair/v1 code');
     });
 
-    test('TypeAction without a locator lowers to bringToFront + insertText '
+    test(
+        'TypeAction without a locator lowers to bringToFront + insertText '
         '(no per-key events — they need OS focus a background window '
         'does not have)', () async {
-      await session.driver.perform(
-        const TypeAction('typed into the focused field'),
-      );
+      await session.driver
+          .perform(const TypeAction('typed into the focused field'));
       expect(server.methods, contains('Page.bringToFront'));
       final inserts = server.inputEvents
           .where((event) => event.containsKey('text'))
           .toList();
       expect(inserts, hasLength(1));
-      expect(inserts.single['text'], 'typed into the focused field');
+      expect(
+        inserts.single['text'],
+        'typed into the focused field',
+      );
       final keyEvents = server.inputEvents
           .where(
             (event) =>
@@ -62,7 +66,8 @@ void main() {
       expect(keyEvents, isEmpty);
     });
 
-    test('TypeAction with submit presses Enter after the insert', () async {
+    test('TypeAction with submit presses Enter after the insert',
+        () async {
       await session.driver.perform(const TypeAction('abc', submit: true));
       expect(server.methods, contains('Page.bringToFront'));
       final enter = server.inputEvents.where(
@@ -77,11 +82,8 @@ void main() {
       await expectLater(
         session.page.resolveNamedRect('Nonexistent'),
         throwsA(
-          isA<ElementNotFoundException>().having(
-            (e) => e.locatorValue,
-            'locatorValue',
-            'Nonexistent',
-          ),
+          isA<ElementNotFoundException>()
+            .having((e) => e.locatorValue, 'locatorValue', 'Nonexistent'),
         ),
       );
     });
@@ -101,7 +103,8 @@ void main() {
       );
     });
 
-    test('resolveNamedRect locates by name and returns actionable bounds '
+    test(
+        'resolveNamedRect locates by name and returns actionable bounds '
         '(the legacy probe shape answers through the loop)', () async {
       // Presence probe → true; the rect probe returns a rect with the
       // legacy hitOk shape (state-less), which the actionability loop
@@ -123,7 +126,8 @@ void main() {
       expect(bounds.center, (140.0, 100.0));
     });
 
-    test('driver semantic click falls back to the live DOM when the AX '
+    test(
+        'driver semantic click falls back to the live DOM when the AX '
         'backend id is dead (stale-id scenario)', () async {
       // AX tree knows the button, but resolving its backendDOMNodeId
       // fails (stale) — the named fallback must click via the live DOM.
@@ -152,9 +156,8 @@ void main() {
       // usable object id (the fake does not implement it, mirroring a
       // detached node), so the poll times out — shrink the driver's
       // timeout pressure by letting the fallback answer immediately.
-      await session.driver.perform(
-        const ClickAction(role: 'button', name: 'Settings'),
-      );
+      await session.driver
+          .perform(const ClickAction(role: 'button', name: 'Settings'));
       final clicks = server.inputEvents
           .where((event) => event['type'] == 'mousePressed')
           .toList();
@@ -164,11 +167,13 @@ void main() {
 
   group('field reads', () {
     test('fieldValue reads the selector-addressed editable', () async {
-      server.evaluateHandler = (expression) =>
-          expression.contains('.value') ? '{"v":"mesh-pair/v1 abc"}' : null;
+      server.evaluateHandler = (expression) => expression.contains('.value')
+          ? '{"v":"mesh-pair/v1 abc"}'
+          : null;
       // The JS returns the string directly; encode through the handler.
-      server.evaluateHandler = (expression) =>
-          expression.contains('.value') ? 'the typed code' : null;
+      server.evaluateHandler = (expression) => expression.contains('.value')
+          ? 'the typed code'
+          : null;
       expect(
         await session.page.fieldValue('flt-semantics textarea'),
         'the typed code',
@@ -178,11 +183,11 @@ void main() {
     test('editableValues lists every editable in DOM order', () async {
       server.evaluateHandler = (expression) =>
           expression.contains('querySelectorAll')
-          ? jsonEncode([
-              {'tag': 'INPUT', 'value': 'first'},
-              {'tag': 'TEXTAREA', 'value': 'second'},
-            ])
-          : null;
+              ? jsonEncode([
+                  {'tag': 'INPUT', 'value': 'first'},
+                  {'tag': 'TEXTAREA', 'value': 'second'},
+                ])
+              : null;
       final values = await session.page.editableValues();
       expect(values, hasLength(2));
       expect(values.last.tag, 'TEXTAREA');
