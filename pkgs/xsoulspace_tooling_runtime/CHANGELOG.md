@@ -21,6 +21,11 @@
   repo's Windows UI Automation sidecar) remain **deferred**.
 - Linux gate: `dart test --concurrency=1` — **53/53** (Windows-only skips);
   `tool/run_p1_oka_probes.sh`.
+- `stopProcessTree` routes non–`runBounded` roots through
+  `stopUnownedPosixProcessTree` (whole descendant tree; caller-owned roots only).
+- `awaitProcessSettlement` returns `bool`: `true` when every owned pid is
+  observed gone; `false` on budget expiry or while observation cannot certify
+  death.
 
 ## 0.1.0
 

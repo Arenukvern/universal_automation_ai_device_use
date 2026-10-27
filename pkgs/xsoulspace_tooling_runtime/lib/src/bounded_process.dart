@@ -1061,6 +1061,17 @@ BoundedProcessCause deadlineCause({
 /// first signal), TERM, wait up to [grace] while verifying death, then
 /// re-enumerate and KILL whatever remains. Returns every pid signaled,
 /// so callers can verify death themselves.
+///
+/// When [rootPid] is registered by an in-flight [runBounded] admission,
+/// the owned POSIX session ladder runs. Otherwise the root is routed to
+/// [stopUnownedPosixProcessTree], which signals the whole descendant tree
+/// visible under that pid in one `ps` snapshot. Callers must pass only roots
+/// they own; foreign or shared subtrees are not filtered.
+///
+/// Pair signaled or reported survivor pids with [awaitProcessSettlement]:
+/// it returns `true` only when live `ps` shows every listed pid gone, and
+/// `false` when [awaitProcessSettlement]'s budget expires or observation
+/// cannot certify death while obligations remain.
 Future<List<int>> stopProcessTree(
   int rootPid, {
   Duration grace = const Duration(seconds: 5),
@@ -1073,7 +1084,15 @@ Future<List<int>> stopProcessTree(
   return stopUnownedPosixProcessTree(rootPid, grace: grace);
 }
 
-/// Legacy `ps` tree stop for processes **not** admitted by [runBounded].
+/// `ps` tree stop for processes **not** admitted by [runBounded].
+///
+/// Enumerates descendants of [rootPid] (inclusive), runs the TERM→KILL ladder,
+/// and returns every pid signaled. The host must own [rootPid] and everything
+/// in that snapshot; there is no authority boundary beyond caller discipline.
+///
+/// Used from [stopProcessTree] when no owned registration exists. After
+/// signaling, use [awaitProcessSettlement] on the returned pids (or reported
+/// survivors) and check the `bool` — never treat completion alone as proof.
 @visibleForTesting
 Future<List<int>> stopUnownedPosixProcessTree(
   int rootPid, {
