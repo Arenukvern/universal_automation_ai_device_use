@@ -9,3 +9,4 @@ Canonical index for docs.page: [index.mdx](./index.mdx).
 | 0003 | Seamless tier routing, optional browser config, and system-browser navigation | Accepted |
 | 0004 | Harness layer and packaging boundaries                                        | Accepted |
 | 0005 | Capture options, browser-tab selection, and OS consent requests               | Accepted |
+| 0006 | `xsoulspace_tooling_runtime` into UA workspace (macOS/Linux; Windows deferred) | Accepted |

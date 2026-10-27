@@ -57,6 +57,7 @@ Windows, CDP, WebDriver), screencast/capture helpers, WebRTC sidecars, and
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
 | [`universal_lexicon`](pkgs/universal_lexicon/) | Lexicon packs (monorepo only — not on pub.dev yet) |
+| [`xsoulspace_tooling_runtime`](pkgs/xsoulspace_tooling_runtime/) | Bounded process runs, path policy, locks, macOS no-fork verify |
 
 Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).
 
@@ -104,7 +105,7 @@ steward map
 # Primary gate (also runs in CI):
 dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics \
   pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast \
-  pkgs/universal_lexicon pkgs/universal_webrtc_raw
+  pkgs/universal_lexicon pkgs/universal_webrtc_raw pkgs/xsoulspace_tooling_runtime
 ```
 
 Full command list: `steward.yaml` → `stewardship.quality.validate`.
