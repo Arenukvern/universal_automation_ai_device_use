@@ -1070,7 +1070,7 @@ Future<List<int>> stopProcessTree(
     owned.externallyStopped = true;
     return _stopOwnedProcessGroup(owned, grace: grace);
   }
-  return const [];
+  return stopUnownedPosixProcessTree(rootPid, grace: grace);
 }
 
 /// Legacy `ps` tree stop for processes **not** admitted by [runBounded].
@@ -1123,6 +1123,8 @@ Future<Set<int>> _processTree(int rootPid) async {
 /// excluded — a dead-but-unreaped pid is NOT alive. Null when `ps` is
 /// unavailable (Windows).
 Future<List<(int, int, String)>?> _psRows() async {
+  final override = boundedProcessPsRowsOverride;
+  if (override != null) return override();
   final output = await _runPsObservation(const ['-eo', 'pid=,ppid=,stat=']);
   if (output == null) return null;
   final rows = <(int, int, String)>[];
@@ -1194,24 +1196,32 @@ Future<Set<int>> _stillAlive(Iterable<int> pids) async {
   return pids.toSet().intersection(live);
 }
 
+/// When set, replaces live `ps` row reads used by settlement and tree probes
+/// (`@visibleForTesting`).
+@visibleForTesting
+Future<List<(int, int, String)>?> Function()? boundedProcessPsRowsOverride;
+
 /// Retain ownership of reported survivors until observation proves settlement.
 /// This is a read-only wait, never another signal against a possibly reused
 /// identity. Unavailable observation cannot certify death.
-Future<void> awaitProcessSettlement(
+///
+/// Returns `true` only when every [ownedPids] entry is absent from a live `ps`
+/// snapshot. Returns `false` when [budget] elapses while obligations remain
+/// (including while observation is unavailable — never guess death).
+Future<bool> awaitProcessSettlement(
   Iterable<int> ownedPids, {
   Duration budget = const Duration(seconds: 30),
 }) async {
   final end = DateTime.now().add(budget);
   var remaining = ownedPids.toSet();
-  while (remaining.isNotEmpty && DateTime.now().isBefore(end)) {
-    final rows = await _psRows();
-    if (rows == null) return;
-    final live = rows.map((row) => row.$1).toSet();
-    remaining = remaining.intersection(live);
-    if (remaining.isNotEmpty) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
+  if (remaining.isEmpty) return true;
+  while (DateTime.now().isBefore(end)) {
+    remaining = await _stillAlive(remaining);
+    if (remaining.isEmpty) return true;
+    await Future<void>.delayed(const Duration(milliseconds: 100));
   }
+  remaining = await _stillAlive(remaining);
+  return remaining.isEmpty;
 }
 
 /// Bounded byte capture (tail kept): output is evidence, not a side
