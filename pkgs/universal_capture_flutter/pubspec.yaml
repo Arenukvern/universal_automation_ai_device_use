@@ -15,7 +15,7 @@ environment:
 resolution: workspace
 
 dependencies:
-  universal_screencast: ^0.2.0
+  universal_screencast: ^0.3.0
   vm_service: ^15.3.0
 
 dev_dependencies:

@@ -17,14 +17,14 @@ resolution: workspace
 dependencies:
   args: ^2.7.0
   meta: ^1.19.0
-  universal_automation_interface: ^0.3.0
-  universal_automation_semantics: ^0.2.0
-  universal_browser_cdp: ^0.4.0
-  universal_browser_webdriver: ^0.2.0
-  universal_driver_linux: ^0.2.0
-  universal_driver_macos: ^0.3.0
-  universal_driver_windows: ^0.2.0
-  universal_screencast: ^0.2.0
+  universal_automation_interface: ^0.4.0
+  universal_automation_semantics: ^0.3.0
+  universal_browser_cdp: ^0.5.0
+  universal_browser_webdriver: ^0.3.0
+  universal_driver_linux: ^0.3.0
+  universal_driver_macos: ^0.4.0
+  universal_driver_windows: ^0.3.0
+  universal_screencast: ^0.3.0
   xsoulspace_permission_core: ^0.1.0
   yaml: ^3.1.3
 
