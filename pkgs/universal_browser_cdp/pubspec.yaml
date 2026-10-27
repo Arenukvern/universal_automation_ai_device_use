@@ -3,7 +3,7 @@ description: >-
   Pure-Dart Chrome DevTools Protocol (CDP) client: discovery, WebSocket
   JSON-RPC, accessibility snapshots, input synthesis, screenshots, and a
   fake CDP server for tests. No Flutter, no Node.
-version: 0.4.0
+version: 0.5.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -16,7 +16,7 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  universal_automation_interface: ^0.3.0
+  universal_automation_interface: ^0.4.0
 
 dev_dependencies:
   test: ^1.31.2

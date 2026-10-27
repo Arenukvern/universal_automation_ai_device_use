@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_tooling_runtime-v0.2.0...universal_tooling_runtime-v0.2.1) (2026-10-27)
+
+
+### Bug Fixes
+
+* **ci:** harden release-please publish dispatch and avoid double publish ([935870d](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/935870dc8c98a2ed7f64e2bf8fa0fd815dc69065))
+
 ## 0.2.0
 
 - **Rename** pub package and UA path to `universal_tooling_runtime` (was

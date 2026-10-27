@@ -5,7 +5,7 @@ description: >-
   observations, observation diffs, and compact text rendering. Pure
   Dart, no Flutter, no protocol clients — every tier projects its tree
   into the family Snapshot and shares this layer.
-version: 0.2.0
+version: 0.3.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -18,7 +18,7 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  universal_automation_interface: ^0.3.0
+  universal_automation_interface: ^0.4.0
 
 dev_dependencies:
   test: ^1.31.2
