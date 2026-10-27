@@ -1,0 +1,69 @@
+# Publish pkgs/universal_tooling_runtime to pub.dev (OIDC).
+#
+# Trigger: workflow_dispatch only (ref must be the release tag). release-please.yml
+# dispatches this after each tooling_runtime release. We intentionally omit on.push.tags
+# so a RELEASE_PLEASE_TOKEN tag push cannot run publish twice (tag push + dispatch).
+# GITHUB_TOKEN tag pushes do not trigger workflows anyway; dispatch is the sole path.
+# Manual recovery: gh workflow run publish_tooling_runtime.yml --ref universal_tooling_runtime-vX.Y.Z
+
+name: Publish universal_tooling_runtime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  require-tag-ref:
+    name: Require release tag ref
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse branch or wrong tag refs
+        run: |
+          if [[ "${GITHUB_REF}" =~ ^refs/tags/universal_tooling_runtime-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Publishing from ${GITHUB_REF}"
+          else
+            echo "::error::Refusing publish: GITHUB_REF must be refs/tags/universal_tooling_runtime-vX.Y.Z."
+            echo "For manual recovery, run: gh workflow run publish_tooling_runtime.yml --ref universal_tooling_runtime-vX.Y.Z"
+            exit 1
+          fi
+
+  ci:
+    name: Analyze, test, dry-run
+    needs: require-tag-ref
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Analyze
+        run: dart analyze
+        working-directory: pkgs/universal_tooling_runtime
+
+      - name: Test
+        run: dart test --concurrency=1
+        working-directory: pkgs/universal_tooling_runtime
+
+      - name: Publish dry run
+        run: dart pub publish --dry-run
+        working-directory: pkgs/universal_tooling_runtime
+
+  publish:
+    name: Publish to pub.dev
+    needs: ci
+    permissions:
+      id-token: write
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    with:
+      working-directory: pkgs/universal_tooling_runtime
+      use-flutter: false
