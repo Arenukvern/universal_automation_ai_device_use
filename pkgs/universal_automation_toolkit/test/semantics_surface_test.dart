@@ -51,63 +51,68 @@ void main() {
     scenarios: [scenario('s', steps: steps)],
   );
 
-  test('observe renders through a view; act returnState closes the loop',
-      () async {
-    final report = await PlanRunner().run(
-      _plan([
-        observe(view: const SemanticView(maxNodes: 3)),
-        click(name: 'Submit', returnState: true),
-      ]),
-    );
-    expect(report.ok, isTrue);
-    final viewDetail = report.steps[0].detail['view'] as Map<String, Object?>;
-    expect(viewDetail['render'], contains('# observation'));
-    expect(viewDetail['refs'], contains('s_0'));
-    final state = report.steps[1].detail['state'] as String;
-    expect(state, contains('button "Submit"'));
-  });
+  test(
+    'observe renders through a view; act returnState closes the loop',
+    () async {
+      final report = await PlanRunner().run(
+        _plan([
+          observe(view: const SemanticView(maxNodes: 3)),
+          click(name: 'Submit', returnState: true),
+        ]),
+      );
+      expect(report.ok, isTrue);
+      final viewDetail = report.steps[0].detail['view'] as Map<String, Object?>;
+      expect(viewDetail['render'], contains('# observation'));
+      expect(viewDetail['refs'], contains('s_0'));
+      final state = report.steps[1].detail['state'] as String;
+      expect(state, contains('button "Submit"'));
+    },
+  );
 
-  test('scope opens, runs children, closes with the delta as evidence',
-      () async {
-    final report = await PlanRunner().run(
-      _plan([
-        scope(
-          const SemanticView(subtreeOf: 's_1'),
-          [click(name: 'Submit')],
+  test(
+    'scope opens, runs children, closes with the delta as evidence',
+    () async {
+      final report = await PlanRunner().run(
+        _plan([
+          scope(const SemanticView(subtreeOf: 's_1'), [click(name: 'Submit')]),
+        ]),
+      );
+      expect(report.ok, isTrue);
+      final scopeResult = report.steps.single;
+      expect(scopeResult.kind, 'scope');
+      expect((scopeResult.detail['open'] as String), contains('"Submit"'));
+      expect(scopeResult.detail['delta'], '# no change');
+      expect(scopeResult.children.single.kind, 'act');
+    },
+  );
+
+  test(
+    'scope refuses code steps at validation (fail-closed, both faces)',
+    () async {
+      final plan = _plan([
+        scope(const SemanticView(), [
+          code((context) async => {'x': 1}),
+        ]),
+      ]);
+      expect(
+        PlanRunner().run(plan),
+        throwsA(
+          isA<SpecViolationException>().having(
+            (error) => error.violations.join(' '),
+            'violations',
+            contains('cannot cross the snapshot boundary'),
+          ),
         ),
-      ]),
-    );
-    expect(report.ok, isTrue);
-    final scopeResult = report.steps.single;
-    expect(scopeResult.kind, 'scope');
-    expect((scopeResult.detail['open'] as String), contains('"Submit"'));
-    expect(scopeResult.detail['delta'], '# no change');
-    expect(scopeResult.children.single.kind, 'act');
-  });
+      );
+      expect(() => planDocument(plan), throwsA(isA<UnsupportedError>()));
+    },
+  );
 
-  test('scope refuses code steps at validation (fail-closed, both faces)',
-      () async {
-    final plan = _plan([
-      scope(const SemanticView(), [
-        code((context) async => {'x': 1}),
-      ]),
-    ]);
-    expect(
-      PlanRunner().run(plan),
-      throwsA(
-        isA<SpecViolationException>().having(
-          (error) => error.violations.join(' '),
-          'violations',
-          contains('cannot cross the snapshot boundary'),
-        ),
-      ),
-    );
-    expect(() => planDocument(plan), throwsA(isA<UnsupportedError>()));
-  });
-
-  test('documents parse and round-trip scope/observe-view/returnState',
-      () async {
-    final yaml = '''
+  test(
+    'documents parse and round-trip scope/observe-view/returnState',
+    () async {
+      final yaml =
+          '''
 sessions:
   browser:
     transport: cdp
@@ -124,24 +129,25 @@ scenarios:
           steps:
             - click: {name: Submit, returnState: true}
 ''';
-    final file = File(
-      '${Directory.systemTemp.createTempSync('uat-sem').path}/plan.yaml',
-    );
-    addTearDown(() => file.parent.deleteSync(recursive: true));
-    await file.writeAsString(yaml);
-    final plan = await AutomationPlan.load(file.path);
-    final report = await PlanRunner().run(plan);
-    expect(report.ok, isTrue);
-    expect(report.steps[0].detail['view'], isNotNull);
-    expect(report.steps[1].children.single.kind, 'act');
-    // And the exported document keeps the new shapes.
-    final exported = planDocument(plan);
-    expect(jsonEncode(exported), contains('returnState'));
-  });
+      final file = File(
+        '${Directory.systemTemp.createTempSync('uat-sem').path}/plan.yaml',
+      );
+      addTearDown(() => file.parent.deleteSync(recursive: true));
+      await file.writeAsString(yaml);
+      final plan = await AutomationPlan.load(file.path);
+      final report = await PlanRunner().run(plan);
+      expect(report.ok, isTrue);
+      expect(report.steps[0].detail['view'], isNotNull);
+      expect(report.steps[1].children.single.kind, 'act');
+      // And the exported document keeps the new shapes.
+      final exported = planDocument(plan);
+      expect(jsonEncode(exported), contains('returnState'));
+    },
+  );
 
-  test('coordinate verbs ride plan documents and the MCP act tool',
-      () async {
-    final yaml = '''
+  test('coordinate verbs ride plan documents and the MCP act tool', () async {
+    final yaml =
+        '''
 sessions:
   browser:
     transport: cdp
@@ -186,9 +192,9 @@ scenarios:
     expect(lastPressed['y'], 24);
   });
 
-  test('modifier chords ride plan documents and the MCP act tool',
-      () async {
-    final yaml = '''
+  test('modifier chords ride plan documents and the MCP act tool', () async {
+    final yaml =
+        '''
 sessions:
   browser:
     transport: cdp
@@ -259,9 +265,7 @@ scenarios:
   test('observe-at grounds a point to the innermost node', () async {
     // The fake tree: document (0,0,800,600) over Submit (40,60,200,80)
     // — (50,70) hits both, the button wins on area.
-    final report = await PlanRunner().run(
-      _plan([observe(at: (50, 70))]),
-    );
+    final report = await PlanRunner().run(_plan([observe(at: (50, 70))]));
     expect(report.ok, isTrue);
     final detail = report.steps.single.detail;
     expect(detail['at'], {

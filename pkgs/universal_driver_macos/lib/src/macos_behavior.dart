@@ -79,9 +79,7 @@ final class BehavioralMacosDriver extends MacosDriver
     if (floorUs > 0) {
       final observedAt = lastObservationAt;
       if (observedAt != null) {
-        final elapsedUs = DateTime.now()
-            .difference(observedAt)
-            .inMicroseconds;
+        final elapsedUs = DateTime.now().difference(observedAt).inMicroseconds;
         final remainingUs = floorUs - elapsedUs;
         if (remainingUs > 0) {
           await Future<void>.delayed(Duration(microseconds: remainingUs));
@@ -167,11 +165,7 @@ final class MacosBehaviorScheduler {
             ),
             'press $button',
           );
-        case PointerUpStep(
-          :final button,
-          :final clickCount,
-          :final modifiers,
-        ):
+        case PointerUpStep(:final button, :final clickCount, :final modifiers):
           _check(
             bridge.pointerButton(
               x: pointerX,
@@ -192,10 +186,7 @@ final class MacosBehaviorScheduler {
         case WheelStep(:final deltaX, :final deltaY):
           // CDP-convention pixels (negative = up) flip into macOS wheel
           // lines (positive = up) at the family's ~10 px/line rate.
-          _check(
-            bridge.scroll(-deltaX / 10, -deltaY / 10),
-            'scroll wheel',
-          );
+          _check(bridge.scroll(-deltaX / 10, -deltaY / 10), 'scroll wheel');
       }
       final atUs = watch.elapsedMicroseconds;
       dispatched.add(

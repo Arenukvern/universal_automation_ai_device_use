@@ -64,25 +64,27 @@ void main() {
       expect(session.page.network.inFlightCount, 0);
     });
 
-    test('networkIdle refuses to resolve while requests are in flight',
-        () async {
-      final session = await CdpBrowserSession.attach(server.httpBase);
-      final page = session.page;
-      final pending = page.navigate(
-        Uri.parse('https://example.test'),
-        waitUntil: NavigateWait.networkIdle,
-        timeout: const Duration(milliseconds: 800),
-      );
-      // A request lands after the load events but never finishes.
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-      server.emit('Network.requestWillBeSent', {
-        'requestId': 'pending-1',
-        'request': {'url': 'https://example.test/api', 'method': 'GET'},
-        'type': 'XHR',
-      });
-      await expectLater(pending, throwsA(isA<TimeoutException>()));
-      expect(page.network.inFlightCount, 1);
-    });
+    test(
+      'networkIdle refuses to resolve while requests are in flight',
+      () async {
+        final session = await CdpBrowserSession.attach(server.httpBase);
+        final page = session.page;
+        final pending = page.navigate(
+          Uri.parse('https://example.test'),
+          waitUntil: NavigateWait.networkIdle,
+          timeout: const Duration(milliseconds: 800),
+        );
+        // A request lands after the load events but never finishes.
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        server.emit('Network.requestWillBeSent', {
+          'requestId': 'pending-1',
+          'request': {'url': 'https://example.test/api', 'method': 'GET'},
+          'type': 'XHR',
+        });
+        await expectLater(pending, throwsA(isA<TimeoutException>()));
+        expect(page.network.inFlightCount, 1);
+      },
+    );
   });
 
   group('actionability polling', () {
@@ -131,9 +133,8 @@ void main() {
     });
 
     test('force skips visible/stable/hittable but not existence', () async {
-      server.evaluateHandler =
-          (expression) =>
-              '{"state":"hidden","x":40,"y":60,"width":200,"height":80}';
+      server.evaluateHandler = (expression) =>
+          '{"state":"hidden","x":40,"y":60,"width":200,"height":80}';
       final session = await CdpBrowserSession.attach(server.httpBase);
       await session.page.click(
         css: '#hidden',
@@ -179,9 +180,11 @@ void main() {
       expect(insertTexts, hasLength(1));
       expect(insertTexts.single['text'], 'é');
       final keyDowns = server.inputEvents
-          .where((event) =>
-              event['method'] == 'Input.dispatchKeyEvent' &&
-              event['type'] == 'keyDown')
+          .where(
+            (event) =>
+                event['method'] == 'Input.dispatchKeyEvent' &&
+                event['type'] == 'keyDown',
+          )
           .toList();
       expect(keyDowns.single['key'], 'x');
       expect(probes, greaterThanOrEqualTo(2));

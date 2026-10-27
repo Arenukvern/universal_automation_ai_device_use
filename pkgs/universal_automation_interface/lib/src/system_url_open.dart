@@ -18,9 +18,7 @@ void validateOpenableUrl(Uri url) {
       'refusing to open "${url.scheme}:" URLs in the system browser '
       '(allowlist: ${systemOpenUrlSchemes.join(", ")}); use an '
       'instrumented tier for custom schemes',
-      details: const {
-        'remedy': 'use an http/https/file/mailto URL',
-      },
+      details: const {'remedy': 'use an http/https/file/mailto URL'},
     );
   }
 }

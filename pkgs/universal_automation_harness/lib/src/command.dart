@@ -217,7 +217,8 @@ final class CommandRegistry {
   /// reference never hides the rest.
   (List<PlanStep>, List<String>) expand(CommandRef reference) {
     final spec = _commands[reference.name];
-    if (spec == null) return (const [], ['unknown command "${reference.name}"']);
+    if (spec == null)
+      return (const [], ['unknown command "${reference.name}"']);
     final args = <String, Object?>{};
     final violations = <String>[];
     for (final param in spec.params) {

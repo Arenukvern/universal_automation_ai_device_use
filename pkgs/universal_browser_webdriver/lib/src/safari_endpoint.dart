@@ -28,7 +28,9 @@ class SafariDriverEndpoint {
     Duration timeout = const Duration(seconds: 15),
   }) async {
     if (!Platform.isMacOS) {
-      throw const DriverUnsupportedException('safaridriver only exists on macOS');
+      throw const DriverUnsupportedException(
+        'safaridriver only exists on macOS',
+      );
     }
     final process = await Process.start(binary, ['-p', '$port']);
     final serverUri = Uri.parse('http://127.0.0.1:$port');

@@ -56,8 +56,7 @@ class CdpScreencastFrameSource implements FrameSource {
       unawaited(
         _connection.send('Page.screencastFrameAck', {'sessionId': ?sessionId}),
       );
-      final metadata =
-          params['metadata'] as Map<String, Object?>? ?? const {};
+      final metadata = params['metadata'] as Map<String, Object?>? ?? const {};
       final timestamp = metadata['timestamp'];
       _frames.add(
         Frame(

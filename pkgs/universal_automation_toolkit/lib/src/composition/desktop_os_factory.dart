@@ -46,7 +46,10 @@ Future<ResolvedSession> desktopOsAccessibilityFactory(
 /// application through an `ax://` URI (ADR 0064). Bundle/name anchors
 /// resolve through the running-apps record at attach; an unknown
 /// target is a loud element-not-found naming the search key.
-Future<ResolvedSession> _attachMacos(SessionBinding binding, Uri endpoint) async {
+Future<ResolvedSession> _attachMacos(
+  SessionBinding binding,
+  Uri endpoint,
+) async {
   final anchor = _parseAxAnchor(endpoint);
   if (anchor == null) {
     return _MacosResolvedSession(binding, BehavioralMacosDriver());
@@ -71,7 +74,7 @@ Future<ResolvedSession> _attachMacos(SessionBinding binding, Uri endpoint) async
         throw ElementNotFoundException(
           'application',
           '$kind "$value" (running: '
-          '${apps.map((app) => app.name).join(", ")})',
+              '${apps.map((app) => app.name).join(", ")})',
         );
       }
       pid = match.pid;
@@ -102,7 +105,7 @@ Future<ResolvedSession> _attachMacos(SessionBinding binding, Uri endpoint) async
   if (raw.isEmpty || !const {'pid', 'bundle', 'name'}.contains(kind)) {
     throw SpecViolationException([
       'ax:// anchors are ax://pid/<pid>, ax://bundle/<bundleId>, or '
-      'ax://name/<name> (got $endpoint)',
+          'ax://name/<name> (got $endpoint)',
     ]);
   }
   return (kind, Uri.decodeComponent(raw));

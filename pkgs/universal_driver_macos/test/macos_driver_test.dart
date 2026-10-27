@@ -806,8 +806,7 @@ void main() {
     );
   });
 
-  test('navigate refuses non-allowlisted schemes loudly (ADR 0003)',
-      () async {
+  test('navigate refuses non-allowlisted schemes loudly (ADR 0003)', () async {
     final opened = <Uri>[];
     final driver = MacosDriver(
       bridge: FakeBridge(),
@@ -1053,9 +1052,7 @@ void main() {
     );
   });
 
-  test(
-    'offscreen listing preserves visibility states',
-    () async {
+  test('offscreen listing preserves visibility states', () async {
     final bridge = AllWindowsFakeBridge()
       ..windowsResult = (
         code: 0,
@@ -1075,8 +1072,7 @@ void main() {
       driver.windows(onScreenOnly: false),
       throwsA(isA<ProtocolException>()),
     );
-    },
-  );
+  });
 
   test(
     'legacy custom bridge refuses offscreen listing before a bridge call',

@@ -4,9 +4,8 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 import 'package:universal_browser_cdp/universal_browser_cdp.dart';
 import 'package:universal_browser_webdriver/universal_browser_webdriver.dart';
 
-
 export 'package:universal_automation_interface/universal_automation_interface.dart'
-show DriverFactory, ResolvedSession;
+    show DriverFactory, ResolvedSession;
 
 /// A transport named in a plan has no linked driver binding in this
 /// build — loud, per the family refuse-not-degrade rule.
@@ -162,18 +161,17 @@ final class SessionRegistry {
     final key = '${transport.name}|$uri';
     final cached = _adHoc[key];
     if (cached != null) return Future.value(cached);
-    return _resolve(
-      SessionBinding(name: key, transport: transport, uri: uri),
-    ).then((resolved) {
-      _adHoc[key] = resolved;
-      return resolved;
-    });
+    return _resolve(SessionBinding(name: key, transport: transport, uri: uri))
+        .then((resolved) {
+          _adHoc[key] = resolved;
+          return resolved;
+        });
   }
 
   Future<ResolvedSession> _resolve(SessionBinding binding) async {
     final uri = resolveEndpoint(binding);
-    final factory = _factories[binding.transport] ??
-        _builtinFactory(binding.transport);
+    final factory =
+        _factories[binding.transport] ?? _builtinFactory(binding.transport);
     if (factory == null) {
       throw TransportNotLinkedException(
         binding.transport.name,
@@ -246,17 +244,13 @@ final class SessionRegistry {
 
   /// Detaches every session this registry opened. Idempotent.
   Future<void> detachAll() async {
-    for (final session in [
-      ..._attached.values,
-      ..._adHoc.values,
-    ]) {
+    for (final session in [..._attached.values, ..._adHoc.values]) {
       await session.detach();
     }
     _attached.clear();
     _adHoc.clear();
   }
 }
-
 
 final class _WebdriverResolvedSession implements ResolvedSession {
   _WebdriverResolvedSession(this.binding, this.client)
@@ -279,7 +273,6 @@ final class _WebdriverResolvedSession implements ResolvedSession {
   @override
   Future<void> detach() => client.deleteSession();
 }
-
 
 final class _CdpResolvedSession implements ResolvedSession {
   _CdpResolvedSession(this.binding, this.session) {

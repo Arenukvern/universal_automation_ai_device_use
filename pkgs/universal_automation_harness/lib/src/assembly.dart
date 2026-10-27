@@ -53,8 +53,7 @@ final class AutomationAssembly {
     final violations = [
       ..._registry.declarationViolations,
       if (budgets != null)
-        for (final violation in budgets!.validate())
-          'budget: $violation',
+        for (final violation in budgets!.validate()) 'budget: $violation',
     ];
     final seenFlows = <String>{};
     for (final flow in flows) {
@@ -70,7 +69,8 @@ final class AutomationAssembly {
       );
       expandedSteps[flow.name] = steps;
       violations.addAll([
-        for (final violation in flowViolations) 'flow "${flow.name}": $violation',
+        for (final violation in flowViolations)
+          'flow "${flow.name}": $violation',
       ]);
     }
     // The plan is built and validated even when expansion already found
@@ -150,9 +150,7 @@ final class AutomationAssembly {
             ),
           );
         default:
-          violations.add(
-            'step tree holds a non-step (${step.runtimeType})',
-          );
+          violations.add('step tree holds a non-step (${step.runtimeType})');
       }
     }
     return (steps, violations);
@@ -168,7 +166,8 @@ final class AutomationAssembly {
     final lines = <String>['# universal automation assembly'];
     lines.add('sessions:');
     for (final session in sessions) {
-      final location = session.uri?.toString() ??
+      final location =
+          session.uri?.toString() ??
           (session.handle == null ? '' : 'handle:${session.handle}');
       lines.add('  - ${session.name} (${session.transport.name}, $location)');
     }
@@ -177,14 +176,9 @@ final class AutomationAssembly {
       for (final command in commands) {
         final params = command.params.isEmpty
             ? ''
-            : ' params: ${[
-                for (final param in command.params)
-                  '${param.name}:${param.type}'
-                  '${param.required ? '!' : ''}',
-              ].join(', ')}';
-        lines.add(
-          '  - ${command.id} (hash ${command.revisionHash})$params',
-        );
+            : ' params: ${[for (final param in command.params) '${param.name}:${param.type}'
+                    '${param.required ? '!' : ''}'].join(', ')}';
+        lines.add('  - ${command.id} (hash ${command.revisionHash})$params');
       }
     }
     if (budgets != null) {
@@ -194,9 +188,7 @@ final class AutomationAssembly {
     for (final flow in flows) {
       final kinds = [
         for (final step in flow.steps)
-          step is CommandRef
-              ? 'command:${step.name}'
-              : (step as PlanStep).kind,
+          step is CommandRef ? 'command:${step.name}' : (step as PlanStep).kind,
       ];
       lines.add(
         '  - ${flow.name}'

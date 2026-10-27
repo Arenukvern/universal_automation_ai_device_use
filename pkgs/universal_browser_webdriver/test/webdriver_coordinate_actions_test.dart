@@ -73,8 +73,7 @@ void main() {
     ]);
   });
 
-  test('drag presses at the from-point and releases at the to-point',
-      () async {
+  test('drag presses at the from-point and releases at the to-point', () async {
     await driver.perform(const DragAction(10, 20, 300, 400));
     expect(server.pointerActions.map((action) => action['type']).toList(), [
       'pointerMove',
@@ -101,9 +100,7 @@ void main() {
   });
 
   test('meta+drag releases the chord after the pointer does', () async {
-    await driver.perform(
-      const DragAction(0, 0, 40, 40, modifiers: ['meta']),
-    );
+    await driver.perform(const DragAction(0, 0, 40, 40, modifiers: ['meta']));
     // keyDown Meta dispatched once; the keyUp lands in a later tick
     // (recorded after all pointer actions).
     expect(server.keyPresses, ['\uE03D']);

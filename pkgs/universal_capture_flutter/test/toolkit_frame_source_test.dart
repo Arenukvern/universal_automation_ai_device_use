@@ -6,7 +6,18 @@ import 'package:universal_capture_flutter/universal_capture_flutter.dart';
 import 'package:universal_screencast/universal_screencast.dart';
 
 final Uint8List _png = Uint8List.fromList(const [
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
+  0x89,
+  0x50,
+  0x4e,
+  0x47,
+  0x0d,
+  0x0a,
+  0x1a,
+  0x0a,
+  1,
+  2,
+  3,
+  4,
 ]);
 
 void main() {
@@ -47,9 +58,8 @@ void main() {
         'ws://127.0.0.1:8123/AuthCode=/ws',
       );
       expect(
-        VmScreenshotGrabber.normalizeWsUri(
-          Uri.parse('ws://127.0.0.1:8123/ws'),
-        ).toString(),
+        VmScreenshotGrabber.normalizeWsUri(Uri.parse('ws://127.0.0.1:8123/ws'))
+            .toString(),
         'ws://127.0.0.1:8123/ws',
       );
     });

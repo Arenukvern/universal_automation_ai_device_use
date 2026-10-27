@@ -48,9 +48,8 @@ Future<void> main() async {
     sourceFactory.createPeer('pair-1', PeerRole.answerer),
   ]).timeout(const Duration(seconds: 30));
   log('peers created: ${peers.map((p) => p.peerId)}');
-  await Future.wait<void>(peers.map((peer) => peer.opened)).timeout(
-    const Duration(seconds: 30),
-  );
+  await Future.wait<void>(peers.map((peer) => peer.opened))
+      .timeout(const Duration(seconds: 30));
   log('peers opened');
 
   final frames = viewer.events
@@ -72,7 +71,7 @@ Future<void> main() async {
   List<SidecarEvent> received;
   try {
     received = await frames.timeout(const Duration(seconds: 15));
-    } on TimeoutException {
+  } on TimeoutException {
     log('TIMEOUT waiting for frame event');
     received = const <SidecarEvent>[];
   }

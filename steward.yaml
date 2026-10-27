@@ -33,7 +33,7 @@ stewardship:
     installable_skills: true
     registry: skills.json
   quality:
-    validate: 'dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast pkgs/universal_lexicon pkgs/universal_webrtc_raw pkgs/universal_automation_harness pkgs/universal_tooling_runtime'
+    validate: 'dart analyze pkgs/universal_automation_interface pkgs/universal_automation_semantics pkgs/universal_automation_conformance pkgs/universal_browser_cdp pkgs/universal_screencast pkgs/universal_webrtc_raw pkgs/universal_automation_harness pkgs/universal_tooling_runtime'
     evidence: .steward/evidence
   harness:
     enabled: false

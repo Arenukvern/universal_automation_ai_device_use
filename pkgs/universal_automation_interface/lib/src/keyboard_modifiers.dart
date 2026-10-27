@@ -35,9 +35,11 @@ String? normalizeModifier(String raw) => switch (raw.toLowerCase()) {
 /// (fail-closed — a dropped modifier is a misfired chord).
 List<String> parseModifiers(Iterable<Object?> raw) => [
   for (final item in raw)
-    if (normalizeModifier('$item') case final normalized?) normalized
-    else throw FormatException(
-      'unknown keyboard modifier "$item"; the family vocabulary is '
-      'shift/control/alt/meta',
-    ),
+    if (normalizeModifier('$item') case final normalized?)
+      normalized
+    else
+      throw FormatException(
+        'unknown keyboard modifier "$item"; the family vocabulary is '
+        'shift/control/alt/meta',
+      ),
 ];

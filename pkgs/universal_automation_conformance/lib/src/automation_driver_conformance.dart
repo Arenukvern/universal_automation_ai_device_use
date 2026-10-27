@@ -34,19 +34,21 @@ void automationDriverConformanceTests(
       }
     });
 
-    test('navigate refuses non-allowlisted schemes loudly (universal)',
-        () async {
-      final driver = await createDriver();
-      addTearDown(driver.close);
-      // ADR 0003: the scheme allowlist binds NavigateAction on every
-      // tier — desktop drivers refuse before the system-browser seam,
-      // protocol drivers refuse before the navigation command. What is
-      // never allowed is silent success.
-      await expectLater(
-        driver.perform(NavigateAction(Uri.parse('javascript:alert(1)'))),
-        throwsA(isA<DriverUnsupportedException>()),
-      );
-    });
+    test(
+      'navigate refuses non-allowlisted schemes loudly (universal)',
+      () async {
+        final driver = await createDriver();
+        addTearDown(driver.close);
+        // ADR 0003: the scheme allowlist binds NavigateAction on every
+        // tier — desktop drivers refuse before the system-browser seam,
+        // protocol drivers refuse before the navigation command. What is
+        // never allowed is silent success.
+        await expectLater(
+          driver.perform(NavigateAction(Uri.parse('javascript:alert(1)'))),
+          throwsA(isA<DriverUnsupportedException>()),
+        );
+      },
+    );
 
     test('navigate capability performs allowlisted navigation', () async {
       final driver = await createDriver();

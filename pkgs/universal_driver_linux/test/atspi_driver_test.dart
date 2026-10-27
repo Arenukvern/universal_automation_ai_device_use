@@ -11,10 +11,7 @@ void main() {
   setUp(() {
     bus = FakeAtspiBus();
     openedUrls = [];
-    driver = AtspiDriver(
-      bus,
-      openUrl: (url) async => openedUrls.add(url),
-    );
+    driver = AtspiDriver(bus, openUrl: (url) async => openedUrls.add(url));
   });
 
   test('maps the AT-SPI tree onto the family snapshot model', () async {

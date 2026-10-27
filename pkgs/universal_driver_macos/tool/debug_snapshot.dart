@@ -13,6 +13,8 @@ void main() {
   }
   final hover = driver.bridge.elementAtPositionJson(x: 720, y: 450);
   // ignore: avoid_print
-  print('hover code: ${hover.code} json: '
-      '${hover.json.length > 300 ? hover.json.substring(0, 300) : hover.json}');
+  print(
+    'hover code: ${hover.code} json: '
+    '${hover.json.length > 300 ? hover.json.substring(0, 300) : hover.json}',
+  );
 }

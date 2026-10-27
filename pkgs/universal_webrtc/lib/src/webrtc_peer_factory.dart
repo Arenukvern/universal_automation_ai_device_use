@@ -28,11 +28,7 @@ enum PeerRole {
 @immutable
 final class IceServerSpec {
   /// Creates a server spec.
-  const IceServerSpec({
-    required this.urls,
-    this.username,
-    this.credential,
-  });
+  const IceServerSpec({required this.urls, this.username, this.credential});
 
   /// A public STUN server, for quick cross-network reachability.
   static const IceServerSpec stunGoogle = IceServerSpec(
@@ -51,10 +47,10 @@ final class IceServerSpec {
   final String? credential;
 
   Map<String, Object?> toJson() => {
-        'urls': urls,
-        if (username != null) 'username': username,
-        if (credential != null) 'credential': credential,
-      };
+    'urls': urls,
+    if (username != null) 'username': username,
+    if (credential != null) 'credential': credential,
+  };
 }
 
 /// A peer whose data channel is open and whose signaling loop is wired.

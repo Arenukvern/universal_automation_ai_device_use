@@ -52,8 +52,7 @@ void behaviorSynthesisConformanceTests() {
       );
     });
 
-    test('humanPrior profiles validate and stay within declared ranges',
-        () {
+    test('humanPrior profiles validate and stay within declared ranges', () {
       for (var seed = 0; seed < 20; seed++) {
         final profile = BehaviorProfile.humanPrior(seed);
         expect(profile.validate(), isEmpty, reason: 'seed $seed');
@@ -80,20 +79,14 @@ void behaviorSynthesisConformanceTests() {
 
     test('invalid profiles fail closed at construction', () {
       expect(
-        () => BehaviorProfile(
-          reaction: const ReactionDelay(floorUs: -1),
-        ),
+        () => BehaviorProfile(reaction: const ReactionDelay(floorUs: -1)),
         throwsA(isA<SpecViolationException>()),
       );
     });
 
     test('typing cadence keeps inter-key gaps above the floor', () {
       final profile = BehaviorProfile.humanPrior(3);
-      final plan = synthesizeBehavior(
-        profile,
-        3,
-        const TypeAction('abcdef'),
-      );
+      final plan = synthesizeBehavior(profile, 3, const TypeAction('abcdef'));
       final report = auditBehavior(plan, profile);
       expect(report.subFloorKeyGapCount, 0);
       expect(report.cadenceGaps.count, greaterThanOrEqualTo(5));

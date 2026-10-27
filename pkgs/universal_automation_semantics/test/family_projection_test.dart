@@ -48,10 +48,10 @@ void main() {
       expect(root.name, 'Root');
       expect(root.bounds, isNotNull);
       expect(root.bounds!.width, 100);
-      expect(
-        root.children.map((child) => child.role).toList(),
-        ['button', 'textfield'],
-      );
+      expect(root.children.map((child) => child.role).toList(), [
+        'button',
+        'textfield',
+      ]);
       expect(root.children[0].name, 'Save');
       // The empty value rides along: an empty field is an answer.
       expect(root.children[1].value, '');
@@ -64,7 +64,10 @@ void main() {
     test('dropped children (trim) do not break parent links', () {
       final trimmed = [
         nodes.first,
-        {...nodes[1], 'children': <String>['s_2']},
+        {
+          ...nodes[1],
+          'children': <String>['s_2'],
+        },
       ];
       final snapshot = familySnapshotFromNodes(
         trimmed,
@@ -105,10 +108,7 @@ void main() {
     });
 
     test('fields projection always keeps ref', () {
-      final projected = projectSnapshotNodes(
-        nodes,
-        fields: ['type'],
-      );
+      final projected = projectSnapshotNodes(nodes, fields: ['type']);
       for (final node in projected) {
         expect(node.containsKey('ref'), isTrue);
         expect(node.containsKey('label'), isFalse);

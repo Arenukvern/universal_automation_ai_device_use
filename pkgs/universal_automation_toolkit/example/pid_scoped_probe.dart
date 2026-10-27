@@ -161,9 +161,8 @@ Future<void> main(List<String> args) async {
   }
 
   evidence['allOk'] = failures.isEmpty;
-  File(
-    '$evidenceDir/evidence.json',
-  ).writeAsStringSync(const JsonEncoder.withIndent('  ').convert(evidence));
+  File('$evidenceDir/evidence.json')
+      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(evidence));
   // ignore: avoid_print
   print('evidence: ${File('$evidenceDir/evidence.json').absolute.path}');
   exit(failures.isEmpty ? 0 : 1);

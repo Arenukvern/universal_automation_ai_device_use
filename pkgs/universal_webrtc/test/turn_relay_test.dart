@@ -18,9 +18,7 @@ String? _turnServerBinary() =>
 Future<({Process process, String uri, String user, String credential})>
 _turnServer() async {
   final binary = _turnServerBinary()!;
-  final port = int.parse(
-    Platform.environment['XS_TURN_PORT'] ?? '3478',
-  );
+  final port = int.parse(Platform.environment['XS_TURN_PORT'] ?? '3478');
   final process = await Process.start(binary, [
     '--listening-ip=127.0.0.1',
     '--relay-ip=127.0.0.1',
@@ -64,7 +62,8 @@ void main() {
 
       final source = SidecarClient(
         await ProcessSidecarTransport.start(
-          binary: Platform.environment['XS_WEBRTC_SIDECAR_BIN'] ??
+          binary:
+              Platform.environment['XS_WEBRTC_SIDECAR_BIN'] ??
               '../universal_webrtc_raw/rust/webrtc_sidecar/target/release/'
                   'xs-webrtc-sidecar',
           onError: (line) => stderr.writeln('[turn-sidecar-a] $line'),
@@ -72,7 +71,8 @@ void main() {
       );
       final viewer = SidecarClient(
         await ProcessSidecarTransport.start(
-          binary: Platform.environment['XS_WEBRTC_SIDECAR_BIN'] ??
+          binary:
+              Platform.environment['XS_WEBRTC_SIDECAR_BIN'] ??
               '../universal_webrtc_raw/rust/webrtc_sidecar/target/release/'
                   'xs-webrtc-sidecar',
           onError: (line) => stderr.writeln('[turn-sidecar-b] $line'),
@@ -120,10 +120,7 @@ void main() {
       void collectCandidates(SidecarClient client) {
         client.events
             .where((event) => event.kind == 'ice')
-            .listen(
-              (event) =>
-                  candidates.add('${event.payload['candidate']}'),
-            );
+            .listen((event) => candidates.add('${event.payload['candidate']}'));
       }
 
       collectCandidates(source);
@@ -133,9 +130,8 @@ void main() {
         viewerFactory.createPeer('turn-pair', PeerRole.offerer),
         sourceFactory.createPeer('turn-pair', PeerRole.answerer),
       ]).timeout(const Duration(seconds: 45));
-      await Future.wait<void>(
-        peers.map((peer) => peer.opened),
-      ).timeout(const Duration(seconds: 60));
+      await Future.wait<void>(peers.map((peer) => peer.opened))
+          .timeout(const Duration(seconds: 60));
 
       // The relay was genuinely in the path: both sides gathered a
       // `typ relay` candidate and nothing else carried the connection
@@ -148,10 +144,7 @@ void main() {
 
       // Frames cross the relay in both directions.
       final payload = Uint8List.fromList(
-        List.generate(
-          FrameChunkCodec.chunkPayloadLimit + 24,
-          (i) => i % 256,
-        ),
+        List.generate(FrameChunkCodec.chunkPayloadLimit + 24, (i) => i % 256),
       );
       final atViewer = viewer.events
           .where((event) => event.kind == 'frame')

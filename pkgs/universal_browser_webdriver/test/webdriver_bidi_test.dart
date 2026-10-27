@@ -1,4 +1,3 @@
-
 import 'package:test/test.dart';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_browser_webdriver/testing.dart';
@@ -23,14 +22,10 @@ void main() {
     test('new session advertises the BiDi socket URL', () async {
       await client.newSession();
       expect(client.webSocketUrl, isNotNull);
-      expect(
-        client.webSocketUrl.toString(),
-        startsWith('ws://127.0.0.1:'),
-      );
+      expect(client.webSocketUrl.toString(), startsWith('ws://127.0.0.1:'));
     });
 
-    test('subscribe, navigate, getTree, and evaluate over BiDi',
-        () async {
+    test('subscribe, navigate, getTree, and evaluate over BiDi', () async {
       await client.newSession();
       final bidi = await client.bidi();
 
@@ -39,9 +34,8 @@ void main() {
       });
       expect(server.bidiCommands, contains('session.subscribe'));
 
-      await WebDriverBidiSession(bidi).navigate(
-        Uri.parse('https://example.test/bidi'),
-      );
+      await WebDriverBidiSession(bidi)
+          .navigate(Uri.parse('https://example.test/bidi'));
       expect(server.currentUrl, 'https://example.test/bidi');
 
       final session = WebDriverBidiSession(bidi);
@@ -84,8 +78,11 @@ void main() {
       await expectLater(
         bidi.send('no.suchMethod'),
         throwsA(
-          isA<BidiException>()
-              .having((e) => e.bidiError, 'error', 'unknown command'),
+          isA<BidiException>().having(
+            (e) => e.bidiError,
+            'error',
+            'unknown command',
+          ),
         ),
       );
       await bidi.close();
@@ -95,8 +92,10 @@ void main() {
       server.bidiEnabled = false;
       await client.newSession();
       expect(client.webSocketUrl, isNull);
-      await expectLater(client.bidi(),
-          throwsA(isA<DriverUnsupportedException>()));
+      await expectLater(
+        client.bidi(),
+        throwsA(isA<DriverUnsupportedException>()),
+      );
     });
   });
 }

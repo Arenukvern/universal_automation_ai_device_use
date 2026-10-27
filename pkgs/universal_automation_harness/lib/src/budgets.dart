@@ -83,13 +83,10 @@ final class BudgetGuard {
   /// anchors [ServeBudgets.maxSessionRuntime]; [lastActivity] exists for
   /// deterministic tests of the idle signal (defaults to now, moves on
   /// every [tryAcquire]/[release]).
-  BudgetGuard(
-    this.budgets, {
-    DateTime? startedAt,
-    DateTime? lastActivity,
-  }) : budgetsViolations = budgets.validate(),
-       startedAt = startedAt ?? DateTime.now(),
-       _lastActivity = lastActivity ?? DateTime.now();
+  BudgetGuard(this.budgets, {DateTime? startedAt, DateTime? lastActivity})
+    : budgetsViolations = budgets.validate(),
+      startedAt = startedAt ?? DateTime.now(),
+      _lastActivity = lastActivity ?? DateTime.now();
 
   /// Declaration violations (the guard still enforces what is valid —
   /// the assembly refuses to compile with these, this field is for

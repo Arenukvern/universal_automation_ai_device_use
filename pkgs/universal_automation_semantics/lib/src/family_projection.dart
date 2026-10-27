@@ -47,7 +47,8 @@ Snapshot familySnapshotFromNodes(
       bounds: _boundsOf(node['bounds']),
       attributes: _attributesOf(node),
       children: [
-        for (final child in node['children'] as List<String>? ?? const <String>[])
+        for (final child
+            in node['children'] as List<String>? ?? const <String>[])
           if (byRef.containsKey(child)) build(byRef[child]!),
       ],
     );
@@ -63,11 +64,7 @@ Snapshot familySnapshotFromNodes(
   for (final node in nodes) {
     if (!referenced.contains(node['ref'])) roots.add(build(node));
   }
-  return Snapshot(
-    roots: roots,
-    capturedAt: capturedAt,
-    revision: snapshotId,
-  );
+  return Snapshot(roots: roots, capturedAt: capturedAt, revision: snapshotId);
 }
 
 AxBounds? _boundsOf(Object? raw) {

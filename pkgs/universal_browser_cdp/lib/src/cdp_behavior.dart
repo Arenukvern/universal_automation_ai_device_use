@@ -199,11 +199,7 @@ final class CdpBehaviorScheduler {
               'modifiers': cdpModifierMask(modifiers),
             'timestamp': timestampSec,
           });
-        case PointerUpStep(
-          :final button,
-          :final clickCount,
-          :final modifiers,
-        ):
+        case PointerUpStep(:final button, :final clickCount, :final modifiers):
           await send('Input.dispatchMouseEvent', {
             'type': 'mouseReleased',
             'x': pointerX,

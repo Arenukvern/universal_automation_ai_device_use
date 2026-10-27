@@ -25,7 +25,8 @@ List<Map<String, Object?>> projectSnapshotNodes(
   List<String>? fields,
 }) {
   final kept = <Map<String, Object?>>[
-    for (final node in nodes) if (keep == null || keep(node)) node,
+    for (final node in nodes)
+      if (keep == null || keep(node)) node,
   ];
   final keptRefs = <Object?>{for (final node in kept) node['ref']};
   final fieldSet = fields?.toSet();
@@ -42,8 +43,7 @@ List<Map<String, Object?>> projectSnapshotNodes(
             else
               key: value,
       }..removeWhere(
-        (key, value) =>
-            key == 'children' && (value! as List<String>).isEmpty,
+        (key, value) => key == 'children' && (value! as List<String>).isEmpty,
       ),
   ];
 }

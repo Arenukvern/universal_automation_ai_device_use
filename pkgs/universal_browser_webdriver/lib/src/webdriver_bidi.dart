@@ -39,13 +39,17 @@ class BidiException extends ProtocolException {
 /// console logs, network activity, and page lifecycle as they happen.
 class WebDriverBidiConnection {
   WebDriverBidiConnection._(this._socket) {
-    _subscription = _socket.listen(_onData, onError: (Object e) {
-      _failAll(e);
-    }, onDone: () {
-      _closed = true;
-      _failAll(const WebSocketException('bidi socket closed'));
-      unawaited(_events.close());
-    });
+    _subscription = _socket.listen(
+      _onData,
+      onError: (Object e) {
+        _failAll(e);
+      },
+      onDone: () {
+        _closed = true;
+        _failAll(const WebSocketException('bidi socket closed'));
+        unawaited(_events.close());
+      },
+    );
   }
 
   final WebSocket _socket;
@@ -62,9 +66,8 @@ class WebDriverBidiConnection {
   }) async {
     final WebSocket socket;
     try {
-      socket = await WebSocket.connect(
-        webSocketUrl.toString(),
-      ).timeout(timeout);
+      socket = await WebSocket.connect(webSocketUrl.toString())
+          .timeout(timeout);
     } on Object catch (error) {
       throw EndpointUnreachableException(
         'cannot connect BiDi socket $webSocketUrl: $error',
@@ -167,10 +170,7 @@ class WebDriverBidiSession {
 
   /// Subscribes this session to BiDi [events] (e.g. `log.entryAdded`,
   /// `browsingContext.contextCreated`), optionally scoped to [contexts].
-  Future<void> subscribe(
-    List<String> events, {
-    List<String>? contexts,
-  }) async {
+  Future<void> subscribe(List<String> events, {List<String>? contexts}) async {
     await connection.send('session.subscribe', {
       'events': events,
       'contexts': ?contexts,
@@ -203,9 +203,7 @@ class WebDriverBidiSession {
   Future<Object?> evaluate(String expression, {String? context}) async {
     final result = await connection.send('script.evaluate', {
       'expression': expression,
-      'target': {
-        'context': context,
-      },
+      'target': {'context': context},
       'awaitPromise': false,
     });
     final scriptResult = result['result'];

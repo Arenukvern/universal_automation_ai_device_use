@@ -78,7 +78,11 @@ void main() {
     httpBase = Uri.parse('http://127.0.0.1:$cdpPort');
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     while (true) {
-      if (await CdpDiscovery.version(httpBase, timeout: const Duration(seconds: 2)) != null) {
+      if (await CdpDiscovery.version(
+            httpBase,
+            timeout: const Duration(seconds: 2),
+          ) !=
+          null) {
         break;
       }
       if (DateTime.now().isAfter(deadline)) {
@@ -107,16 +111,18 @@ void main() {
   });
 
   group('live Chromium', () {
-    test('semantic click lands on a node-replacing (Flutter-web-like) DOM',
-        () async {
-      await session.driver.perform(
-        const ClickAction(role: 'button', name: 'Churning button'),
-      );
-      final count = await session.page.evaluate(
-        'document.getElementById("churn").textContent',
-      );
-      expect(int.parse(count! as String), greaterThanOrEqualTo(1));
-    });
+    test(
+      'semantic click lands on a node-replacing (Flutter-web-like) DOM',
+      () async {
+        await session.driver.perform(
+          const ClickAction(role: 'button', name: 'Churning button'),
+        );
+        final count = await session.page.evaluate(
+          'document.getElementById("churn").textContent',
+        );
+        expect(int.parse(count! as String), greaterThanOrEqualTo(1));
+      },
+    );
 
     test('semantic click lands on a stable DOM node', () async {
       await session.driver.perform(
@@ -130,14 +136,9 @@ void main() {
 
     test('bringToFront + insertText + fieldValue round-trip', () async {
       await session.page.bringToFront();
-      await session.page.evaluate(
-        'document.getElementById("field").focus()',
-      );
+      await session.page.evaluate('document.getElementById("field").focus()');
       await session.page.insertText('mesh-pair/v1 live');
-      expect(
-        await session.page.fieldValue('#field'),
-        'mesh-pair/v1 live',
-      );
+      expect(await session.page.fieldValue('#field'), 'mesh-pair/v1 live');
       final values = await session.page.editableValues();
       expect(values, isNotEmpty);
       expect(values.any((entry) => entry.value == 'mesh-pair/v1 live'), isTrue);

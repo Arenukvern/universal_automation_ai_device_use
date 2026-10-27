@@ -194,7 +194,8 @@ final class BehaviorReport {
   };
 
   @override
-  String toString() => 'BehaviorReport($eventCount events, '
+  String toString() =>
+      'BehaviorReport($eventCount events, '
       '$totalDurationUs us, flags: $subFloorKeyGapCount sub-floor, '
       '$overCeilingSpeedCount over-ceiling)';
 }
@@ -265,14 +266,20 @@ BehaviorReport auditBehavior(BehaviorPlan plan, BehaviorProfile profile) {
 
   final declaredVsObserved = <String, double>{
     if (dwellSamples.isNotEmpty)
-      'rhythm.beforeAction':
-          declaredDelta(profile.rhythm.beforeAction, dwellSamples)!,
+      'rhythm.beforeAction': declaredDelta(
+        profile.rhythm.beforeAction,
+        dwellSamples,
+      )!,
     if (moveDurationSamples.isNotEmpty)
-      'pointer.moveDuration':
-          declaredDelta(profile.pointer.moveDuration, moveDurationSamples)!,
+      'pointer.moveDuration': declaredDelta(
+        profile.pointer.moveDuration,
+        moveDurationSamples,
+      )!,
     if (cadenceSamples.isNotEmpty)
-      'cadence.digraph':
-          declaredDelta(profile.cadence.digraph, cadenceSamples)!,
+      'cadence.digraph': declaredDelta(
+        profile.cadence.digraph,
+        cadenceSamples,
+      )!,
   };
 
   final displacement = firstMove != null && lastMove != null

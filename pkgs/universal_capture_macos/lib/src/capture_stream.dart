@@ -41,23 +41,21 @@ class CaptureStream {
     CaptureBridge.ensureLoaded();
     if (_stopped) throw StateError('CaptureStream is stopped');
     if (_callable != null) return _frames.stream;
-    final callable = NativeCallable<XsStreamFrameCallbackNative>.listener(
-      (
-        Pointer<Uint8> bytes,
-        int length,
-        int timestampUs,
-        Pointer<Void> userData,
-      ) {
-        if (bytes == nullptr || length <= 0) return;
-        if (_frames.isClosed) return;
-        _frames.add(
-          CaptureFrame(
-            Uint8List.fromList(bytes.asTypedList(length)),
-            timestampUs,
-          ),
-        );
-      },
-    );
+    final callable = NativeCallable<XsStreamFrameCallbackNative>.listener((
+      Pointer<Uint8> bytes,
+      int length,
+      int timestampUs,
+      Pointer<Void> userData,
+    ) {
+      if (bytes == nullptr || length <= 0) return;
+      if (_frames.isClosed) return;
+      _frames.add(
+        CaptureFrame(
+          Uint8List.fromList(bytes.asTypedList(length)),
+          timestampUs,
+        ),
+      );
+    });
     _callable = callable;
     final handle = streamStartNative(
       displayId,

@@ -13,10 +13,7 @@ import 'package:universal_webrtc_raw/universal_webrtc_raw.dart';
 /// `FrameChunkCodec` envelope over SCTP.
 class WebrtcDataChannelSink implements FrameSink {
   /// Creates a sink over [_sidecar] for [_peerId].
-  WebrtcDataChannelSink({
-    required this._sidecar,
-    required this._peerId,
-  });
+  WebrtcDataChannelSink({required this._sidecar, required this._peerId});
 
   final SidecarClient _sidecar;
   final String _peerId;

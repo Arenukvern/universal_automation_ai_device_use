@@ -21,12 +21,18 @@ void main() {
 
   test('malformed envelopes fail loudly naming the field', () {
     expect(
-      () => RuleEnvelope.fromJson({'kind': 'rule', 'content': 'x', 'source': 's'}),
-      throwsA(isA<FormatException>().having(
-        (error) => error.message,
-        'message',
-        contains('"id"'),
-      )),
+      () => RuleEnvelope.fromJson({
+        'kind': 'rule',
+        'content': 'x',
+        'source': 's',
+      }),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('"id"'),
+        ),
+      ),
     );
     expect(
       () => RuleEnvelope.fromJson({
@@ -35,11 +41,13 @@ void main() {
         'content': 'x',
         'source': 's',
       }),
-      throwsA(isA<FormatException>().having(
-        (error) => error.message,
-        'message',
-        contains('kind'),
-      )),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('kind'),
+        ),
+      ),
     );
     expect(
       () => RuleEnvelope.fromJson({'id': 'a', 'kind': 'rule', 'source': 's'}),
@@ -47,45 +55,51 @@ void main() {
     );
     expect(
       () => RuleEnvelope.fromJson({'id': 'a', 'kind': 'rule', 'content': 'x'}),
-      throwsA(isA<FormatException>().having(
-        (error) => error.message,
-        'message',
-        contains('"source"'),
-      )),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('"source"'),
+        ),
+      ),
     );
   });
 
   test('loadRuleEnvelopes stamps sources and refuses duplicate ids', () {
     final dir = Directory.systemTemp.createTempSync('harness-envelope');
     addTearDown(() => dir.deleteSync(recursive: true));
-    final first = File('${dir.path}/rules.json')..writeAsStringSync(
-      jsonEncode({
-        'id': 'automation.fail-closed',
-        'kind': 'rule',
-        'content': 'Fail closed.',
-      }),
-    );
-    final second = File('${dir.path}/guides.json')..writeAsStringSync(
-      jsonEncode([
-        {
-          'id': 'automation.semantic-first',
-          'kind': 'guide',
-          'content': 'Observe through a view before acting.',
-        },
-        {
+    final first = File('${dir.path}/rules.json')
+      ..writeAsStringSync(
+        jsonEncode({
           'id': 'automation.fail-closed',
           'kind': 'rule',
-          'content': 'Duplicate id inside the bundle.',
-        },
-      ]),
-    );
+          'content': 'Fail closed.',
+        }),
+      );
+    final second = File('${dir.path}/guides.json')
+      ..writeAsStringSync(
+        jsonEncode([
+          {
+            'id': 'automation.semantic-first',
+            'kind': 'guide',
+            'content': 'Observe through a view before acting.',
+          },
+          {
+            'id': 'automation.fail-closed',
+            'kind': 'rule',
+            'content': 'Duplicate id inside the bundle.',
+          },
+        ]),
+      );
     expect(
       () => loadRuleEnvelopes([first.path, second.path]),
-      throwsA(isA<FormatException>().having(
-        (error) => error.message,
-        'message',
-        contains('declared twice'),
-      )),
+      throwsA(
+        isA<FormatException>().having(
+          (error) => error.message,
+          'message',
+          contains('declared twice'),
+        ),
+      ),
     );
 
     final envelopes = loadRuleEnvelopes([first.path, second.path].take(1));

@@ -138,9 +138,7 @@ final class LoopbackSignalingChannel implements SignalingChannel {
 final class WebSocketSignalingChannel implements SignalingChannel {
   WebSocketSignalingChannel._(this._socket) {
     _subscription = _socket
-        .map(
-          (data) => jsonDecode(data as String) as Map<String, Object?>,
-        )
+        .map((data) => jsonDecode(data as String) as Map<String, Object?>)
         .map(SignalMessage.fromJson)
         .listen(_messages.add, onError: _messages.addError);
   }

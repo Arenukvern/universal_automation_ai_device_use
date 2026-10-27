@@ -94,7 +94,8 @@ final class UniformTiming extends TimingDistribution {
         'UniformTiming.minMicros must be >= 0 (got $minMicros)',
     ];
     if (maxMicros < minMicros) {
-      final message = 'UniformTiming.maxMicros ($maxMicros) must be '
+      final message =
+          'UniformTiming.maxMicros ($maxMicros) must be '
           '>= minMicros ($minMicros)';
       violations.add(message);
     }
@@ -147,18 +148,21 @@ final class PiecewiseTiming extends TimingDistribution {
   List<String> validate() {
     final violations = <String>[];
     if (boundariesUs.length < 2) {
-      final message = 'PiecewiseTiming needs >= 2 boundaries '
+      final message =
+          'PiecewiseTiming needs >= 2 boundaries '
           '(got ${boundariesUs.length})';
       violations.add(message);
     }
     if (boundariesUs.isNotEmpty && boundariesUs.first < 0) {
-      final message = 'PiecewiseTiming boundaries must be >= 0 '
+      final message =
+          'PiecewiseTiming boundaries must be >= 0 '
           '(first is ${boundariesUs.first})';
       violations.add(message);
     }
     for (var i = 1; i < boundariesUs.length; i++) {
       if (boundariesUs[i] <= boundariesUs[i - 1]) {
-        final message = 'PiecewiseTiming boundaries must strictly '
+        final message =
+            'PiecewiseTiming boundaries must strictly '
             'increase (${boundariesUs[i - 1]} !< ${boundariesUs[i]})';
         violations.add(message);
       }
@@ -195,8 +199,7 @@ final class PiecewiseTiming extends TimingDistribution {
 
   @override
   bool operator ==(Object other) =>
-      other is PiecewiseTiming &&
-      _listEquals(other.boundariesUs, boundariesUs);
+      other is PiecewiseTiming && _listEquals(other.boundariesUs, boundariesUs);
 
   @override
   int get hashCode => Object.hashAll(boundariesUs);

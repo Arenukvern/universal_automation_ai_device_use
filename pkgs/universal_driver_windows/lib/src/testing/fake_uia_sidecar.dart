@@ -20,9 +20,7 @@ final class FakeUiaSidecarTransport implements UiaSidecarTransport {
 
   /// Simulates an event.
   void emitEvent(String kind, Map<String, Object?> params) =>
-      _controller.add(
-        jsonEncode({'event': kind, ...params}),
-      );
+      _controller.add(jsonEncode({'event': kind, ...params}));
 
   @override
   Future<void> writeLine(String line) async {

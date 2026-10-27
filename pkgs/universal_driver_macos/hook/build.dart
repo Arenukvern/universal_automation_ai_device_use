@@ -67,9 +67,8 @@ void main(List<String> args) async {
     final staleCandidate = Directory('.dart_tool/lib');
     if (staleCandidate.existsSync()) {
       try {
-        await File(
-          libPath,
-        ).copy('${staleCandidate.path}/libxs_ax_driver.dylib');
+        await File(libPath)
+            .copy('${staleCandidate.path}/libxs_ax_driver.dylib');
       } on Object catch (e) {
         stderr.writeln(
           '[xs_ax_driver hook] stale-candidate refresh skipped: $e',

@@ -53,11 +53,7 @@ void main() {
   tearDown(() => fake.stop());
 
   test('observe prints the snapshot JSON and exits 0', () async {
-    final code = await runToolkitCli([
-      'observe',
-      '--cdp',
-      '$endpoint',
-    ]);
+    final code = await runToolkitCli(['observe', '--cdp', '$endpoint']);
     expect(code, exitOk);
   });
 
@@ -77,11 +73,7 @@ void main() {
   });
 
   test('act without a verb is a usage error (exit 2)', () async {
-    final code = await runToolkitCli([
-      'act',
-      '--cdp',
-      '$endpoint',
-    ]);
+    final code = await runToolkitCli(['act', '--cdp', '$endpoint']);
     expect(code, exitUsage);
   });
 
@@ -123,8 +115,7 @@ void main() {
     expect(code, exitOk);
   });
 
-  test('verify passes when checks hold and fails (exit 1) when not',
-      () async {
+  test('verify passes when checks hold and fails (exit 1) when not', () async {
     final ok = await runToolkitCli([
       'verify',
       '--cdp',
@@ -248,15 +239,13 @@ scenarios:
     expect(code, exitOk);
   });
 
-  test('serve --browser-handle without --handles-dir is a usage error',
-      () async {
-    final code = await runToolkitCli([
-      'serve',
-      '--browser-handle',
-      'moli',
-    ]);
-    expect(code, exitUsage);
-  });
+  test(
+    'serve --browser-handle without --handles-dir is a usage error',
+    () async {
+      final code = await runToolkitCli(['serve', '--browser-handle', 'moli']);
+      expect(code, exitUsage);
+    },
+  );
 
   // Boots `serve` with the given flags/env in a child process and
   // returns the capabilities payload from the loopback HTTP face.
@@ -264,8 +253,9 @@ scenarios:
     List<String> flags = const ['--os'],
     Map<String, String> env = const {},
   }) async {
-    final script =
-        File('${Directory.current.path}/.dart_tool/uat_tier_probe.dart');
+    final script = File(
+      '${Directory.current.path}/.dart_tool/uat_tier_probe.dart',
+    );
     await script.parent.create(recursive: true);
     final flagArgs = flags.map((f) => "'$f'").join(', ');
     await script.writeAsString('''
@@ -287,22 +277,20 @@ Future<void> main() async {
         .transform(utf8.decoder)
         .transform(const LineSplitter())
         .first;
-    final url =
-        (jsonDecode(banner) as Map<String, Object?>)['url'] as String;
+    final url = (jsonDecode(banner) as Map<String, Object?>)['url'] as String;
     final port = Uri.parse(url).port;
     final client = HttpClient();
     addTearDown(client.close);
     final request = await client.post('127.0.0.1', port, '/mcp')
       ..headers.contentType = ContentType.json
-      ..write(jsonEncode({
-        'jsonrpc': '2.0',
-        'id': 1,
-        'method': 'tools/call',
-        'params': {
-          'name': 'automation_capabilities',
-          'arguments': {},
-        },
-      }));
+      ..write(
+        jsonEncode({
+          'jsonrpc': '2.0',
+          'id': 1,
+          'method': 'tools/call',
+          'params': {'name': 'automation_capabilities', 'arguments': {}},
+        }),
+      );
     final response = await request.close();
     final body = await utf8.decoder.bind(response).join();
     final result =
@@ -318,18 +306,9 @@ Future<void> main() async {
     final payload = await serveCapabilities(
       flags: ['--os', '--cdp', '$endpoint'],
     );
-    expect(
-      (payload['serve'] as Map)['defaultTransport'],
-      'osAccessibility',
-    );
-    expect(
-      ((payload['tiers'] as Map)['cdp'] as Map)['configured'],
-      true,
-    );
-    expect(
-      (payload['routing'] as Map)['browserTierConfigured'],
-      true,
-    );
+    expect((payload['serve'] as Map)['defaultTransport'], 'osAccessibility');
+    expect(((payload['tiers'] as Map)['cdp'] as Map)['configured'], true);
+    expect((payload['routing'] as Map)['browserTierConfigured'], true);
   });
 
   test('env UNIVERSAL_AUTOMATION_CDP configures the browser tier without '
@@ -338,18 +317,9 @@ Future<void> main() async {
       flags: ['--os'],
       env: {'UNIVERSAL_AUTOMATION_CDP': '$endpoint'},
     );
-    expect(
-      ((payload['tiers'] as Map)['cdp'] as Map)['configured'],
-      true,
-    );
-    expect(
-      ((payload['tiers'] as Map)['cdp'] as Map)['endpoint'],
-      '$endpoint',
-    );
-    expect(
-      (payload['routing'] as Map)['browserTierConfigured'],
-      true,
-    );
+    expect(((payload['tiers'] as Map)['cdp'] as Map)['configured'], true);
+    expect(((payload['tiers'] as Map)['cdp'] as Map)['endpoint'], '$endpoint');
+    expect((payload['routing'] as Map)['browserTierConfigured'], true);
   });
 
   test('serve --handles-dir + --browser-handle resolves the published '
@@ -369,9 +339,6 @@ Future<void> main() async {
     final handles = payload['handles'] as Map;
     expect(handles['browserHandle'], 'moli');
     expect(handles['resolvedEndpoint'], '$endpoint');
-    expect(
-      (payload['routing'] as Map)['browserTierConfigured'],
-      true,
-    );
+    expect((payload['routing'] as Map)['browserTierConfigured'], true);
   });
 }

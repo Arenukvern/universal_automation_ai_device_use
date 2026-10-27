@@ -32,9 +32,7 @@ class UiaDriver implements AutomationDriver {
         'Linux accessibility tier',
       );
     }
-    final transport = await ProcessUiaSidecarTransport.start(
-      binary: binary,
-    );
+    final transport = await ProcessUiaSidecarTransport.start(binary: binary);
     final client = UiaSidecarClient(transport);
     await client.handshake;
     return UiaDriver(client);
@@ -49,10 +47,10 @@ class UiaDriver implements AutomationDriver {
 
   @override
   DriverCapabilities get capabilities => const DriverCapabilities(
-        a11yTree: true,
-        inputSynthesis: true,
-        navigate: true,
-      );
+    a11yTree: true,
+    inputSynthesis: true,
+    navigate: true,
+  );
 
   @override
   Future<Snapshot> snapshot() async {

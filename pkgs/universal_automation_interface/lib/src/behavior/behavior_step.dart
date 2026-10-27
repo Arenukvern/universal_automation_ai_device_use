@@ -33,15 +33,13 @@ sealed class BehaviorStep {
           plannedAtUs: json['plannedAtUs']! as int,
           button: json['button']! as String? ?? 'left',
           clickCount: json['clickCount'] as int? ?? 1,
-          modifiers:
-              (json['modifiers'] as List?)?.cast<String>() ?? const [],
+          modifiers: (json['modifiers'] as List?)?.cast<String>() ?? const [],
         ),
         'pointerUp' => PointerUpStep(
           plannedAtUs: json['plannedAtUs']! as int,
           button: json['button']! as String? ?? 'left',
           clickCount: json['clickCount'] as int? ?? 1,
-          modifiers:
-              (json['modifiers'] as List?)?.cast<String>() ?? const [],
+          modifiers: (json['modifiers'] as List?)?.cast<String>() ?? const [],
         ),
         'keyDown' => KeyDownStep(
           plannedAtUs: json['plannedAtUs']! as int,
@@ -339,8 +337,7 @@ final class WheelStep extends BehaviorStep {
   };
 
   @override
-  String toString() =>
-      'WheelStep(+$plannedAtUs us, d=($deltaX, $deltaY))';
+  String toString() => 'WheelStep(+$plannedAtUs us, d=($deltaX, $deltaY))';
 }
 
 /// The deterministic canonical plan `synthesize` produces: steps in
@@ -353,9 +350,8 @@ final class BehaviorPlan {
   /// Creates a plan; steps are sorted by `plannedAtUs` and validated to
   /// be non-negative.
   BehaviorPlan({required List<BehaviorStep> steps})
-    : steps = List.of(steps)..sort(
-        (a, b) => a.plannedAtUs.compareTo(b.plannedAtUs),
-      ) {
+    : steps = List.of(steps)
+        ..sort((a, b) => a.plannedAtUs.compareTo(b.plannedAtUs)) {
     for (final step in steps) {
       if (step.plannedAtUs < 0) {
         throw SpecViolationException([
@@ -382,7 +378,7 @@ final class BehaviorPlan {
 
   /// Wire/format identifier pinned into hashes and receipts.
   /// v2: pointer steps carry `clickCount` and modifier `modifiers` in
-/// canonical form (the coordinate-verbs + chords waves).
+  /// canonical form (the coordinate-verbs + chords waves).
   static const String schemaId = 'behavior.plan/v2';
 
   /// The ordered steps.
@@ -401,9 +397,8 @@ final class BehaviorPlan {
   }
 
   /// One canonical JSON document per line, in plan order.
-  String canonicalJsonl() => [
-    for (final step in steps) canonicalJson(step.toJson()),
-  ].join('\n');
+  String canonicalJsonl() =>
+      [for (final step in steps) canonicalJson(step.toJson())].join('\n');
 
   /// SHA-256 of [canonicalJsonl] — the `streamHash` in receipts.
   String get hash => canonicalHash(steps.map((s) => s.toJson()).toList());
@@ -415,6 +410,7 @@ final class BehaviorPlan {
   };
 
   @override
-  String toString() => 'BehaviorPlan(${steps.length} steps, '
+  String toString() =>
+      'BehaviorPlan(${steps.length} steps, '
       '$totalDurationUs us, ${hash.substring(0, 8)})';
 }

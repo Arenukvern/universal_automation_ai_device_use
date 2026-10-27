@@ -71,21 +71,31 @@ Future<void> main() async {
     profiles: {'humanish': BehaviorProfile.humanPrior(7)},
     intents: intents,
     scenarios: [
-      scenario('browsing', steps: [
-        navigate(Uri.parse('$endpoint/#form')),
-        waitFor([exists(role: 'textbox', name: 'Email')]),
-        typeText('antonio@example.com', css: '#email'),
-        verifyThat([exists(role: 'textbox', name: 'Email')]),
-        shot('/tmp/uat-showcase-browsing.png'),
-      ]),
-      scenario('checkout', extend: 'browsing', steps: [
-        intent('webshop', 'checkout'),
-        verifyThat([absent(name: 'Error')]),
-      ]),
-      scenario('humanlike', steps: [
-        navigate(Uri.parse('$endpoint/#human')),
-        soft(click(name: 'Submit', profile: 'humanish', seed: 42)),
-      ]),
+      scenario(
+        'browsing',
+        steps: [
+          navigate(Uri.parse('$endpoint/#form')),
+          waitFor([exists(role: 'textbox', name: 'Email')]),
+          typeText('antonio@example.com', css: '#email'),
+          verifyThat([exists(role: 'textbox', name: 'Email')]),
+          shot('/tmp/uat-showcase-browsing.png'),
+        ],
+      ),
+      scenario(
+        'checkout',
+        extend: 'browsing',
+        steps: [
+          intent('webshop', 'checkout'),
+          verifyThat([absent(name: 'Error')]),
+        ],
+      ),
+      scenario(
+        'humanlike',
+        steps: [
+          navigate(Uri.parse('$endpoint/#human')),
+          soft(click(name: 'Submit', profile: 'humanish', seed: 42)),
+        ],
+      ),
     ],
   );
 
@@ -105,8 +115,10 @@ Future<void> main() async {
       outDir: '/tmp/uat-showcase',
     );
     // ignore: avoid_print
-    print('${report.ok ? "PASS" : "FAIL"} $name: '
-        '${report.steps.length} steps, receipts: ${report.receipts.length}');
+    print(
+      '${report.ok ? "PASS" : "FAIL"} $name: '
+      '${report.steps.length} steps, receipts: ${report.receipts.length}',
+    );
   }
 
   // The same values as the agent wire form:

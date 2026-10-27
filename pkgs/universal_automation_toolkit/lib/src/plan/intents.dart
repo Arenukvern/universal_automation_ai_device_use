@@ -70,8 +70,7 @@ final class IntentHint {
         'must not be empty for ${verb.name}',
       );
     }
-    if (verb == IntentVerb.custom &&
-        (locator['name'] ?? '').trim().isEmpty) {
+    if (verb == IntentVerb.custom && (locator['name'] ?? '').trim().isEmpty) {
       throw ArgumentError.value(
         locator,
         'locator',
@@ -154,7 +153,8 @@ final class IntentHint {
     Map<String, Object?> args = const {},
     required String label,
   }) {
-    final text = (key) => args[key] is String && (args[key] as String).isNotEmpty
+    final text = (key) =>
+        args[key] is String && (args[key] as String).isNotEmpty
         ? args[key] as String
         : (locator[key] ?? '');
     return switch (verb) {
@@ -208,10 +208,7 @@ final class IntentHint {
         }
         return EvaluateAction(value);
       }(),
-      IntentVerb.custom => InvokeAction(
-        locator['name']!,
-        args: args,
-      ),
+      IntentVerb.custom => InvokeAction(locator['name']!, args: args),
     };
   }
 
@@ -234,9 +231,8 @@ final class IntentHint {
       ) &&
       _viewWire == other._viewWire;
 
-  String? get _viewWire => viewHint == null
-      ? null
-      : const JsonEncoder().convert(viewHint!.toJson());
+  String? get _viewWire =>
+      viewHint == null ? null : const JsonEncoder().convert(viewHint!.toJson());
 
   @override
   int get hashCode => Object.hash(
@@ -278,12 +274,10 @@ final class AppIntent {
       hint: hint,
       parameters: parameters is List<Object?>
           ? [
-            for (final parameter in parameters)
-              if (parameter is Map<Object?, Object?>)
-                parameter.map(
-                  (key, value) => MapEntry('$key', value),
-                ),
-          ]
+              for (final parameter in parameters)
+                if (parameter is Map<Object?, Object?>)
+                  parameter.map((key, value) => MapEntry('$key', value)),
+            ]
           : const [],
     );
   }
@@ -303,8 +297,7 @@ final class AppIntent {
   /// Whether [args] satisfy the declared required parameters.
   List<String> missingParameters(Map<String, Object?> args) => [
     for (final parameter in parameters)
-      if (parameter['required'] == true &&
-          (args[parameter['name']] == null))
+      if (parameter['required'] == true && (args[parameter['name']] == null))
         "missing required parameter '${parameter['name']}'",
   ];
 
@@ -366,9 +359,7 @@ final class IntentManifest {
 final class IntentRegistry {
   /// Creates a registry.
   IntentRegistry(Iterable<IntentManifest> manifests)
-    : _manifests = {
-        for (final manifest in manifests) manifest.app: manifest,
-      };
+    : _manifests = {for (final manifest in manifests) manifest.app: manifest};
 
   /// Loads manifest JSON files (single manifest objects or a top-level
   /// list of them) — the intentcall export shape.
@@ -397,10 +388,7 @@ final class IntentRegistry {
   /// too — intentcall's own projection guarantees parseable hints, so a
   /// skip means the payload predates the projection. Throws
   /// [FormatException] for duplicate tool names.
-  factory IntentRegistry.fromMcpToolsList(
-    Object? json, {
-    String app = 'app',
-  }) {
+  factory IntentRegistry.fromMcpToolsList(Object? json, {String app = 'app'}) {
     final tools = switch (json) {
       {'tools': List<Object?> tools} => tools,
       List<Object?> tools => tools,
@@ -452,7 +440,8 @@ final class IntentRegistry {
           final parameter = <String, Object?>{'name': '${entry.key}'};
           if (entry.value is Map<Object?, Object?>) {
             final property = entry.value as Map<Object?, Object?>;
-            if (property['type'] is String) parameter['type'] = property['type'];
+            if (property['type'] is String)
+              parameter['type'] = property['type'];
             if (property['description'] is String) {
               parameter['description'] = property['description'];
             }

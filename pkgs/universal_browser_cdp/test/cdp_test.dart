@@ -176,8 +176,7 @@ void main() {
       expect(keyEvents.last['type'], 'keyUp');
     });
 
-    test('unknown keys are refused loudly; chord keys are supported',
-        () async {
+    test('unknown keys are refused loudly; chord keys are supported', () async {
       await expectLater(
         session.page.keyPress('F5'),
         throwsA(isA<DriverUnsupportedException>()),
