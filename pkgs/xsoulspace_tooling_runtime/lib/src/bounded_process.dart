@@ -1064,9 +1064,10 @@ BoundedProcessCause deadlineCause({
 ///
 /// When [rootPid] is registered by an in-flight [runBounded] admission,
 /// the owned POSIX session ladder runs. Otherwise the root is routed to
-/// [stopUnownedPosixProcessTree], which signals the whole descendant tree
-/// visible under that pid in one `ps` snapshot. Callers must pass only roots
-/// they own; foreign or shared subtrees are not filtered.
+/// [stopUnownedPosixProcessTree] (enumerate from `ps`, TERM, grace with
+/// liveness polls, re-enumerate from `ps` before KILL, then verify death).
+/// Callers must pass only roots they own; foreign or shared subtrees are not
+/// filtered.
 ///
 /// Pair signaled or reported survivor pids with [awaitProcessSettlement]:
 /// it returns `true` only when live `ps` shows every listed pid gone, and
@@ -1086,9 +1087,14 @@ Future<List<int>> stopProcessTree(
 
 /// `ps` tree stop for processes **not** admitted by [runBounded].
 ///
-/// Enumerates descendants of [rootPid] (inclusive), runs the TERM→KILL ladder,
-/// and returns every pid signaled. The host must own [rootPid] and everything
-/// in that snapshot; there is no authority boundary beyond caller discipline.
+/// Enumerates the descendant tree under [rootPid] (inclusive) from `ps`, signals
+/// TERM to that set, polls liveness until [grace] elapses or all are gone, then
+/// takes a fresh `ps` tree snapshot and signals KILL to the union of the
+/// original set and any newly visible descendants (children spawned under TERM
+/// are caught on the re-enumeration), polling again until [grace] or all are
+/// dead. Returns every pid signaled. The host must own [rootPid] and every pid
+/// in those enumerations; there is no authority boundary beyond caller
+/// discipline.
 ///
 /// Used from [stopProcessTree] when no owned registration exists. After
 /// signaling, use [awaitProcessSettlement] on the returned pids (or reported
