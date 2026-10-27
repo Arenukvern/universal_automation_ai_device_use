@@ -75,5 +75,35 @@ tag `universal_tooling_runtime-v{{version}}`. Pub.dev publish runs only via
 `workflow_dispatch` (dispatched from `.github/workflows/release-please.yml` on
 each release). There is no `on.push.tags` trigger, so a custom
 `RELEASE_PLEASE_TOKEN` cannot double-fire publish (tag push plus dispatch).
-Manual recovery: `gh workflow run publish_tooling_runtime.yml --ref
-universal_tooling_runtime-vX.Y.Z`.
+
+CI runs `dart run tool/check_reusable_workflow_inputs.dart` because actionlint
+cannot verify `with:` keys on remote reusable workflows (unknown inputs cause
+`startup_failure` with zero jobs).
+
+### 0.2.1 and the workflow-input fix
+
+Tag `universal_tooling_runtime-v0.2.1` exists on GitHub but **was never published**
+to pub.dev: the publish workflow failed at **startup** (zero jobs) because the
+caller passed an undeclared `with:` input to
+`dart-lang/setup-dart/.github/workflows/publish.yml@v1`. Do **not** move or
+recreate that tag. Merge the `fix(ci):` workflow fix (this README is updated in
+the same change so release-please attributes the commit to this package), then
+let release-please open a release PR that bumps **0.2.2**. Merging that PR tags
+`universal_tooling_runtime-v0.2.2` and dispatches publish with a workflow that
+matches the tag ref.
+
+### Manual recovery (later failures)
+
+`workflow_dispatch` loads the workflow file from the **ref you pass** (`--ref`).
+Use a **tag ref** whose `pubspec.yaml` version matches the tag name. After a
+failed publish on tag `…-vX.Y.Z`, fix `main`, cut the next release (e.g. patch
+bump) so a **new tag** carries the fixed workflow, then re-dispatch if needed:
+
+```bash
+gh workflow run publish_tooling_runtime.yml \
+  --repo Arenukvern/universal_automation_ai_device_use \
+  --ref universal_tooling_runtime-vX.Y.Z
+```
+
+Normal path: merge the release-please release PR and let `release-please.yml`
+dispatch publish on the new tag.
