@@ -35,4 +35,4 @@ jobs:
             pkgs/universal_screencast \
             pkgs/universal_lexicon \
             pkgs/universal_webrtc_raw \
-            pkgs/xsoulspace_tooling_runtime
+            pkgs/universal_tooling_runtime

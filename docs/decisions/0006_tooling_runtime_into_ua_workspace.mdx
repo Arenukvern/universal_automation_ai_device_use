@@ -1,10 +1,12 @@
-# ADR 0006 — `xsoulspace_tooling_runtime` into the UA workspace
+# ADR 0006 — `universal_tooling_runtime` into the UA workspace
 
 **Status:** Accepted (2026-10-26)  
 **North-star impact:** `applies` — adds an independent package without pulling
 device drivers into harness/Last Answer consumers.  
 **Supersedes (for consumers):** dart_flutter_packages (DFP) as the home of
-`xsoulspace_tooling_runtime`; historical DFP path pins (e.g.
+`xsoulspace_tooling_runtime` (workspace package renamed to
+`universal_tooling_runtime` per Anton, 2026-10-27 — 0.2.0 was never published
+under the old pub name; no deprecation shim); historical DFP path pins (e.g.
 `xsoulspace_inference_mlx_native`) should move to pub.dev after 0.2.0 ships.
 
 ## Context
@@ -19,12 +21,13 @@ Host coding harnesses and Last Answer need the same bounded runner:
 
 That logic lived in DFP at `pkgs/xsoulspace_tooling_runtime`, coupled to a large
 monorepo. Arenukvern/ecsai_harness and xsoulspace/last_answer already depend on
-the package name `xsoulspace_tooling_runtime`; they need a **hosted** copy that
+the bounded-runner package (historically `xsoulspace_tooling_runtime` on pub.dev
+pins); they need a **hosted** copy that
 does not drag DFP or UA device drivers.
 
 [oka](https://github.com/Arenukvern/oka) owns long-lived process composition.
 [`oka_process`](https://pub.dev/packages/oka_process) **0.8.1** is on pub.dev
-(2026-10-26, `meta` only). **`xsoulspace_tooling_runtime`** stays a thin
+(2026-10-26, `meta` only). **`universal_tooling_runtime`** stays a thin
 **admission + policy** layer until oka lands the **posix-perl backend** there;
 this package keeps inline Perl/session helpers for **0.2.0**.
 
@@ -38,13 +41,14 @@ full dfp sync).
 
 ## Decision
 
-1. **Add** `pkgs/xsoulspace_tooling_runtime` to this workspace with
-   `resolution: workspace`, unchanged package name, version **0.2.0** (minor bump
-   for the relocation).
+1. **Add** `pkgs/universal_tooling_runtime` to this workspace with
+   `resolution: workspace`, pub name **`universal_tooling_runtime`** (renamed
+   from `xsoulspace_tooling_runtime` before first publish), version **0.2.0**
+   (minor bump for the relocation).
 2. **Dependencies (0.2.0):** **`meta` only** — no git/path pins. **`oka_process`
    is published** on pub.dev; **adoption is deferred** until oka ports the
    posix-perl backend into that package. **Agreed order:** merge UA PR #5 →
-   Anton publishes `xsoulspace_tooling_runtime` 0.2.0 → oka posix-perl backend
+   Anton publishes `universal_tooling_runtime` 0.2.0 → oka posix-perl backend
    → tooling_runtime switches to `oka_process` in a follow-up release.
 3. **Boundaries:** the package must not depend on any UA driver, browser,
    capture, WebRTC, or lexicon package in this repo.
@@ -54,7 +58,7 @@ full dfp sync).
    process model are **not** requirements of this ADR; document root-only
    limitations in package README until a shared `oka_process` Windows backend
    exists. **Local Linux gate (2026-10-27, `cursor/move-tooling-runtime-0ca3`):**
-   `dart test --concurrency=1` in `pkgs/xsoulspace_tooling_runtime` — **53/53**
+   `dart test --concurrency=1` in `pkgs/universal_tooling_runtime` — **60/60**
    passed (Windows-only skips); plus
    `tool/run_p1_oka_probes.sh` (B3/B4/B5/N1).
 5. **Publishing:** owner (Anton) publishes to pub.dev; this ADR does not
@@ -71,4 +75,4 @@ full dfp sync).
 ## References
 
 - DFP ADR 0066 (tooling process runtime) — historical rationale in DFP.
-- Package evidence: `pkgs/xsoulspace_tooling_runtime/doc/evidence/2026-10-13/`.
+- Package evidence: `pkgs/universal_tooling_runtime/doc/evidence/2026-10-13/`.

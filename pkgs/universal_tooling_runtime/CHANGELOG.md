@@ -2,6 +2,8 @@
 
 ## 0.2.0
 
+- **Rename** pub package and UA path to `universal_tooling_runtime` (was
+  `xsoulspace_tooling_runtime`; 0.2.0 never shipped under the old name).
 - Move package from
   [`xsoulspace/dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages)
   into the
