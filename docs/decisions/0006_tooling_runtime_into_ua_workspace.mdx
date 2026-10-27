@@ -39,19 +39,21 @@ without merge and historical cherry-picks are folded here.
 1. **Add** `pkgs/xsoulspace_tooling_runtime` to this workspace with
    `resolution: workspace`, unchanged package name, version **0.2.0** (minor bump
    for the relocation).
-2. **Dependencies:** only `meta` until `oka_process` is published on pub.dev.
-   No path/git dependency on oka in this round. Inline POSIX helpers remain
-   temporarily; switch to `oka_process` in a follow-up CHANGELOG entry.
+2. **Dependencies:** only `meta` in 0.2.0. **`oka_process` is published on
+   pub.dev**; adoption is scheduled in a follow-up CHANGELOG entry — no git/path
+   dependency in this PR. Inline POSIX helpers remain until that swap.
 3. **Boundaries:** the package must not depend on any UA driver, browser,
    capture, WebRTC, or lexicon package in this repo.
 4. **Platform scope for this move:** **macOS and Linux** — Perl session leader,
-   `ps` tree observation, and macOS no-fork verification. DFP PR #5
-   ps-fallback conformance tests (`SIGSTOP` + owned-session timing) stay on the
-   **macOS gate** in this repo until `oka_process` and merged DFP PR #5 land;
-   other Linux VM tests run in CI. **Windows is deferred:** Job Objects, tree
-   kill, and the Windows UI Automation sidecar process model are **not**
-   requirements of this ADR; document root-only limitations in package README
-   until a shared `oka_process` Windows backend exists.
+   `ps` tree observation, and macOS no-fork verification. **Windows is
+   deferred:** Job Objects, tree kill, and the Windows UI Automation sidecar
+   process model are **not** requirements of this ADR; document root-only
+   limitations in package README until a shared `oka_process` Windows backend
+   exists. **Local Linux gate (2026-10-27, branch `cursor/move-tooling-runtime-0ca3`):**
+   `dart test --concurrency=1` in `pkgs/xsoulspace_tooling_runtime` — 45+
+   tests including p1 conformance and `tool/run_p1_oka_probes.sh`; full-suite
+   flake ~2/5 on `bounded_process_session_anchor_test`. macOS remains the gate
+   for `SIGSTOP` ps-fallback timing.
 5. **Publishing:** owner (Anton) publishes to pub.dev; this ADR does not
    authorize tags or release cuts from automation agents.
 
