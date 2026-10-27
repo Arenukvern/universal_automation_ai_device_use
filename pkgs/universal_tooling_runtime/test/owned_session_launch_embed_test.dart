@@ -5,7 +5,7 @@ import 'dart:io';
 import 'dart:isolate';
 
 import 'package:test/test.dart';
-import 'package:xsoulspace_tooling_runtime/src/owned_session_launch_embed.dart';
+import 'package:universal_tooling_runtime/src/owned_session_launch_embed.dart';
 
 String _perlBodyFromFile(File plFile) {
   final pl = plFile.readAsStringSync();
@@ -30,7 +30,7 @@ void main() {
     'embedded owned leader matches tool/owned_session_p1_leader.pl',
     () async {
       final entry = Uri.parse(
-        'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart',
+        'package:universal_tooling_runtime/universal_tooling_runtime.dart',
       );
       final lib = await Isolate.resolvePackageUri(entry);
       final packageRoot = File.fromUri(lib!).parent.parent;

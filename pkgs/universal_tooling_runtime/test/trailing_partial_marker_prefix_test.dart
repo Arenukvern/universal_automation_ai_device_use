@@ -4,7 +4,7 @@ library;
 import 'dart:convert';
 
 import 'package:test/test.dart';
-import 'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart';
+import 'package:universal_tooling_runtime/universal_tooling_runtime.dart';
 
 void main() {
   const marker = 'marker';

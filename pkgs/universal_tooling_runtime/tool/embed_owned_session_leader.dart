@@ -7,7 +7,7 @@ import 'dart:io';
 void main() {
   final packageRoot = Directory.current;
   if (!File('${packageRoot.path}/pubspec.yaml').existsSync()) {
-    stderr.writeln('run from pkgs/xsoulspace_tooling_runtime');
+    stderr.writeln('run from pkgs/universal_tooling_runtime');
     exit(1);
   }
   final pl = File('tool/owned_session_p1_leader.pl').readAsStringSync();

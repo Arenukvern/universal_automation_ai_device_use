@@ -3,7 +3,7 @@
 Reference leader: `tool/owned_session_p1_leader.pl` (Perl today; same argv and
 channel contract will move to **oka** `oka_process` without changes). Host
 admission policy (deadlines, `runBounded`, harness lifecycle) stays in
-`xsoulspace_tooling_runtime` until callers switch transports.
+`universal_tooling_runtime` until callers switch transports.
 
 ## Launcher argv
 
@@ -128,7 +128,7 @@ Close-on-exec pipe detects target exec failure before `started`.
 
 ## Host settlement (not leader)
 
-The reference host (`xsoulspace_tooling_runtime`) certifies owned-session death
+The reference host (`universal_tooling_runtime`) certifies owned-session death
 with repeated `ps -eo pid=,ppid=,stat=` snapshots (and PGID grouping for owned
 stops), not subreaper or session-leader `pgrp` listing alone. Each `ps`
 invocation is bounded (2s); hung `ps` children are killed. Processes that leave

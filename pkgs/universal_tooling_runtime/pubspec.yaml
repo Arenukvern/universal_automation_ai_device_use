@@ -1,4 +1,4 @@
-name: xsoulspace_tooling_runtime
+name: universal_tooling_runtime
 description: >-
   Host-admitted bounded process runs with deadlines and exact stdio, plus
   workspace path policy, cooperative file locks, and macOS no-fork candidate
@@ -8,7 +8,7 @@ version: 0.2.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
-documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/xsoulspace_tooling_runtime
+documentation: https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_tooling_runtime
 
 environment:
   sdk: ^3.13.0
@@ -19,7 +19,7 @@ dependencies:
   meta: ^1.19.0
   # TODO(oka_process): depend on pub.dev `oka_process` once Arenukvern/oka lands
   # the posix-perl backend (oka_process 0.8.1 is published with meta-only deps).
-  # Order: merge UA #5 → publish tooling_runtime 0.2.0 → oka backend → swap here.
+  # Order: publish universal_tooling_runtime 0.2.0 → oka backend → swap here.
   # No git or path dependency until that follow-up release.
 
 dev_dependencies:

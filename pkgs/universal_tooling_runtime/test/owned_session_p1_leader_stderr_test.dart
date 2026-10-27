@@ -24,7 +24,7 @@ void main() {
     expect(perl, isNotEmpty, reason: 'system perl required');
     final entry = await Isolate.resolvePackageUri(
       Uri.parse(
-        'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart',
+        'package:universal_tooling_runtime/universal_tooling_runtime.dart',
       ),
     );
     expect(entry, isNotNull);

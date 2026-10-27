@@ -113,10 +113,10 @@
       "include-component-in-tag": true,
       "bump-minor-pre-major": true
     },
-    "pkgs/xsoulspace_tooling_runtime": {
+    "pkgs/universal_tooling_runtime": {
       "release-type": "dart",
       "pull-request-title-pattern": "chore(${component}): release ${version}",
-      "package-name": "xsoulspace_tooling_runtime",
+      "package-name": "universal_tooling_runtime",
       "include-component-in-tag": true,
       "bump-minor-pre-major": true
     }

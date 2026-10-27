@@ -15,7 +15,7 @@
 - https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md
 - https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md
 - https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_automation_toolkit
-- https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/xsoulspace_tooling_runtime
+- https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/pkgs/universal_tooling_runtime
 
 ## Siblings
 
