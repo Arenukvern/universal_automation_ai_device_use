@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_tooling_runtime-v0.2.1...universal_tooling_runtime-v0.2.2) (2026-10-27)
+
+
+### Bug Fixes
+
+* **ci:** valid inputs for dart-lang pub.dev reusable publish workflow ([0fcad4b](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/0fcad4be3f2384267dd678ccf46b8e0a5d4ecefd))
+* **ci:** valid pub.dev reusable inputs and document 0.2.2 publish path ([e57d9f0](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/e57d9f05ea0af553c9dfbef3d4493695a94ed8c0))
+
 ## [0.2.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_tooling_runtime-v0.2.0...universal_tooling_runtime-v0.2.1) (2026-10-27)
 
 
