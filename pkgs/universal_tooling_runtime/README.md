@@ -4,8 +4,8 @@ Bounded command runs with deadlines and exact stdio, plus admission helpers:
 `WorkspacePathPolicy`, cooperative `FileLockTable`, and macOS
 `macos_no_fork_candidate_v1` verification. Consumed by
 [`ecsai_harness`](https://github.com/Arenukvern/ecsai_harness) and
-[`last_answer`](https://github.com/xsoulspace/last_answer). **0.2.0** is the
-first pub.dev release as `universal_tooling_runtime` (the DFP workspace name
+[`last_answer`](https://github.com/xsoulspace/last_answer). **[0.2.0 on pub.dev](https://pub.dev/packages/universal_tooling_runtime)** is the
+first published release as `universal_tooling_runtime` (the DFP workspace name
 `xsoulspace_tooling_runtime` was never published).
 
 **Platform scope (this cut):** macOS and Linux POSIX session ownership. Windows

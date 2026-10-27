@@ -14,6 +14,7 @@
 [![universal_browser_cdp](https://img.shields.io/pub/v/universal_browser_cdp.svg?label=browser_cdp)](https://pub.dev/packages/universal_browser_cdp)
 [![universal_screencast](https://img.shields.io/pub/v/universal_screencast.svg?label=screencast)](https://pub.dev/packages/universal_screencast)
 [![universal_webrtc](https://img.shields.io/pub/v/universal_webrtc.svg?label=webrtc)](https://pub.dev/packages/universal_webrtc)
+[![universal_tooling_runtime](https://img.shields.io/pub/v/universal_tooling_runtime.svg?label=tooling_runtime)](https://pub.dev/packages/universal_tooling_runtime)
 
 ![Open devices to people and agents with care — composable automation across device classes](docs/brand/assets/png/banner-16x9.png)
 <!-- banner easter-egg: squint at the SVG/PNG horizon for other curious users -->
@@ -59,7 +60,7 @@ agent-facing CLI and MCP server live in
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
 | [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) | Lexicon packs in DFP (not vendored here) |
-| [`universal_tooling_runtime`](pkgs/universal_tooling_runtime/) | Bounded process runs, path policy, locks, macOS no-fork verify |
+| [`universal_tooling_runtime`](pkgs/universal_tooling_runtime/) ([pub](https://pub.dev/packages/universal_tooling_runtime)) | Bounded process runs, path policy, locks, macOS no-fork verify |
 
 Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx).
 

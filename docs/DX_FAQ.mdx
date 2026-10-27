@@ -15,7 +15,7 @@ Concise **how** answers for contributors and integrators. Charter and ethics liv
 ## Packages & pub.dev
 
 **Q: Which packages are on pub.dev?**  
-A: Core contracts, semantics, conformance, toolkit, browser drivers, screencast, WebRTC helpers, OS drivers, and capture packages are published from this repo. **`universal_lexicon`** lives in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) — path/git pin that checkout (or pub.dev when DFP publishes).
+A: Core contracts, semantics, conformance, toolkit, browser drivers, screencast, WebRTC helpers, OS drivers, capture packages, and **`universal_tooling_runtime`** (0.2.0+) are published from this repo. **`universal_lexicon`** lives in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) — path/git pin that checkout (or pub.dev when DFP publishes).
 
 **Q: How do I depend on a package while hacking this monorepo?**  
 A: In-repo packages resolve via the root `workspace:` entry — no override needed for `pkgs/*`. For sibling checkouts (xsoulspace, another app repo), copy `pubspec_overrides.yaml.example` to gitignored `pubspec_overrides.yaml` or run `./tool/overrides.sh write` (see [CONTRIBUTING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/CONTRIBUTING.md)). External apps should use pub.dev version constraints when available.
