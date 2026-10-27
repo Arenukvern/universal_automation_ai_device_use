@@ -4,9 +4,10 @@
 
 use strict;
 use warnings;
+use Config qw(%Config);
 use Fcntl qw(F_SETFD FD_CLOEXEC);
 use IO::Socket::UNIX;
-use POSIX qw(WNOHANG setsid);
+use POSIX qw(WNOHANG pause raise setsid);
 use Socket qw(SOCK_STREAM);
 
 sub emit_error {
@@ -176,6 +177,8 @@ sub start_graceful_hook {
   my $hpid = fork();
   emit_error($marker, 'fork', $! + 0) unless defined $hpid;
   if ($hpid == 0) {
+    $SIG{TERM} = 'DEFAULT';
+    $SIG{PIPE} = 'DEFAULT';
     run_graceful_hook_child(
       $sock,
       $marker,
@@ -248,10 +251,26 @@ if (!$main_reported) {
   }
 }
 
-my $status = $main_reported ? $main_status : 0;
-if ($status & 127) {
+sub signal_name_for_number {
+  my ($sig) = @_;
+  my @names = split /\s+/, $Config{sig_name} || '';
+  return $names[$sig] if $sig < @names;
+  return undef;
+}
+
+sub reraise_wait_signal {
+  my ($status) = @_;
+  return unless $status & 127;
   my $sig = $status & 127;
-  kill $sig, $$;
+  my $name = signal_name_for_number($sig);
+  if (defined $name && $name ne '' && $name ne '0') {
+    $SIG{$name} = 'DEFAULT';
+  }
+  raise($sig) or kill($sig, $$);
+  POSIX::pause();
   exit(128 + $sig);
 }
+
+my $status = $main_reported ? $main_status : 0;
+reraise_wait_signal($status);
 exit($status >> 8);
