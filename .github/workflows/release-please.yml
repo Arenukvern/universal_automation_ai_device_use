@@ -5,14 +5,15 @@ on:
     branches:
       - main
 
-permissions:
-  contents: write
-  pull-requests: write
-  actions: write
-
 jobs:
   release-please:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      tooling_runtime_release_created: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] }}
+      tooling_runtime_tag_name: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -27,8 +28,25 @@ jobs:
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
 
-      # Only pushes to main trigger this job; sync pushes to release-please--branches--main
-      # cannot re-enter release-please or loop.
+  sync-release-pr-constraints:
+    needs: release-please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # Only pushes to main trigger this workflow; sync pushes to
+      # release-please--branches--main cannot re-enter release-please.
       - name: Sync intra-workspace pub constraints on release PR
         id: sync_constraints
         env:
@@ -66,12 +84,18 @@ jobs:
           gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
           gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
 
+  dispatch-tooling-runtime-publish:
+    needs: release-please
+    if: ${{ needs.release-please.outputs.tooling_runtime_release_created == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
       - name: Dispatch pub.dev publish (universal_tooling_runtime)
-        if: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] == 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
+          TAG: ${{ needs.release-please.outputs.tooling_runtime_tag_name }}
         run: |
           echo "Dispatching publish_tooling_runtime.yml for tag ${TAG}"
           gh workflow run publish_tooling_runtime.yml --repo "${GH_REPO}" --ref "${TAG}"
