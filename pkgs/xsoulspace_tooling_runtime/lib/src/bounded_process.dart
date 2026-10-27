@@ -331,27 +331,8 @@ Future<BoundedRunResult> runBounded(
     bytes.removeRange(0, bytes.length - keep);
   }
 
-  int trailingPartialMarkerPrefix(List<int> bytes) {
-    var partialLen = 0;
-    for (
-      var tail = 1;
-      tail < failureBytes.length && tail <= bytes.length;
-      tail++
-    ) {
-      final suffix = bytes.sublist(bytes.length - tail);
-      for (var start = 0; start <= failureBytes.length - tail; start++) {
-        var matches = true;
-        for (var j = 0; j < tail; j++) {
-          if (failureBytes[start + j] != suffix[j]) {
-            matches = false;
-            break;
-          }
-        }
-        if (matches) partialLen = tail;
-      }
-    }
-    return partialLen;
-  }
+  int trailingPartialMarkerPrefix(List<int> bytes) =>
+      trailingPartialMarkerPrefixBytes(bytes, failureBytes);
 
   void flushPendingStatusCapture() {
     if (statusBytes.isNotEmpty) {
@@ -773,6 +754,27 @@ exec { $ARGV[0] } @ARGV;
 print STDERR "$marker:error:exec:$!\n";
 exit(1);
 ''';
+
+/// Longest suffix of [bytes] that is a prefix of [failureBytes] (`@visibleForTesting`).
+@visibleForTesting
+int trailingPartialMarkerPrefixBytes(List<int> bytes, List<int> failureBytes) {
+  var partialLen = 0;
+  for (
+    var tail = 1;
+    tail < failureBytes.length && tail <= bytes.length;
+    tail++
+  ) {
+    var matches = true;
+    for (var j = 0; j < tail; j++) {
+      if (failureBytes[j] != bytes[bytes.length - tail + j]) {
+        matches = false;
+        break;
+      }
+    }
+    if (matches) partialLen = tail;
+  }
+  return partialLen;
+}
 
 int _byteSequenceIndex(List<int> bytes, List<int> needle) {
   outer:
