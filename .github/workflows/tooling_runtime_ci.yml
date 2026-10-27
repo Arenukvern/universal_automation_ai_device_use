@@ -13,6 +13,8 @@ on:
       - 'pkgs/universal_tooling_runtime/**'
       - '.github/workflows/tooling_runtime_ci.yml'
       - '.github/workflows/publish_tooling_runtime.yml'
+  # Dispatched from release-please.yml after constraint sync (see Validate).
+  workflow_dispatch:
 
 jobs:
   ci:

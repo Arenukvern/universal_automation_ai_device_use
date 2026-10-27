@@ -5,6 +5,8 @@ on:
   push:
     branches:
       - main
+  # GITHUB_TOKEN pushes to release-please--branches--main do not trigger pull_request.
+  workflow_dispatch:
 
 jobs:
   analyze:
