@@ -4,9 +4,8 @@ Welcome. This project uses **Skill Steward** to make repository purpose, validat
 
 Computer-use / agent observe–act–verify automation family. Contracts +
 OS/browser/capture/WebRTC drivers live here. `universal_lexicon` is maintained in
-[`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages)
-(`pkgs/universal_lexicon` on branch `ag-c`; TODO: `main` after DFP merge — not
-this workspace).
+[`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon)
+(not this workspace).
 `universal_storage_*` is a sibling product
 ([`universal_storage`](https://github.com/Arenukvern/universal_storage)).
 Public GitHub home:

@@ -37,4 +37,4 @@ dependency_overrides:
   #   git:
   #     url: https://github.com/xsoulspace/dart_flutter_packages.git
   #     path: pkgs/universal_lexicon
-  #     ref: ag-c   # TODO: main after DFP re-home merges; or a release tag when published
+  #     ref: main   # or a release tag when published
