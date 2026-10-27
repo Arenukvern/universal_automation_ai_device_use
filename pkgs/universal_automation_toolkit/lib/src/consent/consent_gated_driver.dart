@@ -3,6 +3,8 @@ import 'dart:typed_data';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:xsoulspace_permission_core/xsoulspace_permission_core.dart';
 
+import 'os_permission_authorizer.dart';
+
 /// A policy refused an OS-consent surface (`consentRequired`). Distinct
 /// from the drivers' typed TCC exceptions: those mean the OS lacks the
 /// grant; this one means the composition's permission chain said no —
@@ -15,6 +17,8 @@ class ConsentRequiredException extends AutomationException {
         '${reason == null ? '' : ': $reason'}',
         details: {
           'permissionKind': permissionKind.wireName,
+          'remedy': 'automation_request_consent',
+          'consentKind': permissionKind.wireName,
           if (reason != null) 'reason': reason,
         },
       );
@@ -57,16 +61,17 @@ final class ConsentGatedDriver implements AutomationDriver {
     required PermissionGate gate,
     String requestOrigin = 'automation',
     String? subject,
-  }) : _gate = gate,
-       _origin = requestOrigin,
-       _subject = subject;
+    OsPermissionAuthorizer? authorizer,
+  }) : _authorizer =
+           authorizer ??
+           OsPermissionAuthorizer(
+             gate: gate,
+             origin: requestOrigin,
+             subject: subject,
+           );
 
   final AutomationDriver _inner;
-  final PermissionGate _gate;
-  final String _origin;
-  final String? _subject;
-  var _sequence = 0;
-  final _allowed = <PermissionKind>{};
+  final OsPermissionAuthorizer _authorizer;
 
   @override
   DriverCapabilities get capabilities => _inner.capabilities;
@@ -103,35 +108,6 @@ final class ConsentGatedDriver implements AutomationDriver {
   @override
   Future<void> close() => _inner.close();
 
-  Future<void> _authorize(PermissionKind kind, {required String title}) async {
-    if (_allowed.contains(kind)) return;
-    final decision = await _gate.resolve(
-      PermissionRequest(
-        id: 'consent-${++_sequence}',
-        title: title,
-        kind: kind,
-        origin: _origin,
-        subject: _subject,
-        requestedAt: DateTime.now().toUtc(),
-      ),
-    );
-    switch (decision) {
-      case PermissionAllow(scope: PermissionGrantScope.once):
-        // Authorized for this call only; the next call re-asks (the
-        // transport's grant store records the spend).
-        return;
-      case PermissionAllow():
-        _allowed.add(kind);
-        return;
-      case PermissionDeny(:final reason):
-        throw ConsentRequiredException(kind, reason: reason);
-      case PermissionEscalate(:final reason):
-        // The gate resolves escalates through its sink; an escaped one
-        // means a miscomposed sink — refuse rather than guess.
-        throw ConsentRequiredException(
-          kind,
-          reason: reason ?? 'unresolved escalation',
-        );
-    }
-  }
+  Future<void> _authorize(PermissionKind kind, {required String title}) async =>
+      _authorizer.require(kind, title: title);
 }

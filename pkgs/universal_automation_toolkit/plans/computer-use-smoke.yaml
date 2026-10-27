@@ -1,0 +1,25 @@
+# Computer-use plumbing smoke (ADR 0008). Anchors an OS app via `app`
+# handle; uses window-local pixel injection (not semantic AXPress).
+#
+#   dart run bin/universal_automation.dart run \
+#     --plan plans/computer-use-smoke.yaml \
+#     --set app=ax://pid/0
+sessions:
+  app:
+    transport: osAccessibility
+    handle: app
+scenarios:
+  main:
+    steps:
+      - observe:
+          save: tree
+      - act:
+          clickAt:
+            x: 8
+            y: 8
+            windowId: 1
+            pixelInjection: true
+      - wait:
+          timeout: 1
+          checks:
+            - exists: {role: application}

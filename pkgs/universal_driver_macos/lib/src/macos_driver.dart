@@ -370,6 +370,124 @@ class MacosDriver
     return _capturedBytes(result, 'window screenshot');
   }
 
+  /// One window PNG plus device-pixel dimensions and scale (ADR 0008).
+  ///
+  /// [maxPx] downscales the returned image; [scale] maps returned image
+  /// pixels back to window points (width / bounds.width).
+  Future<({
+    Uint8List bytes,
+    int width,
+    int height,
+    double scale,
+  })> windowCaptureFrame(int windowId, {int maxPx = 0}) async {
+    final bytes = await windowScreenshot(windowId, maxPx: maxPx);
+    final (width, height) = _pngDeviceSize(bytes);
+    final window = await _windowById(windowId);
+    final bounds = window.bounds;
+    final scale = bounds == null || bounds.width <= 0
+        ? 1.0
+        : width / bounds.width;
+    return (bytes: bytes, width: width, height: height, scale: scale);
+  }
+
+  /// Scroll wheel lines into the anchored application (pid-scoped).
+  Future<void> scrollToAnchored({required double dx, required double dy}) async {
+    final pid = targetPid ?? _observedPid;
+    if (pid == null) {
+      throw const ProtocolException(
+        'scroll requires an anchored application (app: {pid})',
+        code: 6,
+      );
+    }
+    _pointerCheck(bridge.scrollToPid(pid, dx: dx, dy: dy), 'scroll');
+  }
+
+  /// Moves the pointer on the anchored pid at screen coordinates.
+  Future<void> pointerMoveToAnchored(
+    double screenX,
+    double screenY, {
+    List<String> modifiers = const [],
+  }) async {
+    final pid = _requireAnchorPid('pointer move');
+    _pointerCheck(
+      bridge.pointerMoveToPid(
+        pid,
+        x: screenX,
+        y: screenY,
+        modifiers: modifiers,
+      ),
+      'move pointer',
+    );
+  }
+
+  /// Drag in window-local points via pid-scoped pointer events (ADR 0008).
+  Future<void> dragWindowPixel({
+    required int windowId,
+    required double fromX,
+    required double fromY,
+    required double toX,
+    required double toY,
+    String button = 'left',
+    List<String> modifiers = const [],
+  }) async {
+    final window = await _windowById(windowId);
+    final anchorPid = targetPid ?? _observedPid ?? window.pid;
+    final (sx0, sy0) = _screenPointForWindowLocal(window, fromX, fromY);
+    final (sx1, sy1) = _screenPointForWindowLocal(window, toX, toY);
+    for (final modifier in modifiers) {
+      _check(
+        bridge.keyDownToPid(anchorPid, modifierKeyName(modifier)),
+        'hold ${modifierKeyName(modifier)}',
+      );
+    }
+    _pointerCheck(
+      bridge.pointerMoveToPid(
+        anchorPid,
+        x: sx0,
+        y: sy0,
+        modifiers: modifiers,
+      ),
+      'move pointer',
+    );
+    _pointerCheck(
+      bridge.pointerButtonToPid(
+        anchorPid,
+        x: sx0,
+        y: sy0,
+        button: button,
+        down: true,
+        modifiers: modifiers,
+      ),
+      'press $button',
+    );
+    _pointerCheck(
+      bridge.pointerMoveToPid(
+        anchorPid,
+        x: sx1,
+        y: sy1,
+        modifiers: modifiers,
+      ),
+      'drag carry',
+    );
+    _pointerCheck(
+      bridge.pointerButtonToPid(
+        anchorPid,
+        x: sx1,
+        y: sy1,
+        button: button,
+        down: false,
+        modifiers: modifiers,
+      ),
+      'release $button',
+    );
+    for (final modifier in modifiers.reversed) {
+      _check(
+        bridge.keyUpToPid(anchorPid, modifierKeyName(modifier)),
+        'release ${modifierKeyName(modifier)}',
+      );
+    }
+  }
+
   /// Captures one window's frame honoring [options] — the options-aware
   /// sibling of [windowScreenshot] (the base OS facade carries only the
   /// PNG cap).
@@ -512,6 +630,11 @@ class MacosDriver
           }
         }
       case ScrollAction(:final direction, :final distance):
+        if (targetPid != null) {
+          final (dx, dy) = _scrollLines(direction, distance);
+          await scrollToAnchored(dx: dx, dy: dy);
+          break;
+        }
         await ensureForeground(action);
         await _scroll(direction, distance);
       case NavigateAction(:final url):
@@ -559,6 +682,23 @@ class MacosDriver
           );
         }
         await _elementAction(action, role: role, name: name);
+      case ClickAtAction(
+        :final x,
+        :final y,
+        :final windowId,
+        :final button,
+        :final clickCount,
+        :final modifiers,
+        :final pixelInjection,
+      ) when windowId != null && pixelInjection:
+        await _clickAtWindowPixel(
+          windowId: windowId,
+          x: x,
+          y: y,
+          button: button,
+          clickCount: clickCount,
+          modifiers: modifiers,
+        );
       case ClickAtAction(
         :final x,
         :final y,
@@ -798,6 +938,114 @@ class MacosDriver
   }
 
 
+  static (int width, int height) _pngDeviceSize(Uint8List bytes) {
+    if (bytes.length < 24) return (0, 0);
+    int read(int offset) =>
+        (bytes[offset] << 24) |
+        (bytes[offset + 1] << 16) |
+        (bytes[offset + 2] << 8) |
+        bytes[offset + 3];
+    return (read(16), read(20));
+  }
+
+  int _requireAnchorPid(String verb) {
+    final pid = targetPid ?? _observedPid;
+    if (pid == null) {
+      throw ProtocolException(
+        '$verb requires an anchored application (app: {pid})',
+        code: 6,
+      );
+    }
+    return pid;
+  }
+
+  Future<MacosWindow> _windowById(int windowId) async {
+    final anchorPid = targetPid ?? _observedPid;
+    final windows = await this.windows(pid: anchorPid ?? 0);
+    for (final candidate in windows) {
+      if (candidate.windowId == windowId) return candidate;
+    }
+    throw ElementNotFoundException('window', '#$windowId');
+  }
+
+  (double screenX, double screenY) _screenPointForWindowLocal(
+    MacosWindow window,
+    double x,
+    double y,
+  ) {
+    final bounds = window.bounds;
+    if (bounds == null) {
+      throw ElementNotFoundException('window', 'bounds #${window.windowId}');
+    }
+    return (bounds.left + x, bounds.top + y);
+  }
+
+  Future<void> _clickAtWindowPixel({
+    required int windowId,
+    required double x,
+    required double y,
+    required String button,
+    required int clickCount,
+    required List<String> modifiers,
+  }) async {
+    final window = await _windowById(windowId);
+    final anchorPid = targetPid ?? _observedPid ?? window.pid;
+    if (targetPid != null && window.pid != targetPid) {
+      throw ProtocolException(
+        'window #$windowId belongs to pid ${window.pid}, expected $targetPid',
+        code: 6,
+      );
+    }
+    final (screenX, screenY) = _screenPointForWindowLocal(window, x, y);
+    for (final modifier in modifiers) {
+      _check(
+        bridge.keyDownToPid(anchorPid, modifierKeyName(modifier)),
+        'hold ${modifierKeyName(modifier)}',
+      );
+    }
+    _pointerCheck(
+      bridge.pointerMoveToPid(
+        anchorPid,
+        x: screenX,
+        y: screenY,
+        modifiers: modifiers,
+      ),
+      'move pointer',
+    );
+    for (var press = 1; press <= clickCount.clamp(1, 3); press++) {
+      _pointerCheck(
+        bridge.pointerButtonToPid(
+          anchorPid,
+          x: screenX,
+          y: screenY,
+          button: button,
+          down: true,
+          clickCount: press,
+          modifiers: modifiers,
+        ),
+        'press $button (click $press)',
+      );
+      _pointerCheck(
+        bridge.pointerButtonToPid(
+          anchorPid,
+          x: screenX,
+          y: screenY,
+          button: button,
+          down: false,
+          clickCount: press,
+          modifiers: modifiers,
+        ),
+        'release $button (click $press)',
+      );
+    }
+    for (final modifier in modifiers.reversed) {
+      _check(
+        bridge.keyUpToPid(anchorPid, modifierKeyName(modifier)),
+        'release ${modifierKeyName(modifier)}',
+      );
+    }
+  }
+
   Future<void> _clickAtWindowSemantic({
     required int windowId,
     required double x,
@@ -957,7 +1205,7 @@ class MacosDriver
     return raw == null ? null : int.tryParse(raw);
   }
 
-  Future<void> _scroll(String direction, double? distance) async {
+  (double, double) _scrollLines(String direction, double? distance) {
     final normalized = direction.toLowerCase();
     final lines = (distance ?? 30) / 10; // ~10 px per wheel line.
     final dx = switch (normalized) {
@@ -975,6 +1223,12 @@ class MacosDriver
         'scroll direction "$direction" is not one of up/down/left/right',
       );
     }
+    return (dx, dy);
+  }
+
+  Future<void> _scroll(String direction, double? distance) async {
+    final (dx, dy) = _scrollLines(direction, distance);
+    final normalized = direction.toLowerCase();
     _check(bridge.scroll(dx, dy), 'scroll $normalized');
   }
 

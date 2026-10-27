@@ -189,6 +189,42 @@ external int axdrvKeyDownPid(int pid, Pointer<Utf8> key);
 /// Releases the named [key] on the process at [pid].
 external int axdrvKeyUpPid(int pid, Pointer<Utf8> key);
 
+@Native<Int32 Function(Int32, Double, Double, Int64)>(
+  symbol: 'xs_axdrv_pointer_move_pid',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Moves the pointer to (x, y) on the process at [pid].
+external int axdrvPointerMovePid(
+  int pid,
+  double x,
+  double y,
+  int modifierFlags,
+);
+
+@Native<
+  Int32 Function(Int32, Double, Double, Pointer<Utf8>, Bool, Int32, Int64)
+>(
+  symbol: 'xs_axdrv_pointer_button_pid',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Presses/releases [button] at (x, y) on the process at [pid].
+external int axdrvPointerButtonPid(
+  int pid,
+  double x,
+  double y,
+  Pointer<Utf8> button,
+  bool down,
+  int clickCount,
+  int modifierFlags,
+);
+
+@Native<Int32 Function(Int32, Double, Double)>(
+  symbol: 'xs_axdrv_scroll_pid',
+  assetId: 'package:universal_driver_macos/xs_ax_driver',
+)
+/// Posts one wheel-line scroll bundle to the process at [pid].
+external int axdrvScrollPid(int pid, double dx, double dy);
+
 @Native<Void Function()>(
   symbol: 'xs_axdrv_release_all',
   assetId: 'package:universal_driver_macos/xs_ax_driver',

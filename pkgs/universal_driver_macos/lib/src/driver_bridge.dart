@@ -142,6 +142,28 @@ abstract interface class AxDriverBridge {
   /// Releases one named key on the process at [pid].
   int keyUpToPid(int pid, String key);
 
+  /// Moves the pointer to screen (x, y) on the process at [pid].
+  int pointerMoveToPid(
+    int pid, {
+    required double x,
+    required double y,
+    Iterable<String> modifiers = const [],
+  });
+
+  /// Presses or releases [button] at screen (x, y) on the process at [pid].
+  int pointerButtonToPid(
+    int pid, {
+    required double x,
+    required double y,
+    required String button,
+    required bool down,
+    int clickCount = 1,
+    Iterable<String> modifiers = const [],
+  });
+
+  /// Scroll wheel lines on the process at [pid].
+  int scrollToPid(int pid, {required double dx, required double dy});
+
   /// Drops cached element handles and scroll fractions.
   void releaseAll();
 
@@ -448,6 +470,44 @@ final class NativeAxDriverBridge
       calloc.free(pointer);
     }
   }
+
+  @override
+  int pointerMoveToPid(
+    int pid, {
+    required double x,
+    required double y,
+    Iterable<String> modifiers = const [],
+  }) => axdrvPointerMovePid(pid, x, y, cgEventModifierMask(modifiers));
+
+  @override
+  int pointerButtonToPid(
+    int pid, {
+    required double x,
+    required double y,
+    required String button,
+    required bool down,
+    int clickCount = 1,
+    Iterable<String> modifiers = const [],
+  }) {
+    final pointer = button.toNativeUtf8();
+    try {
+      return axdrvPointerButtonPid(
+        pid,
+        x,
+        y,
+        pointer,
+        down,
+        clickCount,
+        cgEventModifierMask(modifiers),
+      );
+    } finally {
+      calloc.free(pointer);
+    }
+  }
+
+  @override
+  int scrollToPid(int pid, {required double dx, required double dy}) =>
+      axdrvScrollPid(pid, dx, dy);
 
   @override
   int keyUp(String key) {

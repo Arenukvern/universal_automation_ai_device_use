@@ -8,6 +8,8 @@ import 'package:universal_automation_toolkit/universal_automation_toolkit.dart';
 import 'package:universal_browser_cdp/universal_browser_cdp_testing.dart';
 import 'package:universal_driver_macos/universal_driver_macos.dart';
 
+import '../../universal_driver_macos/test/macos_driver_test.dart' show FakeBridge;
+
 Future<Map<String, Object?>?> call(
   ToolkitMcpServer server,
   int id,
@@ -112,6 +114,7 @@ void main() {
         'automation_verify',
         'automation_screenshot',
         'automation_preview',
+        'automation_computer',
         'automation_validate_plan',
         'automation_run_plan',
       ]),
@@ -468,6 +471,35 @@ Future<void> main() async {
     },
   );
 
+  test('automation_computer bind returns scale metadata', () async {
+    final bridge = FakeBridge();
+    bridge.windowScreenshotResult = (
+      code: 0,
+      bytes: Uint8List.fromList(_onePixelPng),
+    );
+    final server = ToolkitMcpServer(
+      defaultTransport: AutomationTransport.osAccessibility,
+      factories: {
+        AutomationTransport.osAccessibility:
+            (binding, endpoint, timeout) async =>
+                _MacosResolvedSession(binding, bridge: bridge),
+      },
+    );
+    final response = await call(server, 41, 'tools/call', {
+      'name': 'automation_computer',
+      'arguments': {
+        'transport': 'osAccessibility',
+        'action': 'bind',
+        'app': {'pid': 42},
+        'windowId': 77,
+      },
+    });
+    final payload = payloadOf(response);
+    expect(payload['bound'], isTrue);
+    expect(payload['scale'], isA<num>());
+    expect(payload['width'], 1);
+  });
+
   test('automation_preview frame returns window bytes on OS tier', () async {
     final server = ToolkitMcpServer(
       defaultTransport: AutomationTransport.osAccessibility,
@@ -501,6 +533,36 @@ final class _FakeOsResolvedSession implements ResolvedSession {
 
   @override
   AutomationDriver get driver => _FakeOsDriver();
+
+  @override
+  Uri? get url => null;
+
+  @override
+  BehavioralDriver? asBehavioral() => null;
+
+  @override
+  Future<void> detach() async {}
+}
+
+/// Minimal 1×1 PNG for window capture dimension tests.
+final _onePixelPng = Uint8List.fromList([
+  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49,
+  0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06,
+  0x00, 0x00, 0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44,
+  0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d,
+  0x0a, 0x2d, 0xb4, 0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42,
+  0x60, 0x82,
+]);
+
+final class _MacosResolvedSession implements ResolvedSession {
+  _MacosResolvedSession(this.binding, {required FakeBridge bridge})
+    : driver = MacosDriver(bridge: bridge, targetPid: 42);
+
+  @override
+  final SessionBinding binding;
+
+  @override
+  final AutomationDriver driver;
 
   @override
   Uri? get url => null;

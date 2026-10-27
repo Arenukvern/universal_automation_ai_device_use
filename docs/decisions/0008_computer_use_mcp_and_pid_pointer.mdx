@@ -1,0 +1,30 @@
+---
+title: Computer-use MCP and pid pointer injection
+status: accepted
+date: 2026-10-27
+---
+
+# ADR 0008: Computer-use MCP and pid pointer injection
+
+Amends [0007](/decisions/0007_os_ax_web_fidelity_window_local_preview),
+family [ADR 0066](https://github.com/Arenukvern/dart_flutter_packages/blob/main/docs/decisions/0066_os_computer_use_pid_pointer_and_mcp_codec.md).
+
+## Decision
+
+- **`automation_computer`** is the Codex-parity loop on `serve --os`: `bind`
+  → `screenshot` → pixel actions → `type`/`keypress` without activating the
+  target. Semantic `automation_observe` / `automation_act` stay preferred when
+  AX names exist.
+- **`ClickAtAction.pixelInjection`** with `windowId` maps window-local points
+  to screen coordinates and posts pointer events to the anchored pid.
+- **Screenshots** on the computer path use `windowCaptureFrame` (1:1 device
+  pixels by default; optional `maxPx` rescales the image and updates `scale`).
+- **Consent** refusals point at `automation_request_consent` (`accessibility`,
+  `screenRecording`); humans still approve the OS dialog once.
+- **Evidence** lives under `docs/evidence/computer-use-parity-*` and
+  `example/computer_use_parity_probe.dart`.
+
+## Non-claims
+
+Vision to find controls in PNGs (the model's job); drag on apps that ignore
+pid-posted mouse events without an ADR-gated focus ladder.

@@ -141,6 +141,7 @@ final class ClickAtAction extends AutomationAction {
     this.x,
     this.y, {
     this.windowId,
+    this.pixelInjection = false,
     this.button = 'left',
     this.clickCount = 1,
     this.modifiers = const [],
@@ -152,9 +153,13 @@ final class ClickAtAction extends AutomationAction {
   /// Y in surface coordinates.
   final double y;
 
-  /// When set, coordinates are window-local and actuation uses semantic
-  /// hit-test (ADR 0065) — background-safe, no global pointer stream.
+  /// When set, coordinates are window-local (points or image pixels when
+  /// [pixelInjection] is true — see UA ADR 0008).
   final int? windowId;
+
+  /// When true with [windowId], maps window-local coords to screen space
+  /// and posts pointer events to the anchored pid (computer-use lane).
+  final bool pixelInjection;
 
   /// Pointer button: `left` (default), `right`, or `middle`.
   final String button;

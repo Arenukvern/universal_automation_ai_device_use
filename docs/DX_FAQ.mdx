@@ -66,3 +66,6 @@ A: When `north_star_impact` is `amends` or `conflicts` with the charter — see 
 
 **Q: How do I drive a browser form while another app stays focused?**  
 A: On macOS, anchor with `app: {bundleId|pid|name}`, use `automation_observe` (web-first walk), `automation_preview` for frames, and semantic `setValue`/`click` or window-local `clickAt` with `windowId`. See ADR 0007 / family ADR 0065.
+
+**Q: How do I run the Codex-style computer loop (screenshot → pixel click) without CDP?**  
+A: `automation_computer` on `serve --os`: `bind` → `screenshot` (image block + `width`/`height`/`scale`) → `click`/`type` in image coordinates. Grants: `automation_request_consent` for `accessibility` and `screenRecording` (`automationComputerUseOsKinds` in `xsoulspace_permission_core`). Rebuild after native changes: `./plugin/install.sh`. Plumbing probe: `dart run example/computer_use_parity_probe.dart`. See ADR 0008 / family ADR 0066.

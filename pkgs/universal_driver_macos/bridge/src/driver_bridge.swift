@@ -597,6 +597,30 @@ private func postMouseEvent(
     return 0
 }
 
+private func postMouseEventToPid(
+    _ pid: Int32,
+    _ type: CGEventType,
+    at x: Double,
+    _ y: Double,
+    button: CGMouseButton,
+    clicks: Int64,
+    flags: Int64
+) -> Int32 {
+    guard AXIsProcessTrusted() else { return 10 }
+    guard let event = CGEvent(
+        mouseEventSource: nil,
+        mouseType: type,
+        mouseCursorPosition: CGPoint(x: x, y: y),
+        mouseButton: button
+    ) else { return 3 }
+    event.setIntegerValueField(.mouseEventClickState, value: clicks)
+    if flags != 0 {
+        event.flags = CGEventFlags(rawValue: UInt64(bitPattern: flags))
+    }
+    event.postToPid(pid_t(pid))
+    return 0
+}
+
 /// Moves the pointer to (x, y). While a button is logically down the
 /// event is the matching dragged type (drag continuation); otherwise a
 /// plain move. [modifierFlags] is the raw CGEventFlags mask for an
@@ -701,15 +725,14 @@ public func xs_axdrv_key_up(_ key: UnsafePointer<CChar>?) -> Int32 {
     return 0
 }
 
-// MARK: - PID-scoped event delivery (ADR 0064 rung). CGEventPostToPid
-// hands keyboard events to ONE process's event queue without touching
-// the user's focus, so an anchored session (ax://pid/<n>) can type and
-// press keys into a background application. Delivery is fire-and-forget
-// (the API reports nothing): apps that drop events while inactive need
-// the explicit `foreground: true` ladder instead. Pointer and scroll
-// events stay HID-tapped — they carry global screen coordinates, and
-// posting those to a pid would act on whatever window sits under the
-// cursor, not the target.
+// MARK: - PID-scoped event delivery (ADR 0064 + 0066). CGEventPostToPid
+// hands events to ONE process's event queue without touching the user's
+// focus. Keyboard arrived first; pointer and scroll join for the
+// computer-use lane (window-local coords mapped to screen space, then
+// posted to the anchored pid). Delivery is fire-and-forget: apps that
+// drop events while inactive need the explicit `foreground: true`
+// ladder instead. Global HID pointer remains for foreground screen
+// coordinates only.
 
 @_cdecl("xs_axdrv_type_text_pid")
 public func xs_axdrv_type_text_pid(
@@ -777,6 +800,100 @@ public func xs_axdrv_key_up_pid(
     guard let code = keyCode(for: String(cString: key)) else { return 1 }
     CGEvent(keyboardEventSource: nil, virtualKey: code, keyDown: false)?
         .postToPid(pid_t(pid))
+    return 0
+}
+
+@_cdecl("xs_axdrv_pointer_move_pid")
+public func xs_axdrv_pointer_move_pid(
+    _ pid: Int32,
+    _ x: Double,
+    _ y: Double,
+    _ modifierFlags: Int64
+) -> Int32 {
+    let (type, button): (CGEventType, CGMouseButton)
+    if pointerButtonsDown.contains(0) {
+        (type, button) = (.leftMouseDragged, .left)
+    } else if pointerButtonsDown.contains(1) {
+        (type, button) = (.rightMouseDragged, .right)
+    } else if pointerButtonsDown.contains(2) {
+        (type, button) = (.otherMouseDragged, .center)
+    } else {
+        (type, button) = (.mouseMoved, .left)
+    }
+    let code = postMouseEventToPid(
+        pid,
+        type,
+        at: x,
+        y,
+        button: button,
+        clicks: 1,
+        flags: modifierFlags
+    )
+    if code == 0 {
+        lastPointerX = x
+        lastPointerY = y
+    }
+    return code
+}
+
+@_cdecl("xs_axdrv_pointer_button_pid")
+public func xs_axdrv_pointer_button_pid(
+    _ pid: Int32,
+    _ x: Double,
+    _ y: Double,
+    _ buttonName: UnsafePointer<CChar>?,
+    _ down: Bool,
+    _ clickCount: Int32,
+    _ modifierFlags: Int64
+) -> Int32 {
+    guard let buttonName, let button = cgButton(String(cString: buttonName)) else {
+        return 1
+    }
+    let clicks = Int64(max(1, min(3, clickCount)))
+    let code = postMouseEventToPid(
+        pid,
+        down ? mouseDownType(button) : mouseUpType(button),
+        at: x,
+        y,
+        button: button,
+        clicks: clicks,
+        flags: modifierFlags
+    )
+    guard code == 0 else { return code }
+    let id = button == .left ? 0 : (button == .right ? 1 : 2)
+    if down {
+        pointerButtonsDown.insert(id)
+    } else {
+        pointerButtonsDown.remove(id)
+    }
+    lastPointerX = x
+    lastPointerY = y
+    return 0
+}
+
+@_cdecl("xs_axdrv_scroll_pid")
+public func xs_axdrv_scroll_pid(
+    _ pid: Int32,
+    _ dx: Double,
+    _ dy: Double
+) -> Int32 {
+    guard AXIsProcessTrusted() else { return 10 }
+    scrollRemainderX += dx
+    scrollRemainderY += dy
+    let linesX = Int(scrollRemainderX.rounded(.towardZero))
+    let linesY = Int(scrollRemainderY.rounded(.towardZero))
+    scrollRemainderX -= Double(linesX)
+    scrollRemainderY -= Double(linesY)
+    guard linesX != 0 || linesY != 0 else { return 0 }
+    guard let event = CGEvent(
+        scrollWheelEvent2Source: nil,
+        units: .line,
+        wheelCount: linesX != 0 ? 2 : 1,
+        wheel1: Int32(clamping: linesY),
+        wheel2: Int32(clamping: linesX),
+        wheel3: 0
+    ) else { return 3 }
+    event.postToPid(pid_t(pid))
     return 0
 }
 

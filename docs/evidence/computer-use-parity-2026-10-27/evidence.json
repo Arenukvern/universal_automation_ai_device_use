@@ -1,0 +1,36 @@
+{
+  "schema": "computer-use-parity-evidence/v1",
+  "date": "2026-10-27T12:46:52.091873Z",
+  "screenCaptureTrusted": true,
+  "frontmostBefore": "Safari",
+  "launchTextEdit": {
+    "ok": true
+  },
+  "textEditPid": {
+    "ok": true
+  },
+  "textEditWindow": {
+    "ok": true,
+    "detail": 11514
+  },
+  "screenshotMeta": {
+    "ok": true
+  },
+  "screenshot": {
+    "width": 1264,
+    "height": 668,
+    "scale": 2.4307692307692306,
+    "windowId": 11514
+  },
+  "pidClick": {
+    "ok": true
+  },
+  "frontmostAfter": "Safari",
+  "noFocusSteal": {
+    "ok": true,
+    "detail": {
+      "before": 10785,
+      "after": 10785
+    }
+  }
+}

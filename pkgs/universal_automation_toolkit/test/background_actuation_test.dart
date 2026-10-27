@@ -173,6 +173,7 @@ final class FakeAxDriverBridge implements AxDriverBridge {
 
   /// Recorded pid-scoped typing (the ADR 0064 rung).
   final pidTypedText = <({int pid, String text})>[];
+  final scrollToPidCalls = <({int pid, double dx, double dy})>[];
 
   @override
   int keyPressToPid(int pid, String key) => 0;
@@ -182,6 +183,31 @@ final class FakeAxDriverBridge implements AxDriverBridge {
 
   @override
   int keyUpToPid(int pid, String key) => 0;
+
+  @override
+  int pointerMoveToPid(
+    int pid, {
+    required double x,
+    required double y,
+    Iterable<String> modifiers = const [],
+  }) => 0;
+
+  @override
+  int pointerButtonToPid(
+    int pid, {
+    required double x,
+    required double y,
+    required String button,
+    required bool down,
+    int clickCount = 1,
+    Iterable<String> modifiers = const [],
+  }) => 0;
+
+  @override
+  int scrollToPid(int pid, {required double dx, required double dy}) {
+    scrollToPidCalls.add((pid: pid, dx: dx, dy: dy));
+    return 0;
+  }
 
   @override
   void releaseAll() {}
@@ -405,9 +431,8 @@ void main() {
       expect(bridge.elementActionCalls, [(2, 'AXConfirm')]);
     });
 
-    test('focus contract: pointer verbs on a background anchor refuse; '
-        'keyboard verbs take the pid-scoped rung; foreground opt-in '
-        'activates and records the cost', () async {
+    test('focus contract: global clickAt refuses; scroll/type use pid rung; '
+        'foreground opt-in activates and records the cost', () async {
       final bridge = FakeAxDriverBridge();
       // Frontmost is Safari while the anchor is Finder (pid 42).
       final server = ToolkitMcpServer(
@@ -441,13 +466,26 @@ void main() {
       );
       expect(bridge.lastActivatedPid, isNull);
 
-      // Pointer verbs carry global screen coordinates: still refuse,
-      // naming the ladder rung.
-      final refused = await call(server, 6, 'tools/call', {
+      // Anchored scroll posts to the pid (ADR 0008 / 0066), no activation.
+      final scrolled = await call(server, 6, 'tools/call', {
         'name': 'automation_act',
         'arguments': {
           'action': 'scroll',
           'direction': 'down',
+          'app': {'pid': 42},
+        },
+      });
+      expect(payloadOf(scrolled)['ok'], true);
+      expect(bridge.scrollToPidCalls, isNotEmpty);
+      expect(bridge.lastActivatedPid, isNull);
+
+      // Global clickAt still uses the HID stream: refuse on background anchor.
+      final refused = await call(server, 7, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {
+          'action': 'clickAt',
+          'x': 10,
+          'y': 20,
           'app': {'pid': 42},
         },
       });
@@ -456,15 +494,14 @@ void main() {
         true,
       );
       expect(errorTextOf(refused), contains('foregroundRequired'));
-      expect(bridge.lastActivatedPid, isNull);
 
-      // Opt-in: the refusal escalates — activate the anchor (the fake
-      // moves the frontmost on activation), retry once, record the rung.
+      // Opt-in: activate the anchor, retry once, record the rung.
       final activated = await call(server, 5, 'tools/call', {
         'name': 'automation_act',
         'arguments': {
-          'action': 'scroll',
-          'direction': 'down',
+          'action': 'clickAt',
+          'x': 10,
+          'y': 20,
           'app': {'pid': 42},
           'foreground': true,
         },

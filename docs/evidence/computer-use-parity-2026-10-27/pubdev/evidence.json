@@ -1,0 +1,52 @@
+{
+  "schema": "pubdev-computer-use-evidence/v1",
+  "date": "2026-10-27T12:47:38.838306Z",
+  "adminUrl": "https://pub.dev/packages/oka/admin#github-actions",
+  "transport": "osAccessibility",
+  "cdp": false,
+  "screenCaptureTrusted": true,
+  "frontmostBefore": {
+    "name": "Safari",
+    "pid": 10785,
+    "bundleId": "com.apple.Safari"
+  },
+  "openChromeBackground": {
+    "ok": true,
+    "detail": ""
+  },
+  "chromePid": {
+    "ok": true
+  },
+  "chromeWindow": {
+    "ok": true,
+    "detail": 10370
+  },
+  "screenshotMeta": {
+    "ok": true
+  },
+  "bind": {
+    "windowId": 11562,
+    "pid": 11569,
+    "width": 2624,
+    "height": 1886,
+    "scale": 2.1866666666666665
+  },
+  "pidClickCenter": {
+    "ok": true
+  },
+  "screenshotAfterClick": {
+    "ok": true
+  },
+  "frontmostAfter": {
+    "name": "Safari",
+    "pid": 10785
+  },
+  "noFocusSteal": {
+    "ok": true,
+    "detail": {
+      "before": 10785,
+      "after": 10785
+    }
+  },
+  "ok": true
+}

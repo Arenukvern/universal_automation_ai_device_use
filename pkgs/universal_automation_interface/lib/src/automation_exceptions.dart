@@ -111,9 +111,10 @@ class ForegroundRequiredException extends AutomationException {
     required this.frontmostPid,
   }) : super(
           'foreground required for "$verb": the event stream would reach '
-          'pid $frontmostPid, not the anchored pid $targetPid — activate '
-          'the target first (or use a semantic verb: click / setValue / '
-          'elementAction, which act below the focus layer)',
+          'pid $frontmostPid, not the anchored pid $targetPid — this verb '
+          'uses the global HID stream. Use automation_computer or '
+          'clickAt with windowId and pixelInjection, or semantic click / '
+          'setValue / elementAction, or pass foreground: true to activate',
           details: {
             'verb': verb,
             'targetPid': targetPid,

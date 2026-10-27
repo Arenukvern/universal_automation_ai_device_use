@@ -69,6 +69,7 @@ final class FakeBridge
 
   // -- pid-scoped event delivery (ADR 0064 rung) --
   final pidTypedText = <({int pid, String text})>[];
+  final pidPointerEvents = <Map<String, Object?>>[];
 
   /// Structured record of every pointer event the bridge saw, in order.
   final pointerEvents = <Map<String, Object?>>[];
@@ -247,6 +248,53 @@ final class FakeBridge
   int keyUpToPid(int pid, String key) {
     calls.add('keyUpToPid($pid,$key)');
     return 0;
+  }
+
+  @override
+  int pointerMoveToPid(
+    int pid, {
+    required double x,
+    required double y,
+    Iterable<String> modifiers = const [],
+  }) {
+    calls.add('pointerMoveToPid($pid,$x,$y)');
+    pidPointerEvents.add({
+      'kind': 'move',
+      'pid': pid,
+      'x': x,
+      'y': y,
+    });
+    return pointerResult;
+  }
+
+  @override
+  int pointerButtonToPid(
+    int pid, {
+    required double x,
+    required double y,
+    required String button,
+    required bool down,
+    int clickCount = 1,
+    Iterable<String> modifiers = const [],
+  }) {
+    calls.add(
+      'pointerButtonToPid($pid,$x,$y,$button,${down ? 'down' : 'up'},$clickCount)',
+    );
+    pidPointerEvents.add({
+      'kind': down ? 'down' : 'up',
+      'pid': pid,
+      'x': x,
+      'y': y,
+      'button': button,
+      'clickCount': clickCount,
+    });
+    return pointerResult;
+  }
+
+  @override
+  int scrollToPid(int pid, {required double dx, required double dy}) {
+    calls.add('scrollToPid($pid,$dx,$dy)');
+    return scrollResult;
   }
 
   @override
@@ -455,6 +503,27 @@ void main() {
         .where((event) => event['kind'] == 'down')
         .toList();
     expect(presses.map((event) => event['clickCount']).toList(), [1, 2]);
+  });
+
+  test('window-local pixel clickAt posts pointer to anchored pid', () async {
+    final bridge = FakeBridge();
+    final driver = MacosDriver(bridge: bridge, targetPid: 42);
+    await driver.perform(
+      const ClickAtAction(
+        100,
+        100,
+        windowId: 77,
+        pixelInjection: true,
+      ),
+    );
+    expect(
+      bridge.calls.where((call) => call.startsWith('elementAt')),
+      isEmpty,
+    );
+    expect(bridge.pidPointerEvents[1]['x'], 110.0);
+    expect(bridge.pidPointerEvents[1]['y'], 120.0);
+    expect(bridge.pidPointerEvents[1]['pid'], 42);
+    expect(bridge.pointerEvents, isEmpty);
   });
 
   test('window-local clickAt uses semantic press without pointer events', () async {
@@ -1358,16 +1427,25 @@ void main() {
     expect(bridge.calls.where((call) => call == 'frontmost'), isEmpty);
   });
 
-  test('pid-scoped rung: pointer verbs stay focus-bound on an anchored '
+  test('pid-scoped rung: anchored scroll posts to the target pid', () async {
+    final bridge = FakeBridge();
+    final driver = MacosDriver(bridge: bridge, targetPid: 4242);
+    bridge.frontmostResult = (code: 0, json: _finderJson);
+
+    await driver.perform(const ScrollAction(direction: 'down', distance: 30));
+
+    expect(bridge.calls, contains('scrollToPid(4242,0.0,-3.0)'));
+    expect(bridge.calls.where((call) => call == 'frontmost'), isEmpty);
+  });
+
+  test('pid-scoped rung: global clickAt stays focus-bound on an anchored '
       'session', () async {
     final bridge = FakeBridge();
     final driver = MacosDriver(bridge: bridge, targetPid: 4242);
     bridge.frontmostResult = (code: 0, json: _finderJson);
 
-    // Scroll carries global screen coordinates: still bound by the
-    // focus contract even though typing is not.
     await expectLater(
-      driver.perform(const ScrollAction(distance: 3)),
+      driver.perform(const ClickAtAction(10, 20)),
       throwsA(isA<ForegroundRequiredException>()),
     );
   });

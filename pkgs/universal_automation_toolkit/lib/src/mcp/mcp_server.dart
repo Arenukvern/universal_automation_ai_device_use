@@ -10,12 +10,15 @@ import 'package:xsoulspace_permission_core/xsoulspace_permission_core.dart';
 
 import '../capture/capture_request.dart';
 import '../consent/consent_gated_driver.dart';
+import '../consent/os_permission_authorizer.dart';
 import '../plan/checks.dart';
 import '../plan/plan.dart';
 import '../plan/steps.dart';
 import '../runner/jobs.dart';
 import '../runner/registry.dart';
 import '../runner/runner.dart';
+
+part 'computer_use_tool.dart';
 
 /// MCP protocol versions this server speaks; the client's advertised
 /// version is echoed when supported, else the newest one is offered.
@@ -109,6 +112,8 @@ final class ToolkitMcpServer {
   final String consentOrigin;
   final Map<String, Observation> _lastObservations = {};
   final Map<String, _WindowPreviewSession> _previewSessions = {};
+  ComputerBind? _computerBind;
+  OsPermissionAuthorizer? _osPermissionAuthorizer;
   final String _jobsDirectory;
   SessionRegistry? _registry;
   JobQueue? _jobQueue;
@@ -250,6 +255,7 @@ final class ToolkitMcpServer {
         'automation_verify' => _verify(arguments),
         'automation_screenshot' => _screenshot(arguments),
         'automation_preview' => _preview(arguments),
+        'automation_computer' => _computer(arguments),
         'automation_list_apps' => _listApps(arguments),
         'automation_request_consent' => _requestConsent(arguments),
         'automation_validate_plan' => _validatePlan(arguments),
@@ -308,13 +314,19 @@ final class ToolkitMcpServer {
     final session = await _attachSession(arguments, affinityVerb: affinityVerb);
     final gate = _consentGate;
     if (gate == null) return session;
+    final authorizer = _osPermissionAuthorizer ??= OsPermissionAuthorizer(
+      gate: gate,
+      origin: consentOrigin,
+      subject: session.binding.name,
+    );
     return _ConsentSession(
       session,
       ConsentGatedDriver(
         session.driver,
         gate: gate,
         requestOrigin: consentOrigin,
-        subject: session.url?.toString(),
+        subject: session.binding.name,
+        authorizer: authorizer,
       ),
     );
   }
@@ -540,6 +552,7 @@ final class ToolkitMcpServer {
           'x': arguments['x'],
           'y': arguments['y'],
           if (arguments['windowId'] != null) 'windowId': arguments['windowId'],
+          if (arguments['pixelInjection'] == true) 'pixelInjection': true,
           if (arguments['button'] != null) 'button': arguments['button'],
           if (arguments['clickCount'] != null)
             'clickCount': arguments['clickCount'],
@@ -785,6 +798,51 @@ final class ToolkitMcpServer {
     if (driver is! MacosDriver) return;
     (driver as MacosDriver).preferWebContent =
         arguments['preferWebContent'] != false;
+  }
+
+  MacosDriver? _resolveMacosDriver(ResolvedSession session) {
+    final behavioral = session.asBehavioral();
+    if (behavioral is MacosDriver) return behavioral as MacosDriver;
+    final driver = session.driver;
+    if (driver is MacosDriver) return driver;
+    return null;
+  }
+
+  Future<Map<String, Object?>> _computer(
+    Map<String, Object?> arguments,
+  ) async {
+    final action = arguments['action'];
+    if (action is! String) {
+      throw const McpToolError('automation_computer needs action');
+    }
+    final session = await _session(arguments);
+    final driver = _resolveMacosDriver(session);
+    if (driver == null) {
+      throw const McpToolError(
+        'automation_computer needs the OS tier (transport "osAccessibility")',
+      );
+    }
+    final authorizer = _osPermissionAuthorizer;
+    final result = await handleComputerUseAction(
+      action: action,
+      arguments: arguments,
+      driver: driver,
+      bind: _computerBind,
+      requireConsent: authorizer == null
+          ? null
+          : (kind, title) => authorizer.require(kind, title: title),
+    );
+    _computerBind = result.bind;
+    final payload = Map<String, Object?>.from(result.payload);
+    final attachImage = arguments['image'] != false;
+    if (attachImage && result.image != null) {
+      payload['_imageContent'] = {
+        'type': 'image',
+        'mimeType': 'image/png',
+        'data': base64Encode(result.image!),
+      };
+    }
+    return payload;
   }
 
   Future<Map<String, Object?>> _preview(
@@ -1127,8 +1185,16 @@ final class ToolkitMcpServer {
             'screenshot',
             'listApps',
             'listWindows',
+            'computer',
           ],
           'refuses': ['evaluate', 'invoke'],
+          'computerUse': {
+            'osWindowPixelInjection': Platform.isMacOS,
+            'schema': 'openai-computer-v1-compatible',
+            'consent': [
+              for (final kind in computerUseOsConsentWireNames) kind.wireName,
+            ],
+          },
         },
       },
       'routing': {
@@ -1394,6 +1460,18 @@ final class ToolkitMcpServer {
               'type': 'number',
               'description': 'clickAt/moveTo: viewport Y coordinate',
             },
+            'windowId': {
+              'type': 'integer',
+              'description':
+                  'clickAt: window-local coordinates (semantic AXPress '
+                  'by default; pair with pixelInjection for computer-use)',
+            },
+            'pixelInjection': {
+              'type': 'boolean',
+              'description':
+                  'clickAt with windowId: pid-scoped pointer injection '
+                  '(computer-use lane; UA ADR 0008)',
+            },
             'fromX': {'type': 'number', 'description': 'drag: press X'},
             'fromY': {'type': 'number', 'description': 'drag: press Y'},
             'toX': {'type': 'number', 'description': 'drag: release X'},
@@ -1534,6 +1612,66 @@ final class ToolkitMcpServer {
             'image': {'type': 'boolean'},
           },
           'required': ['op'],
+        },
+      ),
+      tool(
+        'automation_computer',
+        'OpenAI-style computer-use loop on a bound OS window (UA ADR 0008): '
+            'bind, screenshot (image block + width/height/scale), '
+            'click/double_click/move/drag/scroll in image pixel space, '
+            'type/keypress via pid delivery — no focus steal. Missing TCC '
+            'grants refuse with remedy automation_request_consent.',
+        {
+          'type': 'object',
+          'required': ['action'],
+          'properties': {
+            ...transportOverride,
+            'action': {
+              'type': 'string',
+              'enum': [
+                'bind',
+                'unbind',
+                'screenshot',
+                'click',
+                'double_click',
+                'move',
+                'drag',
+                'scroll',
+                'type',
+                'keypress',
+                'wait',
+              ],
+            },
+            'app': {
+              'type': 'object',
+              'description': 'Anchor {pid|bundleId|name} before bind/act',
+            },
+            'windowId': {'type': 'integer'},
+            'x': {'type': 'number'},
+            'y': {'type': 'number'},
+            'fromX': {'type': 'number'},
+            'fromY': {'type': 'number'},
+            'toX': {'type': 'number'},
+            'toY': {'type': 'number'},
+            'dx': {'type': 'number'},
+            'dy': {'type': 'number'},
+            'text': {'type': 'string'},
+            'key': {'type': 'string'},
+            'button': {
+              'type': 'string',
+              'enum': ['left', 'right', 'middle'],
+            },
+            'modifiers': {
+              'type': 'array',
+              'items': {'type': 'string'},
+            },
+            'maxPx': {'type': 'integer'},
+            'image': {
+              'type': 'boolean',
+              'description': 'Attach PNG image block on screenshot (default true)',
+            },
+            'ms': {'type': 'integer', 'description': 'wait: milliseconds (max 5000)'},
+          },
         },
       ),
       tool(

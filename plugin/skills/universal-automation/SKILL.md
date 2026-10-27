@@ -241,3 +241,17 @@ the toolkit or its native driver.
 2. `automation_observe` with `preferWebContent: true` (default) and a `view`
 3. `automation_preview` `{op: start, windowId, intervalMs, maxPx}` then `{op: frame, image: true}`
 4. `setValue` / `click` by locator, or `clickAt` with `windowId` for window-local semantic hits (no focus steal)
+
+## Computer-use loop (Codex parity, no CDP, ADR 0008)
+
+When the model emits pixel `click(x,y)` / `screenshot` / `type` (not AX locators):
+
+1. `automation_capabilities` — confirm `computerUse.osWindowPixelInjection` on macOS
+2. `automation_request_consent` for `accessibility` and `screenRecording` if refusals say so (human approves the OS dialog once)
+3. `automation_list_apps` → anchor with `app: {pid}` on every call
+4. `automation_computer` `{action: bind}` (optional `windowId`; default = largest on-screen window)
+5. `automation_computer` `{action: screenshot}` — image block + `width`/`height`/`scale`; coords are in that image space
+6. `click` / `double_click` / `move` / `scroll` / `type` / `keypress` / `wait` on `automation_computer`
+7. Rebuild native bridge after driver changes: `./plugin/install.sh`
+
+Semantic `automation_observe` / `automation_act` remain preferred when roles and names exist.
