@@ -7,11 +7,13 @@ import 'package:test/test.dart';
 import 'package:xsoulspace_tooling_runtime/xsoulspace_tooling_runtime.dart';
 
 void main() {
-  final failureBytes = utf8.encode('marker:error:');
+  const marker = 'marker';
+  final failureBytes = utf8.encode('$marker:error:');
 
   test(
     'trailingPartialMarkerPrefixBytes matches only failure-marker prefix',
     () {
+      expect(trailingPartialMarkerPrefixBytes(<int>[], failureBytes), 0);
       expect(
         trailingPartialMarkerPrefixBytes(
           utf8.encode('log line\nerror:'),
@@ -26,6 +28,24 @@ void main() {
           failureBytes,
         ),
         utf8.encode('marker:e').length,
+      );
+      expect(
+        trailingPartialMarkerPrefixBytes(failureBytes, failureBytes),
+        failureBytes.length,
+        reason: 'full failure marker suffix must be held across chunks',
+      );
+    },
+  );
+
+  test(
+    'post-startup captureStatus ingests failure marker split before payload',
+    () {
+      expect(
+        startupFailureFromPostStartupStatusChunks(marker, [
+          failureBytes,
+          utf8.encode('exec:x\n'),
+        ]),
+        'exec:x',
       );
     },
   );
