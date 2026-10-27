@@ -155,6 +155,9 @@ Future<bool> _onlyLeaderRemainsLive(
 
 Future<void> _watchSessionSettle(_OwnedProcessGroup owned) async {
   while (!owned.settleRequested) {
+    if (owned.externallyStopped) {
+      return;
+    }
     final members = await _ownedGroupMembers(owned);
     if (members == null) {
       await Future<void>.delayed(const Duration(milliseconds: 20));
