@@ -12,9 +12,11 @@ Job Objects (including the Windows UI Automation sidecar in this repo) are
 explicitly deferred — see
 [ADR 0006](../../docs/decisions/0006_tooling_runtime_into_ua_workspace.mdx).
 
-**Dependencies:** `meta` only today. Process lifetime primitives will move to
-[`oka_process`](https://github.com/Arenukvern/oka) on pub.dev once that package
-is tagged and published (no git/path pin here until then).
+**Dependencies:** `meta` only for **0.2.0**. [`oka_process`
+0.8.1](https://pub.dev/packages/oka_process) is on pub.dev (`meta` only);
+adoption is **deferred** until oka ports the posix-perl backend. Planned order:
+merge UA #5 → publish this package → oka backend → switch dependency (no git/path
+pin in 0.2.0).
 
 One implementation of `runBounded`, `stopProcessTree`, and
 `awaitProcessSettlement`, used through harness compatibility exports by host

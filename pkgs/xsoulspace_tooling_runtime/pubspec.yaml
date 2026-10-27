@@ -17,9 +17,10 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  # TODO(oka_process): replace inline POSIX session/process helpers with
-  # `oka_process` once Arenukvern/oka tags and publishes it on pub.dev.
-  # Do not add a git or path dependency here until then.
+  # TODO(oka_process): depend on pub.dev `oka_process` once Arenukvern/oka lands
+  # the posix-perl backend (oka_process 0.8.1 is published with meta-only deps).
+  # Order: merge UA #5 → publish tooling_runtime 0.2.0 → oka backend → swap here.
+  # No git or path dependency until that follow-up release.
 
 dev_dependencies:
   lints: ^6.1.0
