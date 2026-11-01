@@ -52,7 +52,8 @@ PermissionKind consentKindFor(AutomationAction action) =>
 /// An [PermissionAllow] is not a TCC grant: if the OS lacks the grant,
 /// the driver's own typed exception surfaces untouched — the policy
 /// said yes, the operating system is the authority that matters.
-final class ConsentGatedDriver implements AutomationDriver {
+final class ConsentGatedDriver
+    implements AutomationDriver, ExpressionEvaluator, ConsoleLogReader {
   /// Wraps [inner]. [requestOrigin] attributes the requests (tool name,
   /// composition root); [subject] names the automation target when the
   /// composition knows it (an anchored app, an endpoint).
@@ -107,6 +108,42 @@ final class ConsentGatedDriver implements AutomationDriver {
 
   @override
   Future<void> close() => _inner.close();
+
+  /// The read half of `evaluate`, gated like every other act: the
+  /// inner driver must carry the [ExpressionEvaluator] capability or
+  /// the refusal is loud.
+  @override
+  Future<Object?> evaluateExpression(String expression) async {
+    await _authorize(
+      PermissionKind.accessibility,
+      title: 'Evaluate a script on the automated surface',
+    );
+    final evaluator = _inner;
+    if (evaluator is! ExpressionEvaluator) {
+      throw const DriverUnsupportedException(
+        'this driver cannot evaluate expressions',
+      );
+    }
+    return (evaluator as ExpressionEvaluator).evaluateExpression(expression);
+  }
+
+  @override
+  List<ConsoleEntry> consoleEntries() =>
+      _consoleRead((reader) => reader.consoleEntries());
+
+  @override
+  List<ConsoleEntry> drainConsole() =>
+      _consoleRead((reader) => reader.drainConsole());
+
+  T _consoleRead<T>(T Function(ConsoleLogReader) read) {
+    final reader = _inner;
+    if (reader is! ConsoleLogReader) {
+      throw const DriverUnsupportedException(
+        'this driver does not capture console output',
+      );
+    }
+    return read(reader as ConsoleLogReader);
+  }
 
   Future<void> _authorize(PermissionKind kind, {required String title}) async =>
       _authorizer.require(kind, title: title);

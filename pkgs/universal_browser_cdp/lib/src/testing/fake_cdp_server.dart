@@ -112,6 +112,13 @@ class FakeCdpServer {
   /// real CDP `returnByValue` semantics.
   Object? Function(String expression)? evaluateHandler;
 
+  /// When set, `Runtime.evaluate` answers with this RemoteObject
+  /// verbatim (the CDP `result` field). Tests script typed and
+  /// unserializable shapes with it — a `function` RemoteObject with no
+  /// `value` key, a numeric primitive — overriding
+  /// [evaluateHandler]/[evaluateValue].
+  Map<String, Object?>? evaluateResult;
+
   /// When set, `Runtime.evaluate` answers with `exceptionDetails` whose
   /// exception description carries this text — the JS-rejection path
   /// (`CdpPage.evaluateAsync` surfaces it).
@@ -305,6 +312,11 @@ class FakeCdpServer {
               'exception': {'type': 'object', 'description': evaluateException},
             },
           });
+          break;
+        }
+        final remote = evaluateResult;
+        if (remote != null) {
+          respond({'result': remote});
           break;
         }
         final scripted = evaluateHandler?.call(expression);

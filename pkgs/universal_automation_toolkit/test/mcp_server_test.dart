@@ -173,6 +173,138 @@ void main() {
     );
   });
 
+  group('automation_act evaluate result', () {
+    test('returns the expression value as result', () async {
+      fake.evaluateResult = {'type': 'number', 'value': 7};
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      final response = await call(server, 101, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'evaluate', 'expression': '6 + 1'},
+      });
+      expect(payloadOf(response), {
+        'ok': true,
+        'action': 'evaluate',
+        'result': 7,
+      });
+    });
+
+    test('returns an unserializable value as a descriptor', () async {
+      fake.evaluateResult = {'type': 'function', 'description': '() => 1'};
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      final response = await call(server, 102, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'evaluate', 'expression': '(() => 1)'},
+      });
+      expect(payloadOf(response)['result'], {
+        'type': 'function',
+        'description': '() => 1',
+      });
+    });
+
+    test('surfaces a page exception as ok:false with the details', () async {
+      fake.evaluateException = 'TypeError: boom is not defined';
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      final response = await call(server, 103, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'evaluate', 'expression': 'boom()'},
+      });
+      final result = response!['result'] as Map<String, Object?>;
+      // A page exception is a result, not a transport error: the tool
+      // call succeeds and the payload says ok:false.
+      expect(result['isError'], isFalse);
+      final payload = payloadOf(response);
+      expect(payload['ok'], isFalse);
+      expect(payload['action'], 'evaluate');
+      expect(
+        (payload['error'] as Map<String, Object?>)['message'],
+        contains('TypeError: boom is not defined'),
+      );
+    });
+
+    test('navigate and evaluate results append the console tail', () async {
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      // Attach first: console capture subscribes at attach time, so the
+      // scripted events must come after the session exists.
+      await call(server, 104, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'console'},
+      });
+      fake.emit('Runtime.consoleAPICalled', {
+        'type': 'error',
+        'args': [
+          {'type': 'string', 'value': 'page says no'},
+        ],
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final evaluate = await call(server, 105, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'evaluate', 'expression': '1'},
+      });
+      final evaluatePayload = payloadOf(evaluate);
+      expect(evaluatePayload['ok'], true);
+      final console = evaluatePayload['console'] as List<Object?>;
+      expect(console, hasLength(1));
+      expect(
+        (console.single as Map<String, Object?>)['text'],
+        'page says no',
+      );
+
+      final navigate = await call(server, 106, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'navigate', 'url': 'https://example.test'},
+      });
+      // The tail is a peek, not a drain: the entry survives to the
+      // next result.
+      expect(
+        (payloadOf(navigate)['console'] as List<Object?>),
+        hasLength(1),
+      );
+    });
+
+    test('action console drains the buffer', () async {
+      final server = ToolkitMcpServer(defaultEndpoint: endpoint);
+      await call(server, 107, 'tools/call', {
+        'name': 'automation_act',
+        'arguments': {'action': 'console'},
+      });
+      fake.emit('Runtime.consoleAPICalled', {
+        'type': 'log',
+        'args': [
+          {'type': 'string', 'value': 'one'},
+        ],
+      });
+      fake.emit('Runtime.consoleAPICalled', {
+        'type': 'error',
+        'args': [
+          {'type': 'string', 'value': 'two'},
+        ],
+      });
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+
+      final first = payloadOf(
+        await call(server, 108, 'tools/call', {
+          'name': 'automation_act',
+          'arguments': {'action': 'console'},
+        }),
+      );
+      expect(first['ok'], true);
+      expect(first['action'], 'console');
+      final entries = first['console'] as List<Object?>;
+      expect(entries, hasLength(2));
+      expect((entries.first as Map<String, Object?>)['text'], 'one');
+
+      // Drained: the next read starts empty.
+      final second = payloadOf(
+        await call(server, 109, 'tools/call', {
+          'name': 'automation_act',
+          'arguments': {'action': 'console'},
+        }),
+      );
+      expect(second['console'], isEmpty);
+    });
+  });
+
   test('automation_act with humanPrior reports the behavior outcome', () async {
     final server = ToolkitMcpServer(defaultEndpoint: endpoint);
     final response = await call(server, 6, 'tools/call', {

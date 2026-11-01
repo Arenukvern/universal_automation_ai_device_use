@@ -120,7 +120,7 @@ void main() {
     expect(routing['browserTierConfigured'], true);
     expect(
       (routing['instrumentedAffinityVerbs'] as List<Object?>).toSet(),
-      {'navigate', 'evaluate', 'invoke'},
+      {'navigate', 'evaluate', 'invoke', 'console'},
     );
     expect(
       ((payload['openUrl'] as Map<String, Object?>)['schemes'] as List)

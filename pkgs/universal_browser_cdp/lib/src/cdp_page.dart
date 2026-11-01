@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 
 import 'cdp_connection.dart';
+import 'cdp_console.dart';
 import 'cdp_discovery.dart';
 import 'cdp_network.dart';
 
@@ -180,6 +181,7 @@ class CdpPage {
   int _revision = 0;
   bool _closed = false;
   CdpNetworkLog? _network;
+  CdpConsoleLog? _console;
 
   /// Attaches the facade: enables `Page`, `Runtime`, `DOM`,
   /// `Accessibility`, and `Network` domains.
@@ -192,17 +194,21 @@ class CdpPage {
   /// clickable node — answers nothing usable without the DOM domain on
   /// real Chromium (the fake answers anyway, which is exactly how the
   /// gap survived the suite). `Network.enable` feeds the observation
-  /// log (`network`) that `NavigateWait.networkIdle` counts on.
+  /// log (`network`) that `NavigateWait.networkIdle` counts on. The
+  /// console log (`console`) subscribes before `Runtime.enable` so no
+  /// early script output can be lost.
   static Future<CdpPage> attach(
     CdpTransport connection,
     CdpTargetInfo target,
   ) async {
     await connection.send('Page.enable');
+    final console = await CdpConsoleLog.attach(connection);
     await connection.send('Runtime.enable');
     await connection.send('DOM.enable');
     await connection.send('Accessibility.enable');
     return CdpPage._(connection, target)
-      .._network = await CdpNetworkLog.attach(connection);
+      .._network = await CdpNetworkLog.attach(connection)
+      .._console = console;
   }
 
   /// Monotonic revision; bumps on every navigation.
@@ -214,6 +220,17 @@ class CdpPage {
     final log = _network;
     if (log == null) {
       throw StateError('CdpPage was constructed without a network log');
+    }
+    return log;
+  }
+
+  /// Observation-only console log (console API calls, uncaught page
+  /// exceptions, browser log entries). Enabled at attach; entries
+  /// survive between calls until [CdpConsoleLog.drain].
+  CdpConsoleLog get console {
+    final log = _console;
+    if (log == null) {
+      throw StateError('CdpPage was constructed without a console log');
     }
     return log;
   }
@@ -328,6 +345,61 @@ class CdpPage {
       'awaitPromise': false,
     });
     return ((result['result'] as Map<String, Object?>?) ?? const {})['value'];
+  }
+
+  /// Evaluates [expression] and returns its value — the complete
+  /// contract, for the evaluate action's result path.
+  ///
+  /// - The value comes back JSON-serializable (`returnByValue`).
+  /// - An unserializable value never fails the evaluation: a `function`
+  ///   or `symbol` comes back as the RemoteObject descriptor (`type`,
+  ///   `description`), and a value the protocol refuses to serialize
+  ///   outright (a cyclic object graph answers with a protocol error)
+  ///   retries once without `returnByValue` for the same descriptor.
+  /// - A page-side exception throws [ProtocolException] carrying the
+  ///   CDP `exceptionDetails` — fail loudly, never a silent `null`.
+  ///
+  /// [evaluate] stays the lenient path the internal probes run on: it
+  /// neither throws on exceptions nor describes unserializable values,
+  /// and the actionability probing depends on that staying stable.
+  Future<Object?> evaluateValue(String expression) async {
+    _ensureOpen();
+    Map<String, Object?> result;
+    try {
+      result = await connection.send('Runtime.evaluate', {
+        'expression': expression,
+        'returnByValue': true,
+        'awaitPromise': false,
+      });
+    } on CdpProtocolException {
+      result = await connection.send('Runtime.evaluate', {
+        'expression': expression,
+        'returnByValue': false,
+        'awaitPromise': false,
+      });
+    }
+    final details = result['exceptionDetails'] as Map<String, Object?>?;
+    if (details != null) {
+      final exception = details['exception'] as Map<String, Object?>?;
+      throw ProtocolException(
+        'page evaluation failed: '
+        '${exception?['description'] ?? details['text'] ?? 'unknown'}',
+        details: details,
+      );
+    }
+    final remote = (result['result'] as Map<String, Object?>?) ?? const {};
+    if (remote.containsKey('value')) return remote['value'];
+    if (remote['type'] == 'undefined' ||
+        remote['subtype'] == 'null' ||
+        remote['subtype'] == 'undefined') {
+      return null;
+    }
+    // No `value` key and not undefined: the protocol reported the
+    // value's shape instead of its content (a function, a symbol).
+    return {
+      if (remote['type'] is String) 'type': remote['type'],
+      if (remote['description'] is String) 'description': remote['description'],
+    };
   }
 
   /// Evaluates [expression], awaiting a Promise result, with
@@ -832,6 +904,7 @@ class CdpPage {
   Future<void> close({bool closeTarget = true}) async {
     if (_closed) return;
     _closed = true;
+    await _console?.dispose();
     await _network?.dispose();
     final ws = connection;
     if (closeTarget) {

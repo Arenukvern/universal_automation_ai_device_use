@@ -17,15 +17,20 @@ import 'target_selection_exception.dart';
 /// web surface (Jaspr, plain JS, Flutter web, a design system's storybook)
 /// publishes named handlers and this driver lists and invokes them.
 /// Handlers may be async; a JS rejection surfaces as the rejection's
-/// message. Action *results* are dropped by the observe/act/verify
+/// message. `evaluate` results return through [ExpressionEvaluator] —
+/// the value, or the unserializable-value descriptor; a page exception
+/// throws. Invoke results are still dropped by the observe/act/verify
 /// contract — a handler that wants to report state writes the surface
-/// (or a probe slot) and the caller observes.
+/// (or a probe slot) and the caller observes. Console output and page
+/// errors buffer through [ConsoleLogReader].
 class CdpDriver
     implements
         AutomationDriver,
         AutomationActionCatalog,
         ConfigurableCapture,
-        TargetedAutomationDriver {
+        TargetedAutomationDriver,
+        ExpressionEvaluator,
+        ConsoleLogReader {
   /// Creates a driver over an attached [CdpPage].
   CdpDriver(this._page);
 
@@ -49,6 +54,16 @@ class CdpDriver
 
   @override
   Future<Snapshot> snapshot() => _page.accessibilitySnapshot();
+
+  @override
+  Future<Object?> evaluateExpression(String expression) =>
+      _page.evaluateValue(expression);
+
+  @override
+  List<ConsoleEntry> consoleEntries() => _page.console.entries;
+
+  @override
+  List<ConsoleEntry> drainConsole() => _page.console.drain();
 
   @override
   Future<List<SurfaceActionDescriptor>> actions() async {

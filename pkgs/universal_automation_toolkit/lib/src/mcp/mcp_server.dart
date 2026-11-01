@@ -335,7 +335,12 @@ final class ToolkitMcpServer {
   /// caller names none of `transport`/`endpoint`, the default tier is
   /// the desktop, and a browser tier is configured, these attach to the
   /// browser instead — and the tool result reports `routedTo`.
-  static const instrumentedAffinityVerbs = {'navigate', 'evaluate', 'invoke'};
+  static const instrumentedAffinityVerbs = {
+    'navigate',
+    'evaluate',
+    'invoke',
+    'console',
+  };
 
   /// The configured browser tier, cdp preferred (ADR 0003): the
   /// endpoint registry first, then the `browserHandle` artifact under
@@ -537,6 +542,30 @@ final class ToolkitMcpServer {
     if (action is! String) {
       throw const McpToolError('automation_act needs an action');
     }
+    if (action == 'console') {
+      // The expression-independent console read (the act loop's ears):
+      // buffered console API calls, page exceptions, and browser log
+      // entries since attach — returned and cleared. Session reuse is
+      // what lets the buffer accumulate real page history between
+      // calls; each drain starts a fresh stretch.
+      final session = await _session(arguments, affinityVerb: action);
+      final driver = session.driver;
+      if (driver is! ConsoleLogReader) {
+        throw const McpToolError(
+          'action "console" needs a transport that captures console '
+          'output (the CDP tier today); pass "transport": "cdp" or an '
+          '"endpoint" per call',
+        );
+      }
+      return {
+        'ok': true,
+        'action': 'console',
+        'console': [
+          for (final entry in (driver as ConsoleLogReader).drainConsole())
+            entry.toJson(),
+        ],
+      };
+    }
     final actionBody = <String, Object?>{};
     switch (action) {
       case 'navigate':
@@ -628,7 +657,12 @@ final class ToolkitMcpServer {
     Map<String, Object?> payload;
     if (profileName == null) {
       payload = {
-        ...await _performWithLadder(session, automationAction, arguments),
+        ...await _performOrEvaluate(
+          session,
+          automationAction,
+          action,
+          arguments,
+        ),
         'action': action,
         if (routedBrowser != null)
           'routedTo': {
@@ -682,6 +716,7 @@ final class ToolkitMcpServer {
       );
       payload = {'ok': true, 'action': action, 'behavior': outcome.toJson()};
     }
+    payload = _withConsoleTail(payload, action, session.driver);
     if (arguments['returnState'] == true) {
       // The act loop's closing read: post-action state through the
       // default view, in the same tool result.
@@ -716,6 +751,66 @@ final class ToolkitMcpServer {
       await driver.perform(automationAction);
       return {'ok': true, 'focusContract': 'activated'};
     }
+  }
+
+  /// The evaluate result path: when the tier can return the value
+  /// ([ExpressionEvaluator]), the act result carries it — the
+  /// JSON-serializable value, or the unserializable-value descriptor. A
+  /// page-side exception reports `ok: false` with the exception details
+  /// (a result, not a transport error — the call may still be worth
+  /// reading, e.g. for the console tail). Everything else takes the
+  /// plain act ladder.
+  Future<Map<String, Object?>> _performOrEvaluate(
+    ResolvedSession session,
+    AutomationAction automationAction,
+    String action,
+    Map<String, Object?> arguments,
+  ) async {
+    if (action == 'evaluate') {
+      final driver = session.driver;
+      if (driver is ExpressionEvaluator) {
+        final Object? value;
+        try {
+          value = await (driver as ExpressionEvaluator).evaluateExpression(
+            '${arguments['expression']}',
+          );
+        } on ProtocolException catch (error) {
+          return {
+            'ok': false,
+            'error': {'message': error.message, ...error.details},
+          };
+        }
+        return {'ok': true, 'result': value};
+      }
+    }
+    return _performWithLadder(session, automationAction, arguments);
+  }
+
+  /// How much console history a `navigate`/`evaluate` act result
+  /// appends — the tail of the buffer, not the whole drain.
+  static const consoleTailLimit = 50;
+
+  /// Appends the captured console tail to act results for the actions
+  /// where new console output is the likely verification signal
+  /// (`navigate`, `evaluate`). A peek: the buffer keeps its entries
+  /// until the `console` action drains it. Omitted when nothing was
+  /// logged or the transport does not capture console output.
+  Map<String, Object?> _withConsoleTail(
+    Map<String, Object?> payload,
+    String action,
+    AutomationDriver driver,
+  ) {
+    if (action != 'navigate' && action != 'evaluate') return payload;
+    if (driver is! ConsoleLogReader) return payload;
+    final entries = (driver as ConsoleLogReader).consoleEntries();
+    if (entries.isEmpty) return payload;
+    final tail = entries.length <= consoleTailLimit
+        ? entries
+        : entries.sublist(entries.length - consoleTailLimit);
+    return {
+      ...payload,
+      'console': [for (final entry in tail) entry.toJson()],
+    };
   }
 
   /// The anchor discovery record (ADR 0064): every running,
@@ -1381,21 +1476,27 @@ final class ToolkitMcpServer {
       tool(
         'automation_act',
         'Perform one intent-level action: navigate | click | type | '
-            'setValue | elementAction | key | scroll | evaluate | invoke. '
-            'setValue/elementAction are the semantic write path (ADR 0064): '
-            'they act on the element below the focus layer, valid on '
-            'background applications — prefer them over type/key for text '
-            'and confirmations. Global-event verbs on a background target '
-            'refuse with foregroundRequired unless foreground: true (then '
-            'the anchor is activated and the retry recorded). Tier notes: '
-            'navigate/evaluate/invoke have no desktop-tier surface — on an '
-            'osAccessibility server they affinity-route to a configured '
-            'browser tier (routedTo says so); with none configured navigate '
-            'opens the OS default browser (untracked surface) and '
-            'evaluate/invoke refuse. Optional behavior profile dispatches '
-            'with ADR 0044 dynamics (event-stream verbs only). returnState '
-            'attaches the post-action state render — the act loop\'s '
-            'closing read in one call.',
+            'setValue | elementAction | key | scroll | evaluate | invoke | '
+            'console. setValue/elementAction are the semantic write path '
+            '(ADR 0064): they act on the element below the focus layer, '
+            'valid on background applications — prefer them over type/key '
+            'for text and confirmations. Global-event verbs on a background '
+            'target refuse with foregroundRequired unless foreground: true '
+            '(then the anchor is activated and the retry recorded). Tier '
+            'notes: navigate/evaluate/invoke/console have no desktop-tier '
+            'surface — on an osAccessibility server they affinity-route to '
+            'a configured browser tier (routedTo says so); with none '
+            'configured navigate opens the OS default browser (untracked '
+            'surface) and evaluate/invoke/console refuse. evaluate returns '
+            'the expression\'s value as `result` (unserializable values as '
+            'a type/description descriptor; a page exception as '
+            'ok:false + error details). console returns and clears the '
+            'buffered console output and page errors; navigate/evaluate '
+            'results append the last ~50 entries as `console`. Optional '
+            'behavior profile dispatches with ADR 0044 dynamics '
+            '(event-stream verbs only). returnState attaches the '
+            'post-action state render — the act loop\'s closing read in '
+            'one call.',
         {
           'type': 'object',
           'required': ['action'],
@@ -1415,6 +1516,7 @@ final class ToolkitMcpServer {
                 'scroll',
                 'evaluate',
                 'invoke',
+                'console',
               ],
             },
             'url': {
