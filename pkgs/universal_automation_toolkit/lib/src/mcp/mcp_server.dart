@@ -297,11 +297,13 @@ final class ToolkitMcpServer {
       'cdp' => AutomationTransport.cdp,
       'webdriver' => AutomationTransport.webdriver,
       'os' || 'osAccessibility' => AutomationTransport.osAccessibility,
+      'vm' || 'vmService' => AutomationTransport.vmService,
       _ => null,
     };
     if (transport == null) {
       throw McpToolError(
-        'unknown transport "$value" (cdp | webdriver | osAccessibility)',
+        'unknown transport "$value" '
+        '(cdp | webdriver | osAccessibility | vmService)',
       );
     }
     return transport;
@@ -428,10 +430,11 @@ final class ToolkitMcpServer {
     if (uri == null) {
       throw McpToolError(
         'no endpoint for transport "${resolvedTransport.name}": start '
-        'serve with --cdp/--webdriver/--os, set env '
-        'UNIVERSAL_AUTOMATION_CDP (or --browser-handle for an '
-        'oka-published browser), or pass "endpoint"/"transport" per '
-        'call — automation_capabilities reports what this server sees',
+        'serve with --cdp/--webdriver/--vm/--os, set env '
+        'UNIVERSAL_AUTOMATION_CDP / UNIVERSAL_AUTOMATION_VM (or '
+        '--browser-handle for an oka-published browser), or pass '
+        '"endpoint"/"transport" per call — automation_capabilities '
+        'reports what this server sees',
         details: {
           'transport': resolvedTransport.name,
           'remedy': 'configure the tier or pass endpoint per call',
@@ -1373,7 +1376,7 @@ final class ToolkitMcpServer {
     final transportOverride = {
       'transport': {
         'type': 'string',
-        'enum': ['cdp', 'webdriver', 'osAccessibility'],
+        'enum': ['cdp', 'webdriver', 'osAccessibility', 'vmService'],
         'description':
             'Overrides the serve transport for this call. '
             'osAccessibility is the desktop tier (macOS AX): semantic '

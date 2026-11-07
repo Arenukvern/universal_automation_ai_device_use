@@ -181,8 +181,7 @@ scenarios:
     expect(report.ok, isTrue);
   });
 
-  test('injected DriverFactory extends the registry (the Flutter-tier seam)',
-      () async {
+  test('injected DriverFactory replaces the builtin Flutter tier', () async {
     final plan = AutomationPlan(
       sessions: [
         SessionBinding(
@@ -194,10 +193,12 @@ scenarios:
       scenarios: [scenario('s', steps: [observe()])],
     );
 
-    // Without a factory: loud.
+    // The instrumented tier is linked by default now (universal_driver_
+    // flutter over the MCP toolkit wire); without a live app the attach
+    // is loud and typed — endpointUnreachable, never a missing transport.
     final loud = await PlanRunner().run(plan);
     expect(loud.ok, isFalse);
-    expect(loud.steps.single.errorKind, 'transportNotLinked');
+    expect(loud.steps.single.errorKind, 'endpointUnreachable');
 
     // With a composition-registered factory: the tier participates.
     // (PlanRunner does not expose the registry; drive the registry API
