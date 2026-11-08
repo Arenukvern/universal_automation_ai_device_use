@@ -366,6 +366,112 @@ void main() {
       expect(observation.nodeAt(2, 2).ref, 's_1');
     });
   });
+
+  group('render quality (v0.4 compact format)', () {
+    AxNode disabled(String name) => AxNode(
+      role: 'button',
+      name: name,
+      attributes: const {'enabled': 'false'},
+    );
+
+    Snapshot rich() => Snapshot(
+      roots: [
+        AxNode(
+          role: 'window',
+          name: 'Main',
+          bounds: AxBounds(left: 0, top: 0, width: 400, height: 300),
+          children: [
+            disabled('Buy now'),
+            _node('button', name: 'Say "hi"'),
+            _node('textbox', name: 'Email', value: 'a@b.c', identifier: 'email'),
+          ],
+        ),
+      ],
+      capturedAt: DateTime.parse('2026-11-08T12:00:00Z'),
+      revision: 1,
+    );
+
+    test('lines carry [disabled] and #identifier; empty values vanish', () {
+      final text = Observation.of(rich(), const SemanticView()).render();
+      expect(text, contains('[disabled]'));
+      expect(text, contains('#email'));
+      expect(text, contains(r'"Say \"hi\""'));
+      expect(text, isNot(contains('value=""')));
+      expect(text, contains('value="a@b.c"'));
+    });
+
+    test('fields select what renders; ref is always present', () {
+      final boundsView = const SemanticView(
+        fields: {SemanticField.role, SemanticField.bounds},
+      );
+      final text = Observation.of(rich(), boundsView).render();
+      expect(text, contains('@('));
+      expect(text, isNot(contains('"Main"')));
+      final roleOnly = const SemanticView(fields: {
+        SemanticField.role,
+      });
+      final line = Observation.of(rich(), roleOnly)
+          .render()
+          .split('\n')
+          .map((row) => row.trim())
+          .firstWhere((row) => row.startsWith('s_1'));
+      // State suffixes survive field restriction — they gate the control.
+      expect(line, 's_1 button [disabled]');
+    });
+
+    test('the header accounts for trimming honestly (shown/matched)', () {
+      final text = Observation.of(
+        _fixture(),
+        const SemanticView(maxNodes: 2),
+      ).render();
+      expect(text, contains('shown=2/6 TRIMMED'));
+    });
+
+    test('delta rows say WHAT changed: value swap vs pure move', () {
+      AxNode placed(double left, double top, {String? value}) => AxNode(
+        role: 'slider',
+        name: 'Volume',
+        value: value,
+        bounds: AxBounds(left: left, top: top, width: 10, height: 10),
+      );
+      final view = const SemanticView();
+      final before = Observation.of(
+        Snapshot(
+          roots: [_node('window', name: 'Main', children: [placed(10, 20, value: '3')])],
+          capturedAt: DateTime.parse('2026-11-08T12:00:00Z'),
+          revision: 1,
+        ),
+        view,
+      );
+      final moved = Observation.of(
+        Snapshot(
+          roots: [_node('window', name: 'Main', children: [placed(30, 20, value: '3')])],
+          capturedAt: DateTime.parse('2026-11-08T12:00:01Z'),
+          revision: 2,
+        ),
+        view,
+      );
+      final movedDelta = moved.diff(before).render();
+      expect(movedDelta, contains('# delta +0 -0 ~1'));
+      expect(movedDelta, contains('moved (10.0,20.0) → (30.0,20.0)'));
+      // No phantom value swap for a pure move (the row shows the current
+      // value once, per the default fields — never `"" → ""`).
+      expect(movedDelta, isNot(contains('value="3" →')));
+      expect(movedDelta, isNot(contains('"" → ""')));
+
+      final retuned = Observation.of(
+        Snapshot(
+          roots: [_node('window', name: 'Main', children: [placed(30, 20, value: '9')])],
+          capturedAt: DateTime.parse('2026-11-08T12:00:02Z'),
+          revision: 3,
+        ),
+        view,
+      );
+      final retunedDelta = retuned.diff(moved).render();
+      expect(retunedDelta, contains('value="3" → "9"'));
+      expect(retunedDelta, isNot(contains('moved')));
+    });
+  });
 }
 
 extension on ObservationDelta {

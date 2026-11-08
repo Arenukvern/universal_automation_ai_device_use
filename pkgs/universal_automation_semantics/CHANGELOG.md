@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.0
+
+- **Compact render quality**: lines now carry the state suffixes that
+  locate or gate a control — `[disabled]` and the `#identifier` selector
+  target — and drop empty `value=""` noise; quoted values are escaped.
+- The `fields` view contract is honored end-to-end (it was declared but
+  ignored): `fields: [bounds]` renders `@(left,top) WxH` geometry, and a
+  minimal `fields: [role]` renders `ref role` only; `ref` always renders.
+- Trim accounting is honest: the header reads `shown=S/M TRIMMED` where M
+  is everything the view's selectors matched before the cap.
+- Delta rows say WHAT changed in place: `value="old" → "new"` for value
+  swaps, `moved (l,t) → (l',t')` for pure moves, both when both — and the
+  delta carries a `# delta +A -R ~C` header instead of bare rows.
 
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_semantics-v0.2.0...universal_automation_semantics-v0.3.0) (2026-10-27)
 

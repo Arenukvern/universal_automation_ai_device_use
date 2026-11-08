@@ -39,6 +39,7 @@ final class Observation {
     this._byRef,
     this.walkedCount,
     this.trimmed,
+    this.matchedCount,
   );
 
   /// Resolves [view] against [snapshot].
@@ -62,6 +63,7 @@ final class Observation {
     final byRef = <String, ObservedNode>{};
     var walkedCount = walk.length;
     var trimmed = false;
+    var matchedCount = 0;
 
     void showSection(
       SemanticView section,
@@ -76,6 +78,7 @@ final class Observation {
               (walk[i].attributes['identifier'] ?? '').startsWith(prefix))
             i,
       ];
+      matchedCount += matched.length;
       if (section.maxNodes != null && matched.length > section.maxNodes!) {
         trimmed = true;
       }
@@ -131,7 +134,15 @@ final class Observation {
       }
     }
 
-    return Observation._(snapshot, view, nodes, byRef, walkedCount, trimmed);
+    return Observation._(
+      snapshot,
+      view,
+      nodes,
+      byRef,
+      walkedCount,
+      trimmed,
+      matchedCount,
+    );
   }
 
   /// The snapshot this observation resolved.
@@ -148,6 +159,11 @@ final class Observation {
 
   /// Whether any section's view asked for more than its `maxNodes`.
   final bool trimmed;
+
+  /// Nodes the view's selectors matched in full (before `maxNodes`
+  /// caps) — the honest denominator for the render header's trim
+  /// accounting.
+  final int matchedCount;
 
   /// Shown nodes in render order (main view first, then panes).
   List<ObservedNode> get nodes => List.unmodifiable(_nodes);
@@ -195,15 +211,17 @@ final class Observation {
   }
 
   /// The compact numbered text a model reads: one line per shown node
-  /// (`<ref> <role> "name" value=…`), two-space indent per depth, a
-  /// header that admits trimming, and one `# pane <name>` section per
-  /// declared pane (main first; empty panes render as empty sections —
-  /// loud, not silent).
+  /// (`<ref> <role> "name" value=… [disabled] #identifier`), two-space
+  /// indent per depth, a header that admits trimming with honest
+  /// accounting (`shown=S/M TRIMMED`), and one `# pane <name>` section
+  /// per declared pane (main first; empty panes render as empty
+  /// sections — loud, not silent).
   String render() {
     final buffer = StringBuffer()
       ..write(
         '# observation rev=${snapshot.revision} walked=$walkedCount '
-        'shown=${_nodes.length}${trimmed ? ' TRIMMED' : ''}',
+        'shown=${_nodes.length}'
+        '${trimmed ? '/$matchedCount TRIMMED' : ''}',
       );
     var currentPane = '';
     void section(String name) {
@@ -214,7 +232,9 @@ final class Observation {
     for (final observed in _nodes) {
       final paneName = observed.pane ?? 'main';
       if (paneName != currentPane) section(paneName);
-      buffer.write('\n${'  ' * observed.offsetDepth}${_line(observed)}');
+      buffer.write(
+        '\n${'  ' * observed.offsetDepth}${_line(observed, view.fields)}',
+      );
     }
     // Announce declared panes that showed nothing.
     final shownPanes = _nodes.map((observed) => observed.pane).toSet();
@@ -369,24 +389,47 @@ final class ObservationDelta {
   /// Whether nothing moved.
   bool get isEmpty => added.isEmpty && removed.isEmpty && changed.isEmpty;
 
-  /// Compact delta text; `# no change` when nothing moved.
-  String render() {
+  /// Compact delta text: a `# delta +A -R ~C` header, then `+`/`-`/`~`
+  /// rows (added/changed rows carry the new observation's refs).
+  /// `# no change` when nothing moved.
+  String render({Set<SemanticField> fields = SemanticView.defaultFields}) {
     if (isEmpty) return '# no change';
-    final buffer = StringBuffer();
+    final buffer = StringBuffer(
+      '# delta +${added.length} -${removed.length} ~${changed.length}',
+    );
     for (final observed in added) {
-      buffer.writeln('+ ${_line(observed)}');
+      buffer.write('\n+ ${_line(observed, fields)}');
     }
     for (final observed in removed) {
-      buffer.writeln('- ${_line(observed)}');
+      buffer.write('\n- ${_line(observed, fields)}');
     }
     for (final change in changed) {
-      buffer.writeln(
-        '~ ${_line(change.current)} '
-        '"${change.beforeNode.value ?? ''}" → '
-        '"${change.current.node.value ?? ''}"',
+      buffer.write('\n~ ${_line(change.current, fields)}${_changeClause(change)}');
+    }
+    return buffer.toString();
+  }
+
+  /// Says WHAT changed in place: a value swap, a move, or both — never
+  /// the old misleading `"" → ""` for a bounds-only drift.
+  static String _changeClause(ChangedNode change) {
+    final clauses = <String>[];
+    final beforeValue = change.beforeNode.value ?? '';
+    final afterValue = change.currentNode.value ?? '';
+    if (beforeValue != afterValue) {
+      clauses.add(
+        'value="${_escape(beforeValue)}" → "${_escape(afterValue)}"',
       );
     }
-    return buffer.toString().trimRight();
+    final before = change.beforeNode.bounds;
+    final after = change.currentNode.bounds;
+    if (before != null &&
+        after != null &&
+        (before.left != after.left || before.top != after.top)) {
+      clauses.add(
+        'moved (${before.left},${before.top}) → (${after.left},${after.top})',
+      );
+    }
+    return clauses.isEmpty ? '' : ' ${clauses.join('; ')}';
   }
 }
 
@@ -404,15 +447,41 @@ final class ChangedNode {
   final AxNode currentNode;
 }
 
-String _line(ObservedNode observed) {
+/// One rendered row: the ref (always), then exactly the view's fields,
+/// then the state suffixes that locate or gate a control —
+/// `[disabled]` when the tier reports it so, `#identifier` when the
+/// tier exposes one (the `subtreeOf`/`identifierPrefix` selector
+/// target an agent needs in view). Empty values render nothing.
+String _line(ObservedNode observed, Set<SemanticField> fields) {
   final node = observed.node;
-  return [
-    observed.ref,
-    node.role,
-    if (node.name != null) '"${node.name}"',
-    if (node.value != null) 'value="${node.value}"',
-  ].join(' ');
+  final buffer = StringBuffer(observed.ref);
+  if (fields.contains(SemanticField.role)) buffer.write(' ${node.role}');
+  if (fields.contains(SemanticField.name) && node.name != null) {
+    buffer.write(' "${_escape(node.name!)}"');
+  }
+  if (fields.contains(SemanticField.value) &&
+      node.value != null &&
+      node.value!.isNotEmpty) {
+    buffer.write(' value="${_escape(node.value!)}"');
+  }
+  if (fields.contains(SemanticField.bounds) && node.bounds != null) {
+    final bounds = node.bounds!;
+    buffer.write(
+      ' @(${bounds.left},${bounds.top}) ${bounds.width}x${bounds.height}',
+    );
+  }
+  if (node.attributes['enabled'] == 'false') buffer.write(' [disabled]');
+  final identifier = node.attributes['identifier'];
+  if (identifier != null && identifier.isNotEmpty) {
+    buffer.write(' #$identifier');
+  }
+  return buffer.toString();
 }
+
+/// Escapes a quoted string value so embedded quotes and backslashes
+/// stay parseable.
+String _escape(String text) =>
+    text.replaceAll('\\', r'\\').replaceAll('"', r'\"');
 
 /// A ref an interaction wants is not resolvable against the current
 /// observation — the surface moved on. Fail closed: reobserve, never

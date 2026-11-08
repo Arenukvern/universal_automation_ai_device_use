@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- **Native Flutter vmService tier**: `--vm <vm-service-uri>` (env
+  `UNIVERSAL_AUTOMATION_VM`) drives instrumented Flutter apps through
+  `universal_driver_flutter` — the MCP toolkit's public
+  `ext.mcp.toolkit.*` wire — and `transport: "vmService"` works in the
+  MCP server with per-call endpoints. `SessionRegistry` links vmService
+  as a builtin factory next to cdp/webdriver; composition roots can
+  still replace it.
 
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.2.0...universal_automation_toolkit-v0.3.0) (2026-10-27)
 
