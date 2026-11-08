@@ -76,7 +76,15 @@ final class FlutterVmDriver implements AutomationDriver {
         await _navigate(url);
       case ClickAction(:final css, :final role, :final name):
         final ref = await _resolveRef(css: css, role: role, name: name);
-        await _call(ToolkitWire.tapWidget, args: {'ref': ref});
+        final raw = _unwrap(
+          await _call(ToolkitWire.tapWidget, args: {'ref': ref}),
+        );
+        if (raw['success'] == false) {
+          throw ProtocolException(
+            'tap refused at ref "$ref": ${raw['error']} — '
+            '${raw['hint'] ?? raw['message'] ?? 'no hint'}',
+          );
+        }
       case TypeAction(:final text, :final css, :final submit):
         if (css == null) {
           throw const DriverUnsupportedException(
@@ -86,7 +94,15 @@ final class FlutterVmDriver implements AutomationDriver {
           );
         }
         final ref = await _resolveRef(css: css);
-        await _call(ToolkitWire.enterText, args: {'ref': ref, 'text': text});
+        final raw = _unwrap(
+          await _call(ToolkitWire.enterText, args: {'ref': ref, 'text': text}),
+        );
+        if (raw['success'] == false) {
+          throw ProtocolException(
+            'enter_text refused at ref "$ref": ${raw['error']} — '
+            '${raw['hint'] ?? raw['message'] ?? 'no hint'}',
+          );
+        }
         if (submit) await _pressKey('Enter');
       case KeyPressAction(:final key):
         await _pressKey(key);

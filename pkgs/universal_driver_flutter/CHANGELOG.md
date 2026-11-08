@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.1.1
+
+- tap and enter_text now surface the app-side refusal instead of
+  swallowing it: `success: false` responses (ref not found, stale ref,
+  disabled control, `target_outside_viewport` with its reveal hint)
+  throw `ProtocolException` — live-proven: an off-viewport counter
+  button now reports the refusal with the reveal_search hint instead of
+  a silent ok.
+
 ## 0.1.0
 
 - Initial release: vmService `AutomationDriver` over a running Flutter
