@@ -3,6 +3,33 @@
 /// Token economy is the design constraint: an observation is read by a
 /// model every loop iteration, so the default set is the minimum that
 /// locates a control — role, name, value.
+
+/// The usefulness a render optimizes for — the switch the caller flips
+/// instead of re-deriving a projection (measured in
+/// `tool/benchmark_compression.dart`: compact holds ~100% findability at
+/// 60–75% of the standard byte cost).
+enum SemanticLens {
+  /// The full grammar: long roles, every shown node, explicit `value=`.
+  /// The reference lens — deltas, debugging, and golden comparisons read
+  /// this.
+  standard,
+
+  /// Locate-first: short role codes, unnamed valueless container rows
+  /// dropped (children remain, indented), `=` value prefix. Refs, names,
+  /// identifiers, and state suffixes are never dropped — every hit line
+  /// stays actionable without a second call. The act-loop lens.
+  compact,
+
+  /// Design-scoring seed (the impeccable-style critique feed): every
+  /// shown node renders its geometry row (`@x,y WxH`), and the render
+  /// closes with clustering footers — repeated left edges (column
+  /// consistency), top edges (row rhythm), and widths (size hierarchy).
+  /// Pure tree truth: derivable from `bounds` alone, no pixels needed;
+  /// pixel-level critique (color, type, contrast) stays with a capture
+  /// tier. Names/values are omitted unless asked via `fields`.
+  design;
+}
+
 enum SemanticField {
   /// Lowercase semantic role (`window`, `button`, `textbox`, …).
   role,

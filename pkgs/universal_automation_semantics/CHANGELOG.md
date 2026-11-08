@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.5.0
+
+- **SemanticLens — switchable render usefulness** (measured in
+  tool/benchmark_compression.dart, real + synthetic fixtures):
+  `standard` (reference grammar), `compact` (act-loop: short role
+  codes, unnamed container rows dropped, `=` values — refs, names,
+  identifiers and state suffixes never dropped; 100% findability kept
+  at 8-17% fewer bytes), `design` (critique seed: geometry rows plus
+  column/row/width clustering footers for impeccable-style spacing and
+  alignment scoring — pure bounds truth, no pixels).
+- `Observation.render(lens: ...)` — source-compatible additive param.
+
 ## 0.4.0
 
 - **Compact render quality**: lines now carry the state suffixes that

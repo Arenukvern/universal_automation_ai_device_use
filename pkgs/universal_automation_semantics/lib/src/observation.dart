@@ -216,12 +216,20 @@ final class Observation {
   /// accounting (`shown=S/M TRIMMED`), and one `# pane <name>` section
   /// per declared pane (main first; empty panes render as empty
   /// sections — loud, not silent).
-  String render() {
+  ///
+  /// The [lens] switches the usefulness: [SemanticLens.standard] is the
+  /// reference grammar; [SemanticLens.compact] trades long roles and
+  /// container rows for tokens while keeping every hit line actionable
+  /// (refs, names, identifiers, and state suffixes are never dropped).
+  String render({
+    SemanticLens lens = SemanticLens.standard,
+  }) {
     final buffer = StringBuffer()
       ..write(
         '# observation rev=${snapshot.revision} walked=$walkedCount '
         'shown=${_nodes.length}'
-        '${trimmed ? '/$matchedCount TRIMMED' : ''}',
+        '${trimmed ? '/$matchedCount TRIMMED' : ''}'
+        '${lens == SemanticLens.standard ? '' : ' lens=${lens.name}'}',
       );
     var currentPane = '';
     void section(String name) {
@@ -232,16 +240,55 @@ final class Observation {
     for (final observed in _nodes) {
       final paneName = observed.pane ?? 'main';
       if (paneName != currentPane) section(paneName);
+      if (lens == SemanticLens.compact && _isNoise(observed)) continue;
       buffer.write(
-        '\n${'  ' * observed.offsetDepth}${_line(observed, view.fields)}',
+        '\n${'  ' * observed.offsetDepth}'
+        '${_line(observed, view.fields, lens)}',
       );
     }
+    if (lens == SemanticLens.design) _appendDesignClusters(buffer);
     // Announce declared panes that showed nothing.
     final shownPanes = _nodes.map((observed) => observed.pane).toSet();
     for (final pane in view.panes.keys) {
       if (!shownPanes.contains(pane)) section(pane);
     }
     return buffer.toString();
+  }
+
+  /// Design-lens footers: cluster the shown nodes' geometry into the
+  /// repeated columns, rows, and widths a design critique reads as
+  /// consistency signals. Clusters are ±4 logical px; only repeats
+  /// (count ≥ 2) print, most frequent first, capped at 6 per axis.
+  void _appendDesignClusters(StringBuffer buffer) {
+    final boundsOf = <AxBounds>[
+      for (final observed in _nodes)
+        if (observed.node.bounds case final bounds?) bounds,
+    ];
+    if (boundsOf.length < 2) return;
+    void cluster(String label, double Function(AxBounds) valueOf) {
+      final tally = <int, int>{};
+      for (final bounds in boundsOf) {
+        final key = (valueOf(bounds) / 4).round();
+        tally[key] = (tally[key] ?? 0) + 1;
+      }
+      final repeats = tally.entries
+          .where((entry) => entry.value >= 2)
+          .toList()
+        ..sort((a, b) => b.value.compareTo(a.value));
+      if (repeats.isEmpty) return;
+      buffer
+        ..write('\n# $label ')
+        ..write(
+          [
+            for (final entry in repeats.take(6))
+              '${(entry.key * 4)}×${entry.value}',
+          ].join(' '),
+        );
+    }
+
+    cluster('cols', (bounds) => bounds.left);
+    cluster('rows', (bounds) => bounds.top);
+    cluster('widths', (bounds) => bounds.width);
   }
 
   /// Diffs this observation against [previous] — the act loop's closing
@@ -398,13 +445,16 @@ final class ObservationDelta {
       '# delta +${added.length} -${removed.length} ~${changed.length}',
     );
     for (final observed in added) {
-      buffer.write('\n+ ${_line(observed, fields)}');
+      buffer.write('\n+ ${_line(observed, fields, SemanticLens.standard)}');
     }
     for (final observed in removed) {
-      buffer.write('\n- ${_line(observed, fields)}');
+      buffer.write('\n- ${_line(observed, fields, SemanticLens.standard)}');
     }
     for (final change in changed) {
-      buffer.write('\n~ ${_line(change.current, fields)}${_changeClause(change)}');
+      buffer.write(
+        '\n~ ${_line(change.current, fields, SemanticLens.standard)}'
+        '${_changeClause(change)}',
+      );
     }
     return buffer.toString();
   }
@@ -447,30 +497,76 @@ final class ChangedNode {
   final AxNode currentNode;
 }
 
+/// True when a compact-lens render drops the row: an unnamed, valueless,
+/// un-identified pure container (generic/widget/scrollable). Its children
+/// stay — the row carries no locator value, only structure the indent
+/// already shows.
+bool _isNoise(ObservedNode observed) {
+  final node = observed.node;
+  final name = node.name;
+  final value = node.value;
+  return (name == null || name.isEmpty) &&
+      (value == null || value.isEmpty) &&
+      !node.attributes.containsKey('identifier') &&
+      (node.role == 'generic' || node.role == 'scrollable');
+}
+
+/// Short role codes for the compact lens; falls back to the first three
+/// letters of an unknown role so nothing silently disappears.
+const Map<String, String> _shortRoles = {
+  'button': 'btn',
+  'textbox': 'txt',
+  'text': 'lbl',
+  'heading': 'hdr',
+  'scrollable': 'scr',
+  'window': 'win',
+  'image': 'img',
+  'checkbox': 'chk',
+  'slider': 'sld',
+  'tab': 'tab',
+  'menu': 'mnu',
+  'link': 'lnk',
+  'generic': 'g',
+};
+
 /// One rendered row: the ref (always), then exactly the view's fields,
 /// then the state suffixes that locate or gate a control —
 /// `[disabled]` when the tier reports it so, `#identifier` when the
 /// tier exposes one (the `subtreeOf`/`identifierPrefix` selector
 /// target an agent needs in view). Empty values render nothing.
-String _line(ObservedNode observed, Set<SemanticField> fields) {
+/// Under the compact lens roles shorten and values compress to `=`.
+String _line(ObservedNode observed, Set<SemanticField> fields,
+    SemanticLens lens) {
   final node = observed.node;
+  final compact = lens == SemanticLens.compact;
   final buffer = StringBuffer(observed.ref);
-  if (fields.contains(SemanticField.role)) buffer.write(' ${node.role}');
+  if (fields.contains(SemanticField.role)) {
+    buffer.write(
+      compact
+          ? ' ${_shortRoles[node.role] ?? node.role.substring(0, 3)}'
+          : ' ${node.role}',
+    );
+  }
   if (fields.contains(SemanticField.name) && node.name != null) {
     buffer.write(' "${_escape(node.name!)}"');
   }
   if (fields.contains(SemanticField.value) &&
       node.value != null &&
       node.value!.isNotEmpty) {
-    buffer.write(' value="${_escape(node.value!)}"');
+    final escaped = _escape(node.value!);
+    buffer.write(compact ? ' =$escaped' : ' value="$escaped"');
   }
-  if (fields.contains(SemanticField.bounds) && node.bounds != null) {
+  if ((fields.contains(SemanticField.bounds) ||
+          lens == SemanticLens.design) &&
+      node.bounds != null) {
     final bounds = node.bounds!;
     buffer.write(
       ' @(${bounds.left},${bounds.top}) ${bounds.width}x${bounds.height}',
     );
   }
-  if (node.attributes['enabled'] == 'false') buffer.write(' [disabled]');
+  if (node.attributes['enabled'] == 'false') {
+    buffer.write(compact ? ' !dis' : ' [disabled]');
+  }
   final identifier = node.attributes['identifier'];
   if (identifier != null && identifier.isNotEmpty) {
     buffer.write(' #$identifier');

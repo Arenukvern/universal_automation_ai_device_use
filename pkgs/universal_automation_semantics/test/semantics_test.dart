@@ -427,6 +427,62 @@ void main() {
       expect(text, contains('shown=2/6 TRIMMED'));
     });
 
+    test('compact lens: codes, dropped container rows, refs intact', () {
+      AxNode container() => AxNode(
+        role: 'generic',
+        children: [
+          AxNode(
+            role: 'button',
+            name: 'Buy now',
+            attributes: const {'enabled': 'false', 'identifier': 'buy'},
+          ),
+        ],
+      );
+      final snapshot = Snapshot(
+        roots: [_node('window', name: 'Main', children: [container()])],
+        capturedAt: DateTime.parse('2026-11-08T12:00:00Z'),
+        revision: 2,
+      );
+      final text = Observation.of(
+        snapshot,
+        const SemanticView(),
+      ).render(lens: SemanticLens.compact);
+      expect(text, contains('lens=compact'));
+      expect(text, contains('btn "Buy now" !dis #buy'));
+      expect(text, isNot(contains(' generic')));
+      // Refs survive so the hit line stays actionable.
+      expect(text, matches(RegExp(r's_\d+ btn')));
+    });
+
+    test('design lens: geometry rows plus clustering footers', () {
+      AxNode placed(double left, double top, double width, String name) =>
+          AxNode(
+            role: 'button',
+            name: name,
+            bounds: AxBounds(left: left, top: top, width: width, height: 32),
+          );
+      final snapshot = Snapshot(
+        roots: [
+          _node('window', name: 'Main', children: [
+            placed(72, 100, 160, 'Alpha'),
+            placed(72, 200, 160, 'Beta'),
+            placed(280, 300, 160, 'Gamma'),
+          ]),
+        ],
+        capturedAt: DateTime.parse('2026-11-08T12:00:00Z'),
+        revision: 3,
+      );
+      final text = Observation.of(
+        snapshot,
+        const SemanticView(),
+      ).render(lens: SemanticLens.design);
+      expect(text, contains('lens=design'));
+      expect(text, contains('@(72.0,100.0) 160.0x32.0'));
+      // Repeated left edge x=72 (2 nodes) and width 160 (3 nodes) cluster.
+      expect(text, contains('# cols 72×2'));
+      expect(text, contains('# widths 160×3'));
+    });
+
     test('delta rows say WHAT changed: value swap vs pure move', () {
       AxNode placed(double left, double top, {String? value}) => AxNode(
         role: 'slider',
