@@ -1,0 +1,24 @@
+name: universal_driver_flutter
+description: >-
+  vmService AutomationDriver over a running Flutter app's MCP toolkit
+  service extensions (ext.mcp.toolkit.*) — the CLI/MCP-reachable face of
+  the instrumented tier (ADR 0038). A client of the public wire contract
+  (flutter_mcp_toolkit_core.ToolkitExtensionNames), kept package-agnostic
+  of mcp_flutter per ADR 0036's one-way direction — the same precedent as
+  universal_capture_flutter.
+version: 0.1.0
+homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
+repository: https://github.com/Arenukvern/universal_automation_ai_device_use
+issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
+
+environment:
+  sdk: ^3.13.0
+resolution: workspace
+
+dependencies:
+  universal_automation_interface: ^0.4.0
+  vm_service: ^15.3.0
+
+dev_dependencies:
+  lints: ^6.0.0
+  test: ^1.31.2

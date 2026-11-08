@@ -139,26 +139,48 @@ ServeTierConfig _serveTierConfig(ArgResults options) {
     options['webdriver'] as String?,
     '--webdriver',
   );
+  final vm = _parseVm(options['vm'] as String?);
   final os = options['os'] == true;
   final envCdp = _parseCdp(_env('UNIVERSAL_AUTOMATION_CDP'));
   final envWebdriver = _parseEndpoint(
     _env('UNIVERSAL_AUTOMATION_WEBDRIVER'),
     'UNIVERSAL_AUTOMATION_WEBDRIVER',
   );
+  final envVm = _parseVm(_env('UNIVERSAL_AUTOMATION_VM'));
   final endpoints = <AutomationTransport, Uri>{
     if (envCdp != null) AutomationTransport.cdp: envCdp,
     if (envWebdriver != null) AutomationTransport.webdriver: envWebdriver,
+    if (envVm != null) AutomationTransport.vmService: envVm,
     if (webdriver != null) AutomationTransport.webdriver: webdriver,
     if (cdp != null) AutomationTransport.cdp: cdp,
+    if (vm != null) AutomationTransport.vmService: vm,
   };
   final defaultTransport = os
       ? AutomationTransport.osAccessibility
+      : vm != null || envVm != null
+      ? AutomationTransport.vmService
       : endpoints.containsKey(AutomationTransport.cdp)
       ? AutomationTransport.cdp
       : endpoints.containsKey(AutomationTransport.webdriver)
       ? AutomationTransport.webdriver
       : AutomationTransport.cdp;
   return (defaultTransport, endpoints);
+}
+
+Uri? _parseVm(String? value) {
+  if (value == null) return null;
+  final uri = Uri.tryParse(value);
+  if (uri == null ||
+      !uri.hasScheme ||
+      !(uri.scheme == 'http' ||
+          uri.scheme == 'https' ||
+          uri.scheme == 'ws' ||
+          uri.scheme == 'wss')) {
+    throw UsageException(
+      '--vm must be an absolute VM service URI (http(s) or ws, got $value)',
+    );
+  }
+  return uri;
 }
 
 Future<ResolvedSession> _attachAdHoc(
@@ -203,8 +225,9 @@ Future<ResolvedSession> _attachAdHoc(
     }
     throw const UsageException(
       'choose a transport: --cdp <http-base>, --webdriver <http-base>, '
-      'or --os (the desktop accessibility tier of this host); env '
-      'UNIVERSAL_AUTOMATION_CDP also configures the browser tier',
+      '--vm <vm-service-uri>, or --os (the desktop accessibility tier of '
+      'this host); env UNIVERSAL_AUTOMATION_CDP / UNIVERSAL_AUTOMATION_VM '
+      'also configure the browser and Flutter tiers',
     );
   }
   // The target selector rides the endpoint URI, so the choice reaches the
@@ -275,6 +298,15 @@ Future<int> _dispatch(List<String> arguments) async {
           'WebDriver (grid) HTTP base; combinable with --cdp/--os (ADR '
           '0003 tier registry). Env fallback: '
           'UNIVERSAL_AUTOMATION_WEBDRIVER.',
+    )
+    ..addOption(
+      'vm',
+      help:
+          'Flutter/Dart VM service URI (http(s) or ws) — drives the '
+          'instrumented tier: the app binds the MCP toolkit and this '
+          'tier speaks its ext.mcp.toolkit.* extensions (semantic '
+          'snapshot, ref actions, background screenshots). Env fallback: '
+          'UNIVERSAL_AUTOMATION_VM.',
     )
     ..addFlag(
       'os',

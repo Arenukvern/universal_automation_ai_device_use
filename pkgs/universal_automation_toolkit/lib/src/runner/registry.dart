@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 import 'package:universal_browser_cdp/universal_browser_cdp.dart';
 import 'package:universal_browser_webdriver/universal_browser_webdriver.dart';
+import 'package:universal_driver_flutter/universal_driver_flutter.dart';
 
 
 export 'package:universal_automation_interface/universal_automation_interface.dart'
@@ -32,11 +33,13 @@ class TransportNotLinkedException extends AutomationException {
 ///
 /// Attach-only: [ResolvedSession.detach] drops the client's connection
 /// and never stops the process behind it (ADR 0037 house rule 2;
-/// lifecycle belongs to oka). Transport coverage: CDP, WebDriver, and
-/// the OS-native tier (macOS AX / Linux AT-SPI / Windows UIA sidecar)
-/// are linked; `vmService` resolves through [factories] registered by
-/// composition roots (the instrumented Flutter tier lives in
-/// mcp_flutter — ADR 0036 one-way direction).
+/// lifecycle belongs to oka). Transport coverage: CDP, WebDriver, the
+/// OS-native tier (macOS AX / Linux AT-SPI / Windows UIA sidecar), and
+/// the instrumented Flutter tier (`vmService` over the MCP toolkit's
+/// public service-extension wire, via [universal_driver_flutter]) are
+/// linked; composition roots may still replace any of them through
+/// [factories] (ADR 0036 one-way direction: this build depends on the
+/// wire contract, never on mcp_flutter packages).
 final class SessionRegistry {
   /// Creates a registry over [bindings]; [overrides] resolve handle
   /// bindings (handle name → endpoint URI); [factories] extend or
@@ -213,17 +216,24 @@ final class SessionRegistry {
     return value.isEmpty ? null : Uri.tryParse(value);
   }
 
-  /// The built-in factories: the pure-Dart protocol tiers only (ADR
-  /// 0004). The desktop OS tier is registered by the composition root
-  /// (`desktopOsAccessibilityFactory`) — or replaced by an embedder's
-  /// own tier; an unregistered transport is the loud
-  /// [TransportNotLinkedException], never a silent fallback.
+  /// The built-in factories: the pure-Dart protocol tiers plus the
+  /// instrumented Flutter tier (ADR 0004). The desktop OS tier is
+  /// registered by the composition root (`desktopOsAccessibilityFactory`)
+  /// — or replaced by an embedder's own tier; an unregistered transport
+  /// is the loud [TransportNotLinkedException], never a silent fallback.
   DriverFactory? _builtinFactory(AutomationTransport transport) =>
       switch (transport) {
         AutomationTransport.cdp => _attachCdp,
         AutomationTransport.webdriver => _attachWebdriver,
+        AutomationTransport.vmService => _attachVmService,
         _ => null,
       };
+
+  static Future<ResolvedSession> _attachVmService(
+    SessionBinding binding,
+    Uri endpoint,
+    Duration timeout,
+  ) => flutterVmServiceFactory(binding, endpoint, timeout);
 
   static Future<ResolvedSession> _attachCdp(
     SessionBinding binding,
