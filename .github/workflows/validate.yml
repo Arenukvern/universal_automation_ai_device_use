@@ -28,6 +28,9 @@ jobs:
       - name: Check intra-workspace pub constraints
         run: dart run tool/sync_workspace_pub_constraints.dart --check
 
+      - name: Check hosted sibling deps and publish order
+        run: dart run tool/check_hosted_deps_resolve.dart
+
       - name: Check reusable workflow inputs
         env:
           GITHUB_TOKEN: ${{ github.token }}

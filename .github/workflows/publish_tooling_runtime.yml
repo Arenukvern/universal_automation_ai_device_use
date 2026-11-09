@@ -46,6 +46,9 @@ jobs:
       - name: Resolve workspace
         run: dart pub get
 
+      - name: Check hosted sibling deps and publish order
+        run: dart run tool/check_hosted_deps_resolve.dart
+
       - name: Analyze
         run: dart analyze
         working-directory: pkgs/universal_tooling_runtime

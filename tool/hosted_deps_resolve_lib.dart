@@ -1,0 +1,382 @@
+// Validates that workspace packages can resolve sibling dependencies from
+// pub.dev and optional same-release versions (release-please manifest).
+
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:pub_semver/pub_semver.dart';
+
+import 'workspace_pub_constraints_sync.dart';
+
+const _pubDevPackageApi = 'https://pub.dev/api/packages';
+
+class WorkspacePackage {
+  WorkspacePackage({
+    required this.name,
+    required this.version,
+    required this.pubspecPath,
+    required this.workspaceDeps,
+  });
+
+  final String name;
+  final String version;
+  final String pubspecPath;
+  /// Sibling workspace dependencies: name → constraint string.
+  final Map<String, String> workspaceDeps;
+}
+
+/// Parses `universal_*` entries from dependencies (not dev_dependencies).
+Map<String, String> parseWorkspaceDependencies(String pubspecContent) {
+  final out = <String, String>{};
+  var section = _PubspecSection.none;
+  var sectionIndent = 0;
+
+  for (final line in pubspecContent.split('\n')) {
+    final trimmed = line.trimLeft();
+  if (trimmed.startsWith('dependencies:')) {
+      section = _PubspecSection.dependencies;
+      sectionIndent = line.length - trimmed.length;
+      continue;
+    }
+    if (trimmed.startsWith('dev_dependencies:') ||
+        trimmed.startsWith('dependency_overrides:')) {
+      section = _PubspecSection.other;
+      continue;
+    }
+
+    if (section != _PubspecSection.dependencies) {
+      continue;
+    }
+    if (trimmed.isEmpty) {
+      continue;
+    }
+    final indent = line.length - trimmed.length;
+    if (indent <= sectionIndent) {
+      section = _PubspecSection.other;
+      continue;
+    }
+    final match = RegExp(r'^([a-zA-Z0-9_]+):\s+(\S+)').firstMatch(trimmed);
+    if (match == null) {
+      continue;
+    }
+    final depName = match.group(1)!;
+    if (!depName.startsWith('universal_')) {
+      continue;
+    }
+    var constraint = match.group(2)!;
+    // Strip inline comment.
+    final hash = constraint.indexOf('#');
+    if (hash >= 0) {
+      constraint = constraint.substring(0, hash).trim();
+    }
+    out[depName] = constraint;
+  }
+  return out;
+}
+
+enum _PubspecSection { none, dependencies, other }
+
+List<WorkspacePackage> loadWorkspacePackages(Directory repoRoot) {
+  final packages = <WorkspacePackage>[];
+  for (final path in workspacePubspecPaths(repoRoot)) {
+    final content = File(path).readAsStringSync();
+    final header = parsePubspecHeader(content);
+    packages.add(
+      WorkspacePackage(
+        name: header.name,
+        version: header.version,
+        pubspecPath: path,
+        workspaceDeps: parseWorkspaceDependencies(content),
+      ),
+    );
+  }
+  packages.sort((a, b) => a.name.compareTo(b.name));
+  return packages;
+}
+
+/// release-please manifest: `pkgs/foo` → semver string.
+Map<String, String> loadReleaseManifestVersions(
+  Directory repoRoot,
+  String manifestPath,
+) {
+  final file = File(manifestPath);
+  if (!file.existsSync()) {
+    return {};
+  }
+  final raw = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
+  final byName = <String, String>{};
+  for (final entry in raw.entries) {
+    final pkgDir = '${repoRoot.path}/${entry.key}';
+    final pubspec = File('$pkgDir/pubspec.yaml');
+    if (!pubspec.existsSync()) {
+      continue;
+    }
+    final name = parsePubspecHeader(pubspec.readAsStringSync()).name;
+    byName[name] = entry.value as String;
+  }
+  return byName;
+}
+
+class PubDevCatalog {
+  PubDevCatalog({HttpClient? client}) : _client = client ?? HttpClient();
+
+  final HttpClient _client;
+  final _cache = <String, List<String>>{};
+
+  Future<List<String>> versionsOnPubDev(String packageName) async {
+    if (_cache.containsKey(packageName)) {
+      return _cache[packageName]!;
+    }
+    final uri = Uri.parse('$_pubDevPackageApi/$packageName');
+    final request = await _client.getUrl(uri);
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    final response = await request.close();
+    if (response.statusCode != 200) {
+      throw HttpException(
+        'pub.dev ${response.statusCode} for $packageName',
+        uri: uri,
+      );
+    }
+    final body = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final versions = (decoded['versions'] as List<dynamic>)
+        .map((v) => (v as Map<String, dynamic>)['version'] as String)
+        .toList();
+    _cache[packageName] = versions;
+    return versions;
+  }
+
+  Future<Map<String, String>> latestPublishedWorkspaceDeps(
+    String packageName,
+  ) async {
+    final uri = Uri.parse('$_pubDevPackageApi/$packageName');
+    final request = await _client.getUrl(uri);
+    final response = await request.close();
+    if (response.statusCode == 404) {
+      return {};
+    }
+    if (response.statusCode != 200) {
+      throw HttpException(
+        'pub.dev ${response.statusCode} for $packageName',
+        uri: uri,
+      );
+    }
+    final body = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final latest = decoded['latest'] as Map<String, dynamic>;
+    final pubspec = latest['pubspec'] as Map<String, dynamic>;
+    final deps = pubspec['dependencies'] as Map<String, dynamic>? ?? {};
+    final out = <String, String>{};
+    for (final entry in deps.entries) {
+      if (entry.key.startsWith('universal_')) {
+        out[entry.key] = entry.value.toString();
+      }
+    }
+    return out;
+  }
+
+  void close() => _client.close(force: true);
+}
+
+bool constraintSatisfiedByAnyVersion(
+  String constraintText,
+  Iterable<String> versions,
+) {
+  final constraint = VersionConstraint.parse(constraintText);
+  for (final v in versions) {
+    if (constraint.allows(Version.parse(v))) {
+      return true;
+    }
+  }
+  return false;
+}
+
+List<String> resolveErrors({
+  required List<WorkspacePackage> packages,
+  required Set<String> workspaceNames,
+  required Map<String, List<String>> pubDevVersions,
+  required Map<String, String> releaseManifestByName,
+}) {
+  final errors = <String>[];
+
+  for (final pkg in packages) {
+    for (final entry in pkg.workspaceDeps.entries) {
+      final depName = entry.key;
+      if (!workspaceNames.contains(depName)) {
+        continue;
+      }
+      final constraint = entry.value;
+      final available = <String>{...?pubDevVersions[depName]};
+      final manifestVersion = releaseManifestByName[depName];
+      if (manifestVersion != null) {
+        available.add(manifestVersion);
+      }
+      if (!constraintSatisfiedByAnyVersion(constraint, available)) {
+        errors.add(
+          '${pkg.name}@${pkg.version} requires $depName $constraint '
+          '(pub.dev: ${pubDevVersions[depName]?.join(', ') ?? 'none'}'
+          '${manifestVersion != null ? '; manifest: $manifestVersion' : ''})',
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+/// Checks pub.dev **latest** tarball pubspecs for unresolved sibling deps.
+List<String> auditPublishedLatestErrors({
+  required List<WorkspacePackage> packages,
+  required Set<String> workspaceNames,
+  required Map<String, List<String>> pubDevVersions,
+  required Map<String, Map<String, String>> publishedLatestDeps,
+}) {
+  final errors = <String>[];
+  for (final pkg in packages) {
+    final versions = pubDevVersions[pkg.name];
+    if (versions == null || versions.isEmpty) {
+      continue;
+    }
+    final latest = _maxVersion(versions);
+    final deps = publishedLatestDeps[pkg.name];
+    if (deps == null) {
+      continue;
+    }
+    for (final entry in deps.entries) {
+      if (!workspaceNames.contains(entry.key)) {
+        continue;
+      }
+      final available = pubDevVersions[entry.key] ?? [];
+      if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
+        errors.add(
+          'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
+          '(pub.dev has: ${available.join(', ')})',
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+String _maxVersion(List<String> versions) {
+  return versions.reduce(
+    (a, b) => Version.parse(a) > Version.parse(b) ? a : b,
+  );
+}
+
+/// Builds directed edges: dependency must publish before dependent.
+Map<String, Set<String>> workspaceDependencyGraph(
+  List<WorkspacePackage> packages,
+) {
+  final names = packages.map((p) => p.name).toSet();
+  final graph = <String, Set<String>>{};
+  for (final name in names) {
+    graph[name] = {};
+  }
+  for (final pkg in packages) {
+    for (final dep in pkg.workspaceDeps.keys) {
+      if (names.contains(dep)) {
+        graph[dep]!.add(pkg.name);
+      }
+    }
+  }
+  return graph;
+}
+
+List<String> topologicalPublishOrder(Map<String, Set<String>> graph) {
+  final inDegree = <String, int>{};
+  for (final node in graph.keys) {
+    inDegree[node] = 0;
+  }
+  for (final targets in graph.values) {
+    for (final t in targets) {
+      inDegree[t] = (inDegree[t] ?? 0) + 1;
+    }
+  }
+
+  final ready = graph.keys.where((n) => inDegree[n] == 0).toList()..sort();
+  final order = <String>[];
+
+  while (ready.isNotEmpty) {
+    final node = ready.removeAt(0);
+    order.add(node);
+    for (final dependent in graph[node]!) {
+      inDegree[dependent] = inDegree[dependent]! - 1;
+      if (inDegree[dependent] == 0) {
+        ready.add(dependent);
+        ready.sort();
+      }
+    }
+  }
+
+  if (order.length != graph.length) {
+  throw StateError('Workspace dependency graph has a cycle');
+  }
+  return order;
+}
+
+List<String> validatePublishOrderList(
+  List<String> configuredOrder,
+  Map<String, Set<String>> graph,
+) {
+  final errors = <String>[];
+  final index = <String, int>{};
+  for (var i = 0; i < configuredOrder.length; i++) {
+    index[configuredOrder[i]] = i;
+  }
+  for (final dep in graph.keys) {
+    final depIndex = index[dep];
+    if (depIndex == null) {
+      errors.add('publish order missing package $dep');
+      continue;
+    }
+    for (final dependent in graph[dep]!) {
+      final depIdx = index[dependent];
+      if (depIdx == null) {
+        errors.add('publish order missing package $dependent');
+        continue;
+      }
+      if (depIndex >= depIdx) {
+        errors.add(
+          'publish order violates dependency: $dep must come before $dependent',
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+List<String> loadPublishOrderYaml(String path) {
+  final file = File(path);
+  if (!file.existsSync()) {
+    throw StateError('Missing publish order file: $path');
+  }
+  final lines = file.readAsLinesSync();
+  final order = <String>[];
+  for (final line in lines) {
+    final trimmed = line.trim();
+    if (trimmed.isEmpty || trimmed.startsWith('#')) {
+      continue;
+    }
+    if (trimmed.startsWith('- ')) {
+      order.add(trimmed.substring(2).trim());
+    } else {
+      order.add(trimmed);
+    }
+  }
+  return order;
+}
+
+Future<Map<String, List<String>>> fetchAllPubDevVersions(
+  PubDevCatalog catalog,
+  Set<String> packageNames,
+) async {
+  final out = <String, List<String>>{};
+  for (final name in packageNames) {
+    try {
+      out[name] = await catalog.versionsOnPubDev(name);
+    } on IOException {
+      out[name] = [];
+    }
+  }
+  return out;
+}
