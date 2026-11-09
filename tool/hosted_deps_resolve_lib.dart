@@ -347,17 +347,79 @@ Set<String> computeReleaseSet({
   return releaseSet;
 }
 
-/// Manifest / pubspec drift against pub.dev (release-please aware).
+/// Version / manifest policy outcome (errors block; warnings do not).
+class VersionPolicyResult {
+  VersionPolicyResult({required this.errors, required this.warnings});
+
+  final List<String> errors;
+  final List<String> warnings;
+}
+
+/// `null` = no release tag; `true` = changes since tag; `false` = unchanged.
+typedef GitChangesSinceReleaseTag = Future<bool?> Function(
+  Directory repoRoot,
+  WorkspacePackage pkg,
+);
+
+Future<bool?> defaultGitChangesSinceReleaseTag(
+  Directory repoRoot,
+  WorkspacePackage pkg,
+) async {
+  final tag = '${pkg.name}-v${pkg.version}';
+  final verify = await Process.run(
+    'git',
+    ['rev-parse', '--verify', 'refs/tags/$tag'],
+    workingDirectory: repoRoot.path,
+  );
+  if (verify.exitCode != 0) {
+    return null;
+  }
+  final pkgDir = File(pkg.pubspecPath).parent;
+  final relDir = pkgDir.path.startsWith('${repoRoot.path}/')
+      ? pkgDir.path.substring(repoRoot.path.length + 1)
+      : pkgDir.path;
+  final diff = await Process.run(
+    'git',
+    ['diff', '--quiet', tag, '--', relDir],
+    workingDirectory: repoRoot.path,
+  );
+  if (diff.exitCode == 0) {
+    return false;
+  }
+  if (diff.exitCode == 1) {
+    return true;
+  }
+  return null;
+}
+
+/// Workspace version policy (supersedes legacy manifest-drift-only rules).
 ///
-/// Manifest records **last released**; pubspec may be ahead — manifest != pubspec
-/// is allowed. Fails when manifest or pubspec disagree with shipped reality.
-List<String> manifestDriftErrors({
+/// Manifest = last **released** version; pubspec may be ahead without error.
+Future<VersionPolicyResult> evaluateVersionPolicy({
+  required Directory repoRoot,
   required List<WorkspacePackage> packages,
   required Map<String, String> manifestByName,
   required Map<String, List<String>> pubDevVersions,
-  Set<String> releaseSet = const {},
-}) {
+  required Set<String> releaseSet,
+  bool warnManifestBehindPub = false,
+  /// When true (main/PR co-release with `--warn-manifest-behind-pub`), git-tag
+  /// reuse checks are skipped so blocking releasability is not tied to local tag
+  /// hygiene; release paths run strict checks via `--check-manifest-drift`.
+  bool skipReuseSinceTagCheck = false,
+  GitChangesSinceReleaseTag? gitChangesSinceTag,
+}) async {
+  final gitCheck = gitChangesSinceTag ?? defaultGitChangesSinceReleaseTag;
   final errors = <String>[];
+  final warnings = <String>[];
+
+  void addManifestIssue(String msg) {
+    if (warnManifestBehindPub) {
+      warnings.add(msg);
+    } else {
+      errors.add(msg);
+    }
+  }
+
   for (final pkg in packages) {
     final pubListed = pubDevVersions[pkg.name] ?? [];
     if (pubListed.isEmpty) {
@@ -375,37 +437,71 @@ List<String> manifestDriftErrors({
     }
 
     final manifestVersion = manifestByName[pkg.name];
-    if (manifestVersion == null) {
-      continue;
+    if (manifestVersion != null) {
+      final manifestParsed = Version.parse(manifestVersion);
+      if (manifestParsed < pubLatest) {
+        addManifestIssue(
+          '${pkg.name}: manifest $manifestVersion is lower than pub.dev '
+          'latest $pubLatestStr (last-released marker behind reality)',
+        );
+      }
+      if (!pubListed.contains(manifestVersion)) {
+        addManifestIssue(
+          '${pkg.name}: manifest $manifestVersion is not on pub.dev (claimed '
+          'release never shipped)',
+        );
+      }
     }
-    final manifestParsed = Version.parse(manifestVersion);
 
-    if (manifestParsed < pubLatest) {
+    if (pubListed.contains(pkg.version) && pkg.version != pubLatestStr) {
       errors.add(
-        '${pkg.name}: release-please manifest $manifestVersion is lower than '
-        'pub.dev latest $pubLatestStr',
+        '${pkg.name}: pubspec ${pkg.version} is on pub.dev but is not the '
+        'latest ($pubLatestStr) — version reuse',
       );
     }
-    if (!pubListed.contains(manifestVersion)) {
-      errors.add(
-        '${pkg.name}: manifest $manifestVersion is not on pub.dev (claimed '
-        'release never shipped; pub.dev has: ${pubListed.join(', ')})',
-      );
+
+    if (pubspecVersion == pubLatest && !skipReuseSinceTagCheck) {
+      final changed = await gitCheck(repoRoot, pkg);
+      if (changed == true) {
+        errors.add(
+          '${pkg.name}: pubspec ${pkg.version} matches pub.dev latest but the '
+          'package changed since tag ${pkg.name}-v${pkg.version} — version reuse',
+        );
+      } else if (changed == null) {
+        warnings.add(
+          '${pkg.name}: pubspec ${pkg.version} matches pub.dev latest; no git tag '
+          '${pkg.name}-v${pkg.version} to verify unchanged (OK with warning)',
+        );
+      }
     }
-    if (pubspecVersion < manifestParsed) {
-      errors.add(
-        '${pkg.name}: pubspec ${pkg.version} is lower than manifest '
-        '$manifestVersion',
-      );
-    }
+
     if (releaseSet.contains(pkg.name) && pubListed.contains(pkg.version)) {
       errors.add(
         '${pkg.name}: pubspec ${pkg.version} is already on pub.dev but package '
-        'is in the pending release set',
+        'is pending release',
       );
     }
   }
-  return errors;
+
+  return VersionPolicyResult(errors: errors, warnings: warnings);
+}
+
+/// Back-compat wrapper (strict; no manifest-behind downgrade).
+Future<VersionPolicyResult> evaluateVersionPolicyStrict({
+  required Directory repoRoot,
+  required List<WorkspacePackage> packages,
+  required Map<String, String> manifestByName,
+  required Map<String, List<String>> pubDevVersions,
+  required Set<String> releaseSet,
+}) {
+  return evaluateVersionPolicy(
+    repoRoot: repoRoot,
+    packages: packages,
+    manifestByName: manifestByName,
+    pubDevVersions: pubDevVersions,
+    releaseSet: releaseSet,
+    warnManifestBehindPub: false,
+  );
 }
 
 Directory packageDirectory(WorkspacePackage pkg) {
@@ -635,6 +731,7 @@ Future<Map<String, List<String>>> fetchAllPubDevVersions(
 
 /// Default workspace hosted-deps + publish-order check.
 Future<int> runHostedWorkspaceCheck({
+  required Directory repoRoot,
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
   required Map<String, String> manifestByName,
@@ -642,6 +739,8 @@ Future<int> runHostedWorkspaceCheck({
   required PubDevGateway catalog,
   required bool coRelease,
   required bool checkManifestDrift,
+  bool warnManifestBehindPub = false,
+  bool githubReport = false,
 }) async {
   try {
     final graph = workspaceDependencyGraph(packages);
@@ -676,27 +775,48 @@ Future<int> runHostedWorkspaceCheck({
       );
     }
 
-    final driftErrors = checkManifestDrift
-        ? manifestDriftErrors(
-            packages: packages,
-            manifestByName: manifestByName,
-            pubDevVersions: pubVersions,
-            releaseSet: releaseSet,
-          )
-        : <String>[];
+    final runVersionPolicy = coRelease || checkManifestDrift;
+    VersionPolicyResult? policy;
+    if (runVersionPolicy) {
+      policy = await evaluateVersionPolicy(
+        repoRoot: repoRoot,
+        packages: packages,
+        manifestByName: manifestByName,
+        pubDevVersions: pubVersions,
+        releaseSet: releaseSet,
+        warnManifestBehindPub:
+            warnManifestBehindPub && !checkManifestDrift,
+        skipReuseSinceTagCheck:
+            warnManifestBehindPub && !checkManifestDrift,
+      );
+    }
 
-    final dependencyErrors = resolveErrorsAlongPublishOrder(
+    final dependencyErrors = coRelease
+        ? resolveErrorsAlongPublishOrder(
       packages: packages,
       workspaceNames: workspaceNames,
       pubDevVersions: pubVersions,
       releaseSet: releaseSet,
       publishOrder: configuredOrder,
-    );
+        )
+        : <String>[];
 
-    if (driftErrors.isNotEmpty) {
-      stderr.writeln('Manifest / pubspec drift:\n');
-      for (final e in driftErrors) {
+    if (policy != null && policy.warnings.isNotEmpty) {
+      stderr.writeln('Version policy warnings:\n');
+      for (final w in policy.warnings) {
+        stderr.writeln('  - $w');
+      }
+      if (githubReport) {
+        emitGithubCiReport(title: 'Version policy warning', errors: policy.warnings);
+      }
+    }
+    if (policy != null && policy.errors.isNotEmpty) {
+      stderr.writeln('Version policy errors:\n');
+      for (final e in policy.errors) {
         stderr.writeln('  - $e');
+      }
+      if (githubReport) {
+        emitGithubCiReport(title: 'Version policy', errors: policy.errors);
       }
     }
     if (orderErrors.isNotEmpty) {
@@ -714,7 +834,7 @@ Future<int> runHostedWorkspaceCheck({
       }
     }
 
-    if (driftErrors.isNotEmpty ||
+    if ((policy?.errors.isNotEmpty ?? false) ||
         dependencyErrors.isNotEmpty ||
         orderErrors.isNotEmpty) {
       return 1;
@@ -742,10 +862,12 @@ Future<int> runHostedWorkspaceCheck({
 
 /// Manifest / pubspec drift only (--manifest-drift-only).
 Future<int> runManifestDriftOnly({
+  required Directory repoRoot,
   required List<WorkspacePackage> packages,
   required Map<String, String> manifestByName,
   required PubDevGateway catalog,
   bool githubReport = false,
+  bool warnManifestBehindPub = false,
 }) async {
   try {
     final workspaceNames = packages.map((p) => p.name).toSet();
@@ -755,22 +877,34 @@ Future<int> runManifestDriftOnly({
       pubDevVersions: pubVersions,
       coReleaseEnabled: true,
     );
-    final errors = manifestDriftErrors(
+    final policy = await evaluateVersionPolicy(
+      repoRoot: repoRoot,
       packages: packages,
       manifestByName: manifestByName,
       pubDevVersions: pubVersions,
       releaseSet: releaseSet,
+      warnManifestBehindPub: warnManifestBehindPub,
+      skipReuseSinceTagCheck: warnManifestBehindPub,
     );
-    if (errors.isEmpty) {
-      stdout.writeln('No manifest/pubspec drift vs pub.dev latest.');
+    if (policy.warnings.isNotEmpty) {
+      stderr.writeln('Version policy warnings:\n');
+      for (final w in policy.warnings) {
+        stderr.writeln('  - $w');
+      }
+      if (githubReport) {
+        emitGithubCiReport(title: 'Version policy warning', errors: policy.warnings);
+      }
+    }
+    if (policy.errors.isEmpty) {
+      stdout.writeln('Version policy check passed (no blocking errors).');
       return 0;
     }
-    stderr.writeln('Manifest / pubspec drift vs pub.dev:\n');
-    for (final e in errors) {
+    stderr.writeln('Version policy errors:\n');
+    for (final e in policy.errors) {
       stderr.writeln('  - $e');
     }
     if (githubReport) {
-      emitGithubCiReport(title: 'Manifest drift', errors: errors);
+      emitGithubCiReport(title: 'Version policy', errors: policy.errors);
     }
     return 1;
   } on HttpException catch (e) {

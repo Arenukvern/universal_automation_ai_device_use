@@ -1,12 +1,12 @@
-// Manual pub.dev publish train: checks, then dry-run or publish per package.
+// Manual pub.dev publish train: owner runs locally (Mac) with their pub.dev login.
 //
 //   dart run tool/publish_in_order.dart
-//   dart run tool/publish_in_order.dart --publish   # owner only: real publish
+//   dart run tool/publish_in_order.dart --publish
+//   dart run tool/publish_in_order.dart --publish --yes
 //
-// Reads tool/publish_order.yaml, computes the release set (--co-release rules),
-// runs hosted-deps + drift checks, then `dart pub publish --dry-run` per
-// release-set package in order (stops at first failure). With --publish, waits
-// for each version on pub.dev before publishing dependents (fail closed).
+// Default is dry-run: prints release set, publish order, and exact commands.
+// Real publishes only with --publish plus interactive confirmation (type
+// `publish`) or --yes.
 
 import 'dart:io';
 
@@ -14,15 +14,26 @@ import 'hosted_deps_resolve_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
-  exit(await runPublishInOrder(doPublish: args.contains('--publish')));
+  final doPublish = args.contains('--publish');
+  final skipConfirm = args.contains('--yes');
+  exit(
+    await runPublishInOrder(
+      doPublish: doPublish,
+      skipConfirm: skipConfirm,
+    ),
+  );
 }
+
+typedef PublishConfirm = Future<bool> Function();
 
 /// Entry point for tests and CLI.
 Future<int> runPublishInOrder({
   required bool doPublish,
+  bool skipConfirm = false,
   PubDevGateway? catalog,
   Directory? repoRoot,
   Future<int> Function(Directory dir, List<String> publishArgs)? publishRunner,
+  PublishConfirm? confirmPublish,
 }) async {
   final root = repoRoot ?? findWorkspaceRepoRoot();
   final publishOrderPath = '${root.path}/tool/publish_order.yaml';
@@ -45,14 +56,25 @@ Future<int> runPublishInOrder({
     );
 
     stdout.writeln(releaseSetRuleText);
-    stdout.writeln('Packages selected for this publish train:');
+    stdout.writeln('\nRelease set (${releaseSet.length} packages):');
     for (final name in configuredOrder) {
       if (releaseSet.contains(name)) {
         stdout.writeln('  - $name@${byName[name]!.version}');
       }
     }
+    if (releaseSet.isEmpty) {
+      stdout.writeln('  (empty — nothing pending on pub.dev)');
+    }
 
-    final driftErrors = manifestDriftErrors(
+    stdout.writeln('\nPublish order (tool/publish_order.yaml):');
+    for (final name in configuredOrder) {
+      final inTrain = releaseSet.contains(name);
+      final mark = inTrain ? 'PUBLISH' : 'skip';
+      stdout.writeln('  - $name [$mark]');
+    }
+
+    final policy = await evaluateVersionPolicyStrict(
+      repoRoot: root,
       packages: packages,
       manifestByName: manifestByName,
       pubDevVersions: pubVersions,
@@ -66,12 +88,58 @@ Future<int> runPublishInOrder({
       publishOrder: configuredOrder,
     );
 
-    if (driftErrors.isNotEmpty || dependencyErrors.isNotEmpty) {
-      stderr.writeln('Pre-publish checks failed:\n');
-      for (final e in [...driftErrors, ...dependencyErrors]) {
+    if (policy.warnings.isNotEmpty) {
+      stderr.writeln('\nVersion policy warnings:\n');
+      for (final w in policy.warnings) {
+        stderr.writeln('  - $w');
+      }
+    }
+
+    final preflightErrors = [...policy.errors, ...dependencyErrors];
+    if (preflightErrors.isNotEmpty) {
+      stderr.writeln('\nPre-publish checks failed:\n');
+      for (final e in preflightErrors) {
         stderr.writeln('  - $e');
       }
       return 1;
+    }
+
+    final planned = <String>[];
+    for (final name in configuredOrder) {
+      if (!releaseSet.contains(name)) {
+        continue;
+      }
+      final dir = packageDirectory(byName[name]!);
+      final rel = dir.path.startsWith('${root.path}/')
+          ? dir.path.substring(root.path.length + 1)
+          : dir.path;
+      planned.add('(cd $rel && dart pub publish)');
+    }
+
+    stdout.writeln('\nPlanned commands (dry-run uses --dry-run):');
+    if (planned.isEmpty) {
+      stdout.writeln('  (none)');
+    } else {
+      for (final cmd in planned) {
+        final suffix = doPublish ? '' : ' # add --dry-run';
+        stdout.writeln('  $cmd$suffix');
+      }
+    }
+
+    if (!doPublish) {
+      stdout.writeln(
+        '\nDry-run mode. Re-run with --publish to publish (owner machine + pub.dev login).',
+      );
+    }
+
+    if (doPublish && releaseSet.isNotEmpty) {
+      final ok = skipConfirm
+          ? true
+          : await (confirmPublish ?? _interactivePublishConfirm)();
+      if (!ok) {
+        stderr.writeln('Publish cancelled.');
+        return 1;
+      }
     }
 
     Future<int> defaultPublishRunner(Directory dir, List<String> publishArgs) async {
@@ -155,4 +223,13 @@ Future<int> runPublishInOrder({
       gateway.close();
     }
   }
+}
+
+Future<bool> _interactivePublishConfirm() async {
+  stdout.writeln(
+    '\nAbout to run real `dart pub publish` for the release set. '
+    'Type publish and press Enter to continue:',
+  );
+  final line = stdin.readLineSync();
+  return line?.trim() == 'publish';
 }

@@ -197,9 +197,31 @@ void main() {
     });
   });
 
-  group('manifestDriftErrors', () {
-    test('PR #24 shape: manifest == pub.dev latest, pubspec ahead — pass', () {
-      final errors = manifestDriftErrors(
+  group('evaluateVersionPolicy', () {
+    final repoRoot = Directory.systemTemp;
+
+    Future<VersionPolicyResult> policyFor({
+      required List<WorkspacePackage> packages,
+      required Map<String, String> manifestByName,
+      required Map<String, List<String>> pubDevVersions,
+      Set<String> releaseSet = const {},
+      bool warnManifestBehindPub = false,
+      Future<bool?> Function(Directory, WorkspacePackage)? gitCheck,
+    }) {
+      return evaluateVersionPolicy(
+        repoRoot: repoRoot,
+        packages: packages,
+        manifestByName: manifestByName,
+        pubDevVersions: pubDevVersions,
+        releaseSet: releaseSet,
+        warnManifestBehindPub: warnManifestBehindPub,
+        gitChangesSinceTag:
+            gitCheck ?? (_, __) async => false,
+      );
+    }
+
+    test('PR #24 shape: manifest == pub.dev latest, pubspec ahead — pass', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_semantics',
@@ -214,42 +236,11 @@ void main() {
         },
         releaseSet: {'universal_automation_semantics'},
       );
-      expect(errors, isEmpty);
+      expect(result.errors, isEmpty);
     });
 
-    test('release path: semantics and toolkit manifest behind pub.dev latest', () {
-      final errors = manifestDriftErrors(
-        packages: [
-          WorkspacePackage(
-            name: 'universal_automation_semantics',
-            version: '0.5.0',
-            pubspecPath: 'x',
-            workspaceDeps: {},
-          ),
-          WorkspacePackage(
-            name: 'universal_automation_toolkit',
-            version: '0.4.0',
-            pubspecPath: 'x',
-            workspaceDeps: {},
-          ),
-        ],
-        manifestByName: {
-          'universal_automation_semantics': '0.3.0',
-          'universal_automation_toolkit': '0.3.0',
-        },
-        pubDevVersions: {
-          'universal_automation_semantics': ['0.3.0', '0.5.0'],
-          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
-        },
-      );
-      expect(
-        errors.where((e) => e.contains('lower than pub.dev latest')).length,
-        greaterThanOrEqualTo(2),
-      );
-    });
-
-    test('manifest lower than pub.dev latest', () {
-      final errors = manifestDriftErrors(
+    test('release path: manifest behind pub.dev latest is blocking', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_semantics',
@@ -263,11 +254,31 @@ void main() {
           'universal_automation_semantics': ['0.3.0', '0.5.0'],
         },
       );
-      expect(errors.any((e) => e.contains('manifest 0.3.0')), isTrue);
+      expect(result.errors.any((e) => e.contains('manifest 0.3.0')), isTrue);
     });
 
-    test('manifest version not on pub.dev (never shipped)', () {
-      final errors = manifestDriftErrors(
+    test('main/PR: manifest behind pub.dev latest can warn only', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_semantics',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_semantics': '0.3.0'},
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.3.0', '0.5.0'],
+        },
+        warnManifestBehindPub: true,
+      );
+      expect(result.errors, isEmpty);
+      expect(result.warnings.any((e) => e.contains('manifest 0.3.0')), isTrue);
+    });
+
+    test('manifest version not on pub.dev (never shipped)', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_interface',
@@ -281,11 +292,31 @@ void main() {
           'universal_automation_interface': ['0.3.0'],
         },
       );
-      expect(errors.any((e) => e.contains('not on pub.dev')), isTrue);
+      expect(result.errors.any((e) => e.contains('not on pub.dev')), isTrue);
     });
 
-    test('pubspec lower than manifest', () {
-      final errors = manifestDriftErrors(
+    test('main/PR warn mode: manifest not on pub.dev is warning', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_interface',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_interface': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_interface': ['0.3.0'],
+        },
+        warnManifestBehindPub: true,
+      );
+      expect(result.errors, isEmpty);
+      expect(result.warnings.any((e) => e.contains('not on pub.dev')), isTrue);
+    });
+
+    test('pubspec lower than pub.dev latest', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_toolkit',
@@ -299,11 +330,14 @@ void main() {
           'universal_automation_toolkit': ['0.3.0', '0.4.0'],
         },
       );
-      expect(errors.any((e) => e.contains('lower than manifest')), isTrue);
+      expect(
+        result.errors.any((e) => e.contains('lower than pub.dev latest')),
+        isTrue,
+      );
     });
 
-    test('pubspec on pub.dev while in release set', () {
-      final errors = manifestDriftErrors(
+    test('pubspec on pub.dev while in release set', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_toolkit',
@@ -318,11 +352,11 @@ void main() {
         },
         releaseSet: {'universal_automation_toolkit'},
       );
-      expect(errors.any((e) => e.contains('already on pub.dev')), isTrue);
+      expect(result.errors.any((e) => e.contains('already on pub.dev')), isTrue);
     });
 
-    test('allows manifest behind pubspec when manifest matches pub.dev', () {
-      final errors = manifestDriftErrors(
+    test('allows manifest behind pubspec when manifest matches pub.dev', () async {
+      final result = await policyFor(
         packages: [
           WorkspacePackage(
             name: 'universal_automation_toolkit',
@@ -337,7 +371,46 @@ void main() {
         },
         releaseSet: {'universal_automation_toolkit'},
       );
-      expect(errors, isEmpty);
+      expect(result.errors, isEmpty);
+    });
+
+    test('pubspec equals pub.dev latest with changes since tag — reuse error', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.4.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_toolkit': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+        gitCheck: (_, __) async => true,
+      );
+      expect(result.errors.any((e) => e.contains('version reuse')), isTrue);
+    });
+
+    test('pubspec equals pub.dev latest without tag — warning', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.4.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_toolkit': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+        gitCheck: (_, __) async => null,
+      );
+      expect(result.errors, isEmpty);
+      expect(result.warnings, isNotEmpty);
     });
   });
 

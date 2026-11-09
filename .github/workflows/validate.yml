@@ -32,12 +32,12 @@ jobs:
         run: dart run tool/sync_workspace_pub_constraints.dart --check
 
       - name: Releasable workspace (co-release, blocking)
-        run: dart run tool/check_hosted_deps_resolve.dart --co-release
+        run: dart run tool/check_hosted_deps_resolve.dart --co-release --warn-manifest-behind-pub
 
       - name: Report manifest drift (non-blocking)
         if: ${{ github.head_ref != 'release-please--branches--main' }}
         continue-on-error: true
-        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report
+        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report --warn-manifest-behind-pub
 
       - name: Report pub.dev audit (non-blocking)
         if: ${{ github.head_ref != 'release-please--branches--main' }}

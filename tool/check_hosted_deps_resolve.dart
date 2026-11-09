@@ -17,6 +17,7 @@ Future<void> main(List<String> args) async {
   final githubReport = args.contains('--github-report');
   final coRelease = args.contains('--co-release');
   final checkManifestDrift = args.contains('--check-manifest-drift');
+  final warnManifestBehindPub = args.contains('--warn-manifest-behind-pub');
   final manifestFlag = args.indexOf('--release-manifest');
   String? manifestPath;
   if (manifestFlag >= 0) {
@@ -57,16 +58,19 @@ Future<void> main(List<String> args) async {
     if (manifestDriftOnly) {
       exit(
         await runManifestDriftOnly(
+          repoRoot: repoRoot,
           packages: packages,
           manifestByName: releaseByName,
           catalog: catalog,
           githubReport: githubReport,
+          warnManifestBehindPub: warnManifestBehindPub,
         ),
       );
     }
 
     exit(
       await runHostedWorkspaceCheck(
+        repoRoot: repoRoot,
         packages: packages,
         workspaceNames: workspaceNames,
         manifestByName: releaseByName,
@@ -74,6 +78,8 @@ Future<void> main(List<String> args) async {
         catalog: catalog,
         coRelease: coRelease,
         checkManifestDrift: checkManifestDrift,
+        warnManifestBehindPub: warnManifestBehindPub,
+        githubReport: githubReport,
       ),
     );
   } finally {
