@@ -5,18 +5,48 @@
 //   dart run tool/check_hosted_deps_resolve.dart --co-release
 //   dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
 //   dart run tool/check_hosted_deps_resolve.dart --audit-published
+//   dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+//   dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
 
 import 'dart:io';
 
 import 'hosted_deps_resolve_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
+void printUsage() {
+  stdout.writeln('''
+Hosted dependency resolve + release-please version policy.
+
+Flags:
+  --co-release              Co-release sibling resolution along publish_order.yaml
+  --check-manifest-drift    Blocking manifest/pubspec policy (release paths)
+  --release-pr              With --check-manifest-drift: on the release-please
+                            branch, accept manifest == pubspec > pub.dev latest
+                            not yet on pub.dev as a pending release (not an error).
+                            Without this flag, manifest not on pub.dev is always
+                            "claimed release never shipped".
+  --manifest-drift-only     Version policy only (no co-release resolve)
+  --warn-manifest-behind-pub  Downgrade manifest-behind-pub.dev to warnings
+  --audit-published         Post-publish: every workspace package on pub.dev
+  --github-report           Emit workflow commands for GitHub Actions
+  --release-manifest <path> Alternate release-please manifest JSON
+  --publish-order <path>    Alternate publish_order.yaml
+  --help                    Show this text
+''');
+}
+
 Future<void> main(List<String> args) async {
+  if (args.contains('--help') || args.contains('-h')) {
+    printUsage();
+    exit(0);
+  }
+
   final auditPublished = args.contains('--audit-published');
   final manifestDriftOnly = args.contains('--manifest-drift-only');
   final githubReport = args.contains('--github-report');
   final coRelease = args.contains('--co-release');
   final checkManifestDrift = args.contains('--check-manifest-drift');
+  final releasePrMode = args.contains('--release-pr');
   final warnManifestBehindPub = args.contains('--warn-manifest-behind-pub');
   final manifestFlag = args.indexOf('--release-manifest');
   String? manifestPath;
@@ -26,6 +56,11 @@ Future<void> main(List<String> args) async {
       exit(64);
     }
     manifestPath = args[manifestFlag + 1];
+  }
+
+  if (releasePrMode && !checkManifestDrift) {
+    stderr.writeln('--release-pr requires --check-manifest-drift');
+    exit(64);
   }
 
   final publishOrderPath = _flagValue(args, '--publish-order') ??
@@ -78,6 +113,7 @@ Future<void> main(List<String> args) async {
         catalog: catalog,
         coRelease: coRelease,
         checkManifestDrift: checkManifestDrift,
+        releasePrMode: releasePrMode,
         warnManifestBehindPub: warnManifestBehindPub,
         githubReport: githubReport,
       ),
