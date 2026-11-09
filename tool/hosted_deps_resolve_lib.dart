@@ -451,6 +451,9 @@ Future<VersionPolicyResult> evaluateVersionPolicy({
   bool warnManifestBehindPub = false,
   /// Tag-reuse since release only when `--check-manifest-drift` (not on PRs).
   bool enableTagReuseCheck = false,
+  /// Release-please release branch: manifest may equal unreleased pubspec ahead
+  /// of pub.dev (`--release-pr` with `--check-manifest-drift`).
+  bool releasePrMode = false,
   GitChangesSinceReleaseTag? gitChangesSinceTag,
 }) async {
   final gitCheck = gitChangesSinceTag ?? defaultGitChangesSinceReleaseTag;
@@ -491,10 +494,15 @@ Future<VersionPolicyResult> evaluateVersionPolicy({
         );
       }
       if (!pubListed.contains(manifestVersion)) {
-        addManifestIssue(
-          '${pkg.name}: manifest $manifestVersion is not on pub.dev (claimed '
-          'release never shipped)',
-        );
+        final pendingReleasePr = releasePrMode &&
+            manifestParsed == pubspecVersion &&
+            manifestParsed > pubLatest;
+        if (!pendingReleasePr) {
+          addManifestIssue(
+            '${pkg.name}: manifest $manifestVersion is not on pub.dev (claimed '
+            'release never shipped)',
+          );
+        }
       }
     }
 
@@ -786,6 +794,7 @@ Future<int> runHostedWorkspaceCheck({
   required PubDevGateway catalog,
   required bool coRelease,
   required bool checkManifestDrift,
+  bool releasePrMode = false,
   bool warnManifestBehindPub = false,
   bool githubReport = false,
 }) async {
@@ -834,6 +843,7 @@ Future<int> runHostedWorkspaceCheck({
         warnManifestBehindPub:
             warnManifestBehindPub && !checkManifestDrift,
         enableTagReuseCheck: checkManifestDrift,
+        releasePrMode: releasePrMode,
       );
     }
 

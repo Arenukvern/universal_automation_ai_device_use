@@ -24,9 +24,18 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 
 ### Version policy (CI + publish train)
 
-- **Manifest** (release-please) = last released version; may trail pubspec while a release PR is open.
-- **Blocking everywhere** except on **`main` and ordinary PRs** until companion PR **#24** lands: manifest markers that trail pub.dev (`manifest < pub.dev latest`, or manifest version never shipped) are **warnings** on the blocking `--co-release --warn-manifest-behind-pub` step (not errors). **Release paths** (`--co-release --check-manifest-drift`, release-please sync, publish workflows) keep those **blocking**. **Git-tag reuse** runs only on those release paths, and only for packages in the **release set** (not on ordinary PR validate).
+- **Manifest** (release-please) = last released version on `main`; on an open **release-please PR** the manifest is bumped to the **next** version together with pubspec (not yet on pub.dev).
+- **Blocking everywhere** except on **`main` and ordinary PRs** until companion PR **#24** lands: manifest markers that trail pub.dev (`manifest < pub.dev latest`, or manifest version never shipped) are **warnings** on the blocking `--co-release --warn-manifest-behind-pub` step (not errors). **Release paths** keep manifest-behind blocking; see the table below for manifest-not-on-pub.dev. **Git-tag reuse** runs only on `--check-manifest-drift` paths, and only for packages in the **release set** (not on ordinary PR validate).
 - Pubspec < pub.dev latest → error (backward). Pubspec equals pub.dev latest → OK only if unchanged since git tag `<package>-v<version>` (else version reuse error; no tag → OK with warning). Pubspec on pub.dev but not latest → reuse error. Pending packages (ahead of pub.dev, not published) satisfy sibling constraints via co-release in `publish_order.yaml` order.
+
+| Context | Command | Manifest not on pub.dev |
+| --- | --- | --- |
+| `main` / ordinary PR validate | `--co-release --warn-manifest-behind-pub` | Warning (if manifest trails policy) |
+| Publish / tag workflows | `--co-release --check-manifest-drift` | Error: claimed release never shipped |
+| **Release-please PR** sync job | `--co-release --check-manifest-drift --release-pr` | OK when manifest == pubspec **>** pub.dev latest (pending release); otherwise error |
+| Post-publish | `--audit-published` | N/A (all workspace versions must exist on pub.dev) |
+
+`--release-pr` is only valid with `--check-manifest-drift`. Pre-publish `--audit-published` runs from `publish_in_order.dart` and `post_publish_audit.yml`, not from the release-please constraint sync job.
 
 `universal_tooling_runtime` additionally has [`.github/workflows/publish_tooling_runtime.yml`](.github/workflows/publish_tooling_runtime.yml) (tag dispatch). All other family packages are manual via `publish_in_order.dart`.
 
@@ -37,6 +46,6 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 
 ## Release-please
 
-Merge release-please PRs only when **release-path** CI passes: co-release resolve, strict version policy (manifest drift blocking), and pub.dev audit on the release branch.
+Merge release-please PRs only when **release-path** CI passes: co-release resolve and release-PR version policy (`--check-manifest-drift --release-pr`) on the release branch.
 
 See also [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) (publish order) and [PR #23](https://github.com/Arenukvern/universal_automation_ai_device_use/pull/23) (guards).

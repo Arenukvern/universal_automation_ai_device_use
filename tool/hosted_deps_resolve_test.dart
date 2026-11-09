@@ -206,6 +206,7 @@ void main() {
       required Map<String, List<String>> pubDevVersions,
       Set<String> releaseSet = const {},
       bool warnManifestBehindPub = false,
+      bool releasePrMode = false,
       Future<bool?> Function(Directory, WorkspacePackage)? gitCheck,
     }) {
       return evaluateVersionPolicy(
@@ -215,6 +216,7 @@ void main() {
         pubDevVersions: pubDevVersions,
         releaseSet: releaseSet,
         warnManifestBehindPub: warnManifestBehindPub,
+        releasePrMode: releasePrMode,
         gitChangesSinceTag:
             gitCheck ?? (_, __) async => false,
       );
@@ -277,7 +279,67 @@ void main() {
       expect(result.warnings.any((e) => e.contains('manifest 0.3.0')), isTrue);
     });
 
-    test('manifest version not on pub.dev (never shipped)', () async {
+    test('release-PR mode: manifest == pubspec > pub latest, not on pub', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_semantics',
+            version: '0.6.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_semantics': '0.6.0'},
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.4.0', '0.5.0'],
+        },
+        releaseSet: {'universal_automation_semantics'},
+        releasePrMode: true,
+      );
+      expect(result.errors, isEmpty);
+    });
+
+    test('release-PR mode: manifest != pubspec is error', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_toolkit': '0.6.0'},
+        pubDevVersions: {
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+        releaseSet: {'universal_automation_toolkit'},
+        releasePrMode: true,
+      );
+      expect(result.errors.any((e) => e.contains('not on pub.dev')), isTrue);
+    });
+
+    test('release-PR mode: manifest <= pub latest but not on pub is error', () async {
+      final result = await policyFor(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_interface',
+            version: '0.4.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_interface': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_interface': ['0.3.0', '0.5.0'],
+        },
+        releaseSet: {'universal_automation_interface'},
+        releasePrMode: true,
+      );
+      expect(result.errors.any((e) => e.contains('not on pub.dev')), isTrue);
+    });
+
+    test('strict mode: manifest not on pub.dev (never shipped)', () async {
       final result = await policyFor(
         packages: [
           WorkspacePackage(
