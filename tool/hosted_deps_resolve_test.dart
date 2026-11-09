@@ -170,7 +170,26 @@ void main() {
   });
 
   group('manifestDriftErrors', () {
-    test('reports manifest lower than pub.dev latest', () {
+    test('PR #24 shape: manifest == pub.dev latest, pubspec ahead — pass', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_semantics',
+            version: '0.6.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_semantics': '0.5.0'},
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.4.0', '0.5.0'],
+        },
+        releaseSet: {'universal_automation_semantics'},
+      );
+      expect(errors, isEmpty);
+    });
+
+    test('manifest lower than pub.dev latest', () {
       final errors = manifestDriftErrors(
         packages: [
           WorkspacePackage(
@@ -179,6 +198,54 @@ void main() {
             pubspecPath: 'x',
             workspaceDeps: {},
           ),
+        ],
+        manifestByName: {'universal_automation_semantics': '0.3.0'},
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.3.0', '0.5.0'],
+        },
+      );
+      expect(errors.any((e) => e.contains('manifest 0.3.0')), isTrue);
+    });
+
+    test('manifest version not on pub.dev (never shipped)', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_interface',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_interface': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_interface': ['0.3.0'],
+        },
+      );
+      expect(errors.any((e) => e.contains('not on pub.dev')), isTrue);
+    });
+
+    test('pubspec lower than manifest', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.3.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_toolkit': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+      );
+      expect(errors.any((e) => e.contains('lower than manifest')), isTrue);
+    });
+
+    test('pubspec on pub.dev while in release set', () {
+      final errors = manifestDriftErrors(
+        packages: [
           WorkspacePackage(
             name: 'universal_automation_toolkit',
             version: '0.4.0',
@@ -186,18 +253,32 @@ void main() {
             workspaceDeps: {},
           ),
         ],
-        manifestByName: {
-          'universal_automation_semantics': '0.3.0',
-          'universal_automation_toolkit': '0.3.0',
-        },
+        manifestByName: {'universal_automation_toolkit': '0.4.0'},
         pubDevVersions: {
-          'universal_automation_semantics': ['0.5.0'],
           'universal_automation_toolkit': ['0.4.0'],
         },
+        releaseSet: {'universal_automation_toolkit'},
       );
-      expect(errors.length, greaterThanOrEqualTo(2));
-      expect(errors.join('\n'), contains('semantics'));
-      expect(errors.join('\n'), contains('toolkit'));
+      expect(errors.any((e) => e.contains('already on pub.dev')), isTrue);
+    });
+
+    test('allows manifest behind pubspec when manifest matches pub.dev', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_toolkit': '0.4.0'},
+        pubDevVersions: {
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+        releaseSet: {'universal_automation_toolkit'},
+      );
+      expect(errors, isEmpty);
     });
   });
 

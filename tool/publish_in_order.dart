@@ -56,6 +56,7 @@ Future<int> runPublishInOrder({
       packages: packages,
       manifestByName: manifestByName,
       pubDevVersions: pubVersions,
+      releaseSet: releaseSet,
     );
     final dependencyErrors = resolveErrorsAlongPublishOrder(
       packages: packages,

@@ -306,11 +306,15 @@ Set<String> computeReleaseSet({
   return releaseSet;
 }
 
-/// Manifest / pubspec drift against pub.dev.
+/// Manifest / pubspec drift against pub.dev (release-please aware).
+///
+/// Manifest records **last released**; pubspec may be ahead — manifest != pubspec
+/// is allowed. Fails when manifest or pubspec disagree with shipped reality.
 List<String> manifestDriftErrors({
   required List<WorkspacePackage> packages,
   required Map<String, String> manifestByName,
   required Map<String, List<String>> pubDevVersions,
+  Set<String> releaseSet = const {},
 }) {
   final errors = <String>[];
   for (final pkg in packages) {
@@ -318,28 +322,46 @@ List<String> manifestDriftErrors({
     if (pubListed.isEmpty) {
       continue;
     }
-    final pubLatest = Version.parse(_maxVersion(pubListed));
+    final pubLatestStr = _maxVersion(pubListed);
+    final pubLatest = Version.parse(pubLatestStr);
     final pubspecVersion = Version.parse(pkg.version);
+
     if (pubspecVersion < pubLatest) {
       errors.add(
         '${pkg.name}: pubspec ${pkg.version} is lower than pub.dev latest '
-        '${_maxVersion(pubListed)}',
+        '$pubLatestStr',
       );
     }
+
     final manifestVersion = manifestByName[pkg.name];
-    if (manifestVersion != null) {
-      final manifestParsed = Version.parse(manifestVersion);
-      if (manifestParsed < pubLatest) {
-        errors.add(
-          '${pkg.name}: release-please manifest $manifestVersion is lower than '
-          'pub.dev latest ${_maxVersion(pubListed)}',
-        );
-      }
-      if (manifestVersion != pkg.version) {
-        errors.add(
-          '${pkg.name}: manifest $manifestVersion != pubspec ${pkg.version}',
-        );
-      }
+    if (manifestVersion == null) {
+      continue;
+    }
+    final manifestParsed = Version.parse(manifestVersion);
+
+    if (manifestParsed < pubLatest) {
+      errors.add(
+        '${pkg.name}: release-please manifest $manifestVersion is lower than '
+        'pub.dev latest $pubLatestStr',
+      );
+    }
+    if (!pubListed.contains(manifestVersion)) {
+      errors.add(
+        '${pkg.name}: manifest $manifestVersion is not on pub.dev (claimed '
+        'release never shipped; pub.dev has: ${pubListed.join(', ')})',
+      );
+    }
+    if (pubspecVersion < manifestParsed) {
+      errors.add(
+        '${pkg.name}: pubspec ${pkg.version} is lower than manifest '
+        '$manifestVersion',
+      );
+    }
+    if (releaseSet.contains(pkg.name) && pubListed.contains(pkg.version)) {
+      errors.add(
+        '${pkg.name}: pubspec ${pkg.version} is already on pub.dev but package '
+        'is in the pending release set',
+      );
     }
   }
   return errors;
@@ -618,6 +640,7 @@ Future<int> runHostedWorkspaceCheck({
             packages: packages,
             manifestByName: manifestByName,
             pubDevVersions: pubVersions,
+            releaseSet: releaseSet,
           )
         : <String>[];
 
@@ -685,10 +708,16 @@ Future<int> runManifestDriftOnly({
   try {
     final workspaceNames = packages.map((p) => p.name).toSet();
     final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    final releaseSet = computeReleaseSet(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      coReleaseEnabled: true,
+    );
     final errors = manifestDriftErrors(
       packages: packages,
       manifestByName: manifestByName,
       pubDevVersions: pubVersions,
+      releaseSet: releaseSet,
     );
     if (errors.isEmpty) {
       stdout.writeln('No manifest/pubspec drift vs pub.dev latest.');
