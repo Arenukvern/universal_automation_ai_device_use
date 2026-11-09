@@ -46,8 +46,10 @@ jobs:
       - name: Resolve workspace
         run: dart pub get
 
-      - name: Check hosted sibling deps and publish order
-        run: dart run tool/check_hosted_deps_resolve.dart
+      - name: Release batch — hosted deps, drift, pub.dev audit (blocking)
+        run: |
+          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+          dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Analyze
         run: dart analyze

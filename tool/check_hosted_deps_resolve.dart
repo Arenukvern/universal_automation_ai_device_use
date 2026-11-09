@@ -3,8 +3,8 @@
 //
 // Usage:
 //   dart run tool/check_hosted_deps_resolve.dart
+//   dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
 //   dart run tool/check_hosted_deps_resolve.dart --audit-published
-//   dart run tool/check_hosted_deps_resolve.dart --release-manifest .release-please-manifest.json
 
 import 'dart:io';
 
@@ -13,6 +13,8 @@ import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
   final auditPublished = args.contains('--audit-published');
+  final coRelease = args.contains('--co-release');
+  final checkManifestDrift = args.contains('--check-manifest-drift');
   final manifestFlag = args.indexOf('--release-manifest');
   String? manifestPath;
   if (manifestFlag >= 0) {
@@ -49,69 +51,17 @@ Future<void> main(List<String> args) async {
       );
     }
 
-    final graph = workspaceDependencyGraph(packages);
-    final computedOrder = topologicalPublishOrder(graph);
-    stdout.writeln('Computed topological publish order:');
-    for (final name in computedOrder) {
-      stdout.writeln('  - $name');
-    }
-
-    List<String> configuredOrder;
-    try {
-      configuredOrder = loadPublishOrderYaml(publishOrderPath);
-    } on StateError catch (e) {
-      stderr.writeln('Publish order check failed: ${e.message}');
-      exit(1);
-    }
-
-    final orderErrors = validatePublishOrderList(configuredOrder, graph);
-
-    Map<String, List<String>> pubVersions;
-    try {
-      pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
-    } on HttpException catch (e) {
-      stderr.writeln('Hosted dependency check failed: HTTP error from pub.dev: $e');
-      exit(1);
-    } on SocketException catch (e) {
-      stderr.writeln('Hosted dependency check failed: could not reach pub.dev: $e');
-      exit(1);
-    } on IOException catch (e) {
-      stderr.writeln('Hosted dependency check failed: I/O error talking to pub.dev: $e');
-      exit(1);
-    }
-
-    final dependencyErrors = resolveErrorsAlongPublishOrder(
-      packages: packages,
-      workspaceNames: workspaceNames,
-      pubDevVersions: pubVersions,
-      releaseManifestByName: releaseByName,
-      publishOrder: configuredOrder,
+    exit(
+      await runHostedWorkspaceCheck(
+        packages: packages,
+        workspaceNames: workspaceNames,
+        manifestByName: releaseByName,
+        publishOrderPath: publishOrderPath,
+        catalog: catalog,
+        coRelease: coRelease,
+        checkManifestDrift: checkManifestDrift,
+      ),
     );
-
-    if (orderErrors.isNotEmpty) {
-      stderr.writeln('Publish order check failed:\n');
-      for (final e in orderErrors) {
-        stderr.writeln('  - $e');
-      }
-    }
-    if (dependencyErrors.isNotEmpty) {
-      stderr.writeln(
-        'Hosted sibling dependency check failed (publish-order batch):\n',
-      );
-      for (final e in dependencyErrors) {
-        stderr.writeln('  - $e');
-      }
-    }
-
-    if (dependencyErrors.isNotEmpty || orderErrors.isNotEmpty) {
-      exit(1);
-    }
-
-    stdout.writeln(
-      'Workspace sibling dependencies resolve along publish_order.yaml '
-      '(pub.dev ∪ earlier co-release manifest versions).',
-    );
-    stdout.writeln('Publish order file is a valid topological order.');
   } finally {
     catalog.close();
   }

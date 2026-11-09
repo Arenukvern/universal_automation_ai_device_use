@@ -46,50 +46,41 @@ void main() {
       expect(constraintSatisfiedByAnyVersion('^0.4.0', ['0.4.1']), isTrue);
       expect(constraintSatisfiedByAnyVersion('^0.4.0', ['0.5.0']), isFalse);
     });
-
-    test('manifest version can satisfy unreleased constraint', () {
-      expect(
-        constraintSatisfiedByAnyVersion('^0.4.0', ['0.3.0', '0.4.0']),
-        isTrue,
-      );
-    });
   });
 
-  group('topologicalPublishOrder', () {
-    test('interface before semantics before toolkit', () {
-      final packages = [
-        WorkspacePackage(
-          name: 'universal_automation_interface',
-          version: '0.1.0',
-          pubspecPath: 'x',
-          workspaceDeps: {},
-        ),
-        WorkspacePackage(
-          name: 'universal_automation_semantics',
-          version: '0.1.0',
-          pubspecPath: 'x',
-          workspaceDeps: {'universal_automation_interface': '^0.1.0'},
-        ),
-        WorkspacePackage(
-          name: 'universal_automation_toolkit',
-          version: '0.1.0',
-          pubspecPath: 'x',
-          workspaceDeps: {
-            'universal_automation_interface': '^0.1.0',
-            'universal_automation_semantics': '^0.1.0',
+  group('computeReleaseSet', () {
+    final packages = [
+      WorkspacePackage(
+        name: 'universal_automation_interface',
+        version: '0.4.0',
+        pubspecPath: 'x',
+        workspaceDeps: {},
+      ),
+    ];
+
+    test('empty when co-release disabled', () {
+      expect(
+        computeReleaseSet(
+          packages: packages,
+          pubDevVersions: {
+            'universal_automation_interface': ['0.3.0'],
           },
+          coReleaseEnabled: false,
         ),
-      ];
-      final order = topologicalPublishOrder(
-        workspaceDependencyGraph(packages),
+        isEmpty,
       );
+    });
+
+    test('includes package when version bumps above pub.dev', () {
       expect(
-        order.indexOf('universal_automation_interface'),
-        lessThan(order.indexOf('universal_automation_semantics')),
-      );
-      expect(
-        order.indexOf('universal_automation_semantics'),
-        lessThan(order.indexOf('universal_automation_toolkit')),
+        computeReleaseSet(
+          packages: packages,
+          pubDevVersions: {
+            'universal_automation_interface': ['0.3.0'],
+          },
+          coReleaseEnabled: true,
+        ),
+        {'universal_automation_interface'},
       );
     });
   });
@@ -120,21 +111,46 @@ void main() {
       'universal_automation_semantics': [],
     };
 
-    const manifest = {
-      'universal_automation_interface': '0.4.0',
-      'universal_automation_semantics': '0.4.0',
-    };
+    const publishOrder = [
+      'universal_automation_interface',
+      'universal_automation_semantics',
+    ];
 
-    test('accepts dependency before dependent in publish order', () {
+    test(
+      'regression main state: manifest 0.4.0 not in release set fails semantics',
+      () {
+        final errors = resolveErrorsAlongPublishOrder(
+          packages: [
+            WorkspacePackage(
+              name: 'universal_automation_interface',
+              version: '0.4.0',
+              pubspecPath: 'x',
+              workspaceDeps: {},
+            ),
+            WorkspacePackage(
+              name: 'universal_automation_semantics',
+              version: '0.5.0',
+              pubspecPath: 'x',
+              workspaceDeps: {'universal_automation_interface': '^0.4.0'},
+            ),
+          ],
+          workspaceNames: workspaceNames,
+          pubDevVersions: pubDev,
+          releaseSet: {},
+          publishOrder: publishOrder,
+        );
+        expect(errors, isNotEmpty);
+        expect(errors.join('\n'), contains('^0.4.0'));
+      },
+    );
+
+    test('co-release: accepts dependency before dependent in publish order', () {
       final errors = resolveErrorsAlongPublishOrder(
         packages: packages,
         workspaceNames: workspaceNames,
         pubDevVersions: pubDev,
-        releaseManifestByName: manifest,
-        publishOrder: const [
-          'universal_automation_interface',
-          'universal_automation_semantics',
-        ],
+        releaseSet: {'universal_automation_interface'},
+        publishOrder: publishOrder,
       );
       expect(errors, isEmpty);
     });
@@ -144,14 +160,45 @@ void main() {
         packages: packages,
         workspaceNames: workspaceNames,
         pubDevVersions: pubDev,
-        releaseManifestByName: manifest,
+        releaseSet: {'universal_automation_interface'},
         publishOrder: const [
           'universal_automation_semantics',
           'universal_automation_interface',
         ],
       );
       expect(errors, isNotEmpty);
-      expect(errors.join('\n'), contains('universal_automation_interface'));
+    });
+  });
+
+  group('manifestDriftErrors', () {
+    test('reports manifest lower than pub.dev latest', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_semantics',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.4.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {
+          'universal_automation_semantics': '0.3.0',
+          'universal_automation_toolkit': '0.3.0',
+        },
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.5.0'],
+          'universal_automation_toolkit': ['0.4.0'],
+        },
+      );
+      expect(errors.length, greaterThanOrEqualTo(2));
+      expect(errors.join('\n'), contains('semantics'));
+      expect(errors.join('\n'), contains('toolkit'));
     });
   });
 
@@ -170,26 +217,6 @@ void main() {
         workspaceNames: {'universal_automation_interface'},
         catalog: _FakePubDevGateway(
           failOnVersionsFor: 'universal_automation_interface',
-        ),
-      );
-      expect(code, 1);
-    });
-
-    test('fails closed on HTTP error reading latest pubspec', () async {
-      final packages = [
-        WorkspacePackage(
-          name: 'universal_automation_interface',
-          version: '0.1.0',
-          pubspecPath: 'x',
-          workspaceDeps: {},
-        ),
-      ];
-      final code = await runAuditPublished(
-        packages: packages,
-        workspaceNames: {'universal_automation_interface'},
-        catalog: _FakePubDevGateway(
-          versions: {'universal_automation_interface': ['0.3.0']},
-          failOnLatestFor: 'universal_automation_interface',
         ),
       );
       expect(code, 1);

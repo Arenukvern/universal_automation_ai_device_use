@@ -203,31 +203,79 @@ bool constraintSatisfiedByAnyVersion(
   return false;
 }
 
-List<String> resolveErrors({
+/// Human-readable rule printed when co-release checking is enabled.
+const releaseSetRuleText = '''
+Release set rule (co-release mode only):
+  A workspace package version may satisfy a sibling constraint (in addition to
+  pub.dev) only when ALL are true:
+    1. The package is in the computed release set for this run.
+    2. Its pubspec version is strictly greater than pub.dev latest.
+    3. Its pubspec version is not already on pub.dev.
+    4. It appears earlier than the dependent in tool/publish_order.yaml.
+  Without --co-release, the release set is empty: only pub.dev versions count
+  (manifest entries are never treated as published).
+''';
+
+/// Packages scheduled to publish in this run (--co-release only).
+Set<String> computeReleaseSet({
   required List<WorkspacePackage> packages,
-  required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
-  required Map<String, String> releaseManifestByName,
+  required bool coReleaseEnabled,
+}) {
+  if (!coReleaseEnabled) {
+    return {};
+  }
+  final releaseSet = <String>{};
+  for (final pkg in packages) {
+    final pubListed = pubDevVersions[pkg.name] ?? [];
+    final workspaceVersion = Version.parse(pkg.version);
+    if (pubListed.contains(pkg.version)) {
+      continue;
+    }
+    if (pubListed.isEmpty) {
+      releaseSet.add(pkg.name);
+      continue;
+    }
+    final pubLatest = Version.parse(_maxVersion(pubListed));
+    if (workspaceVersion > pubLatest) {
+      releaseSet.add(pkg.name);
+    }
+  }
+  return releaseSet;
+}
+
+/// Manifest / pubspec drift against pub.dev.
+List<String> manifestDriftErrors({
+  required List<WorkspacePackage> packages,
+  required Map<String, String> manifestByName,
+  required Map<String, List<String>> pubDevVersions,
 }) {
   final errors = <String>[];
-
   for (final pkg in packages) {
-    for (final entry in pkg.workspaceDeps.entries) {
-      final depName = entry.key;
-      if (!workspaceNames.contains(depName)) {
-        continue;
-      }
-      final constraint = entry.value;
-      final available = <String>{...?pubDevVersions[depName]};
-      final manifestVersion = releaseManifestByName[depName];
-      if (manifestVersion != null) {
-        available.add(manifestVersion);
-      }
-      if (!constraintSatisfiedByAnyVersion(constraint, available)) {
+    final pubListed = pubDevVersions[pkg.name] ?? [];
+    if (pubListed.isEmpty) {
+      continue;
+    }
+    final pubLatest = Version.parse(_maxVersion(pubListed));
+    final pubspecVersion = Version.parse(pkg.version);
+    if (pubspecVersion < pubLatest) {
+      errors.add(
+        '${pkg.name}: pubspec ${pkg.version} is lower than pub.dev latest '
+        '${_maxVersion(pubListed)}',
+      );
+    }
+    final manifestVersion = manifestByName[pkg.name];
+    if (manifestVersion != null) {
+      final manifestParsed = Version.parse(manifestVersion);
+      if (manifestParsed < pubLatest) {
         errors.add(
-          '${pkg.name}@${pkg.version} requires $depName $constraint '
-          '(pub.dev: ${pubDevVersions[depName]?.join(', ') ?? 'none'}'
-          '${manifestVersion != null ? '; manifest: $manifestVersion' : ''})',
+          '${pkg.name}: release-please manifest $manifestVersion is lower than '
+          'pub.dev latest ${_maxVersion(pubListed)}',
+        );
+      }
+      if (manifestVersion != pkg.version) {
+        errors.add(
+          '${pkg.name}: manifest $manifestVersion != pubspec ${pkg.version}',
         );
       }
     }
@@ -235,14 +283,18 @@ List<String> resolveErrors({
   return errors;
 }
 
+Directory packageDirectory(WorkspacePackage pkg) {
+  return File(pkg.pubspecPath).parent;
+}
+
 /// Resolves sibling deps as if packages publish in [publishOrder] sequence.
-/// A manifest version counts only for dependencies listed **before** the
-/// dependent in [publishOrder] (same-release train, topological apply).
+/// Co-release versions count only for dependencies in [releaseSet] listed
+/// **before** the dependent in [publishOrder].
 List<String> resolveErrorsAlongPublishOrder({
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
-  required Map<String, String> releaseManifestByName,
+  required Set<String> releaseSet,
   required List<String> publishOrder,
 }) {
   final errors = <String>[];
@@ -273,18 +325,18 @@ List<String> resolveErrorsAlongPublishOrder({
       }
       final constraint = entry.value;
       final available = <String>{...?pubDevVersions[depName]};
-      if (depIdx < pkgIdx) {
-        final manifestVersion = releaseManifestByName[depName];
-        if (manifestVersion != null) {
-          available.add(manifestVersion);
-        }
+      final depPkg = byName[depName];
+      if (depIdx < pkgIdx &&
+          releaseSet.contains(depName) &&
+          depPkg != null) {
+        available.add(depPkg.version);
       }
       if (!constraintSatisfiedByAnyVersion(constraint, available)) {
         errors.add(
           '${pkg.name}@${pkg.version} requires $depName $constraint when '
           'published at publish-order index $pkgIdx '
           '(pub.dev: ${pubDevVersions[depName]?.join(', ') ?? 'none'}'
-          '${depIdx < pkgIdx && releaseManifestByName[depName] != null ? '; co-release from index $depIdx: ${releaseManifestByName[depName]}' : ''})',
+          '${releaseSet.contains(depName) && depIdx < pkgIdx ? '; co-release: ${depPkg?.version}' : ''})',
         );
       }
     }
@@ -454,6 +506,112 @@ Future<Map<String, List<String>>> fetchAllPubDevVersions(
     out[name] = await catalog.versionsOnPubDev(name);
   }
   return out;
+}
+
+/// Default workspace hosted-deps + publish-order check.
+Future<int> runHostedWorkspaceCheck({
+  required List<WorkspacePackage> packages,
+  required Set<String> workspaceNames,
+  required Map<String, String> manifestByName,
+  required String publishOrderPath,
+  required PubDevGateway catalog,
+  required bool coRelease,
+  required bool checkManifestDrift,
+}) async {
+  try {
+    final graph = workspaceDependencyGraph(packages);
+    final computedOrder = topologicalPublishOrder(graph);
+    stdout.writeln('Computed topological publish order:');
+    for (final name in computedOrder) {
+      stdout.writeln('  - $name');
+    }
+
+    final configuredOrder = loadPublishOrderYaml(publishOrderPath);
+    final orderErrors = validatePublishOrderList(configuredOrder, graph);
+
+    final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    final releaseSet = computeReleaseSet(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      coReleaseEnabled: coRelease,
+    );
+
+    if (coRelease) {
+      stdout.writeln(releaseSetRuleText);
+      stdout.writeln('Release set (${releaseSet.length} packages):');
+      for (final name in configuredOrder) {
+        if (releaseSet.contains(name)) {
+          final pkg = packages.firstWhere((p) => p.name == name);
+          stdout.writeln('  - $name@${pkg.version}');
+        }
+      }
+    } else {
+      stdout.writeln(
+        'Co-release disabled: release set is empty (pub.dev only).',
+      );
+    }
+
+    final driftErrors = checkManifestDrift
+        ? manifestDriftErrors(
+            packages: packages,
+            manifestByName: manifestByName,
+            pubDevVersions: pubVersions,
+          )
+        : <String>[];
+
+    final dependencyErrors = resolveErrorsAlongPublishOrder(
+      packages: packages,
+      workspaceNames: workspaceNames,
+      pubDevVersions: pubVersions,
+      releaseSet: releaseSet,
+      publishOrder: configuredOrder,
+    );
+
+    if (driftErrors.isNotEmpty) {
+      stderr.writeln('Manifest / pubspec drift:\n');
+      for (final e in driftErrors) {
+        stderr.writeln('  - $e');
+      }
+    }
+    if (orderErrors.isNotEmpty) {
+      stderr.writeln('Publish order check failed:\n');
+      for (final e in orderErrors) {
+        stderr.writeln('  - $e');
+      }
+    }
+    if (dependencyErrors.isNotEmpty) {
+      stderr.writeln(
+        'Hosted sibling dependency check failed (publish-order batch):\n',
+      );
+      for (final e in dependencyErrors) {
+        stderr.writeln('  - $e');
+      }
+    }
+
+    if (driftErrors.isNotEmpty ||
+        dependencyErrors.isNotEmpty ||
+        orderErrors.isNotEmpty) {
+      return 1;
+    }
+
+    stdout.writeln(
+      'Workspace sibling dependencies resolve along publish_order.yaml.',
+    );
+    stdout.writeln('Publish order file is a valid topological order.');
+    return 0;
+  } on HttpException catch (e) {
+    stderr.writeln('Hosted dependency check failed: HTTP error from pub.dev: $e');
+    return 1;
+  } on SocketException catch (e) {
+    stderr.writeln('Hosted dependency check failed: could not reach pub.dev: $e');
+    return 1;
+  } on IOException catch (e) {
+    stderr.writeln('Hosted dependency check failed: I/O error talking to pub.dev: $e');
+    return 1;
+  } on StateError catch (e) {
+    stderr.writeln('Publish order check failed: ${e.message}');
+    return 1;
+  }
 }
 
 /// Runs [--audit-published]: exits the process on fetch/parse failures (fail closed).

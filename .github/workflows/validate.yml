@@ -25,11 +25,21 @@ jobs:
         with:
           sdk: stable
 
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
       - name: Check intra-workspace pub constraints
         run: dart run tool/sync_workspace_pub_constraints.dart --check
 
-      - name: Check hosted sibling deps and publish order
+      - name: Check hosted sibling deps and publish order (default / pub.dev only)
+        if: ${{ github.head_ref != 'release-please--branches--main' }}
         run: dart run tool/check_hosted_deps_resolve.dart
+
+      - name: Release batch — hosted deps, drift, pub.dev audit (blocking)
+        if: ${{ github.head_ref == 'release-please--branches--main' }}
+        run: |
+          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+          dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Check reusable workflow inputs
         env:

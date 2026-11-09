@@ -64,7 +64,8 @@ jobs:
           git fetch origin release-please--branches--main
           git checkout -B release-please--branches--main origin/release-please--branches--main
           dart run tool/sync_workspace_pub_constraints.dart --write
-          dart run tool/check_hosted_deps_resolve.dart
+          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+          dart run tool/check_hosted_deps_resolve.dart --audit-published
           if git diff --quiet -- pkgs; then
             echo "Workspace pub constraints already in sync"
             echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
