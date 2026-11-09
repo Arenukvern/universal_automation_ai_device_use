@@ -31,14 +31,35 @@ jobs:
       - name: Check intra-workspace pub constraints
         run: dart run tool/sync_workspace_pub_constraints.dart --check
 
-      - name: Check hosted sibling deps and publish order (default / pub.dev only)
-        if: ${{ github.head_ref != 'release-please--branches--main' }}
-        run: dart run tool/check_hosted_deps_resolve.dart
+      - name: Releasable workspace (co-release, blocking)
+        run: dart run tool/check_hosted_deps_resolve.dart --co-release
 
-      - name: Release batch — hosted deps, drift, pub.dev audit (blocking)
+      - name: Report manifest drift (non-blocking)
+        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        continue-on-error: true
+        id: drift_report
+        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
+
+      - name: Annotate manifest drift
+        if: ${{ steps.drift_report.outcome == 'failure' }}
+        run: |
+          echo "::warning::Manifest/pubspec drift vs pub.dev (report only). See 'Report manifest drift' step."
+
+      - name: Report pub.dev audit (non-blocking)
+        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        continue-on-error: true
+        id: audit_report
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published
+
+      - name: Annotate pub.dev audit
+        if: ${{ steps.audit_report.outcome == 'failure' }}
+        run: |
+          echo "::warning::pub.dev latest packages have unresolved sibling deps (report only). See 'Report pub.dev audit' step."
+
+      - name: Release-please PR — drift + audit (blocking)
         if: ${{ github.head_ref == 'release-please--branches--main' }}
         run: |
-          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+          dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
           dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Check reusable workflow inputs

@@ -117,7 +117,7 @@ void main() {
     ];
 
     test(
-      'regression main state: manifest 0.4.0 not in release set fails semantics',
+      'co-release plans interface 0.4.0 before semantics (releasable monorepo)',
       () {
         final errors = resolveErrorsAlongPublishOrder(
           packages: [
@@ -136,11 +136,10 @@ void main() {
           ],
           workspaceNames: workspaceNames,
           pubDevVersions: pubDev,
-          releaseSet: {},
+          releaseSet: {'universal_automation_interface'},
           publishOrder: publishOrder,
         );
-        expect(errors, isNotEmpty);
-        expect(errors.join('\n'), contains('^0.4.0'));
+        expect(errors, isEmpty);
       },
     );
 

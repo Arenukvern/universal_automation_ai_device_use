@@ -5,7 +5,8 @@
 //
 // Reads tool/publish_order.yaml, computes the release set (--co-release rules),
 // runs hosted-deps + drift checks, then `dart pub publish --dry-run` per
-// release-set package in order (stops at first failure).
+// release-set package in order (stops at first failure). With --publish, waits
+// for each version on pub.dev before publishing dependents (fail closed).
 
 import 'dart:io';
 
@@ -13,21 +14,30 @@ import 'hosted_deps_resolve_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
-  final doPublish = args.contains('--publish');
+  exit(await runPublishInOrder(doPublish: args.contains('--publish')));
+}
 
-  final repoRoot = findWorkspaceRepoRoot();
-  final publishOrderPath = '${repoRoot.path}/tool/publish_order.yaml';
-  final manifestPath = '${repoRoot.path}/.release-please-manifest.json';
+/// Entry point for tests and CLI.
+Future<int> runPublishInOrder({
+  required bool doPublish,
+  PubDevGateway? catalog,
+  Directory? repoRoot,
+  Future<int> Function(Directory dir, List<String> publishArgs)? publishRunner,
+}) async {
+  final root = repoRoot ?? findWorkspaceRepoRoot();
+  final publishOrderPath = '${root.path}/tool/publish_order.yaml';
+  final manifestPath = '${root.path}/.release-please-manifest.json';
 
-  final packages = loadWorkspacePackages(repoRoot);
+  final packages = loadWorkspacePackages(root);
   final workspaceNames = packages.map((p) => p.name).toSet();
-  final manifestByName = loadReleaseManifestVersions(repoRoot, manifestPath);
+  final manifestByName = loadReleaseManifestVersions(root, manifestPath);
   final configuredOrder = loadPublishOrderYaml(publishOrderPath);
   final byName = {for (final p in packages) p.name: p};
 
-  final catalog = PubDevCatalog();
+  final gateway = catalog ?? PubDevCatalog();
+  final ownsCatalog = catalog == null;
   try {
-    final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    var pubVersions = await fetchAllPubDevVersions(gateway, workspaceNames);
     final releaseSet = computeReleaseSet(
       packages: packages,
       pubDevVersions: pubVersions,
@@ -60,20 +70,10 @@ Future<void> main(List<String> args) async {
       for (final e in [...driftErrors, ...dependencyErrors]) {
         stderr.writeln('  - $e');
       }
-      exit(1);
+      return 1;
     }
 
-    for (final name in configuredOrder) {
-      if (!releaseSet.contains(name)) {
-        continue;
-      }
-      final dir = packageDirectory(byName[name]!);
-      final publishArgs = doPublish
-          ? ['pub', 'publish', '-f']
-          : ['pub', 'publish', '--dry-run'];
-      stdout.writeln(
-        '\n--- dart ${publishArgs.join(' ')} ($name) ---',
-      );
+    Future<int> defaultPublishRunner(Directory dir, List<String> publishArgs) async {
       final result = await Process.run(
         'dart',
         publishArgs,
@@ -82,15 +82,62 @@ Future<void> main(List<String> args) async {
       );
       stdout.write(result.stdout);
       stderr.write(result.stderr);
-      if (result.exitCode != 0) {
-        stderr.writeln('Stopped: dry-run failed for $name');
-        exit(result.exitCode);
+      return result.exitCode;
+    }
+
+    final runPublish = publishRunner ?? defaultPublishRunner;
+
+    for (final name in configuredOrder) {
+      if (!releaseSet.contains(name)) {
+        continue;
+      }
+      final pkg = byName[name]!;
+
+      pubVersions = await fetchAllPubDevVersions(gateway, workspaceNames);
+      final pubDevOnlyErrors = siblingDepErrorsPubDevOnly(
+        pkg: pkg,
+        workspaceNames: workspaceNames,
+        pubDevVersions: pubVersions,
+      );
+      if (pubDevOnlyErrors.isNotEmpty) {
+        stderr.writeln(
+          'Refusing to publish $name: siblings must already be on pub.dev:\n',
+        );
+        for (final e in pubDevOnlyErrors) {
+          stderr.writeln('  - $e');
+        }
+        return 1;
+      }
+
+      final dir = packageDirectory(pkg);
+      final publishArgs = doPublish
+          ? ['pub', 'publish', '-f']
+          : ['pub', 'publish', '--dry-run'];
+      stdout.writeln('\n--- dart ${publishArgs.join(' ')} ($name) ---');
+      final code = await runPublish(dir, publishArgs);
+      if (code != 0) {
+        stderr.writeln('Stopped: publish failed for $name');
+        return code;
+      }
+
+      if (doPublish) {
+        await waitForVersionOnPubDev(
+          catalog: gateway,
+          packageName: name,
+          version: pkg.version,
+        );
       }
     }
 
     final verb = doPublish ? 'publishes' : 'dry-runs';
     stdout.writeln('\nAll release-set $verb passed (in publish_order.yaml order).');
+    return 0;
+  } on StateError catch (e) {
+    stderr.writeln('Publish train failed: $e');
+    return 1;
   } finally {
-    catalog.close();
+    if (ownsCatalog) {
+      gateway.close();
+    }
   }
 }

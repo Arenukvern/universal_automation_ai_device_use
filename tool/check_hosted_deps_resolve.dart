@@ -2,8 +2,8 @@
 // tool/publish_order.yaml is a valid topological publish order.
 //
 // Usage:
-//   dart run tool/check_hosted_deps_resolve.dart
-//   dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+//   dart run tool/check_hosted_deps_resolve.dart --co-release
+//   dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
 //   dart run tool/check_hosted_deps_resolve.dart --audit-published
 
 import 'dart:io';
@@ -13,6 +13,7 @@ import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
   final auditPublished = args.contains('--audit-published');
+  final manifestDriftOnly = args.contains('--manifest-drift-only');
   final coRelease = args.contains('--co-release');
   final checkManifestDrift = args.contains('--check-manifest-drift');
   final manifestFlag = args.indexOf('--release-manifest');
@@ -46,6 +47,16 @@ Future<void> main(List<String> args) async {
         await runAuditPublished(
           packages: packages,
           workspaceNames: workspaceNames,
+          catalog: catalog,
+        ),
+      );
+    }
+
+    if (manifestDriftOnly) {
+      exit(
+        await runManifestDriftOnly(
+          packages: packages,
+          manifestByName: releaseByName,
           catalog: catalog,
         ),
       );

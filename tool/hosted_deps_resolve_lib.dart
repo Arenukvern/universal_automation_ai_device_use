@@ -187,6 +187,15 @@ class PubDevCatalog implements PubDevGateway {
   }
 
   @override
+  void clearVersionCache([String? packageName]) {
+    if (packageName == null) {
+      _cache.clear();
+    } else {
+      _cache.remove(packageName);
+    }
+  }
+
+  @override
   void close() => _client.close(force: true);
 }
 
@@ -212,9 +221,62 @@ Release set rule (co-release mode only):
     2. Its pubspec version is strictly greater than pub.dev latest.
     3. Its pubspec version is not already on pub.dev.
     4. It appears earlier than the dependent in tool/publish_order.yaml.
-  Without --co-release, the release set is empty: only pub.dev versions count
-  (manifest entries are never treated as published).
+  On validate / co-release CI, --co-release enables this set so main answers
+  "releasable in publish_order.yaml order?".
+  Without --co-release, the release set is empty (pub.dev only).
 ''';
+
+/// Sibling dependency errors for one package using pub.dev versions only.
+List<String> siblingDepErrorsPubDevOnly({
+  required WorkspacePackage pkg,
+  required Set<String> workspaceNames,
+  required Map<String, List<String>> pubDevVersions,
+}) {
+  final errors = <String>[];
+  for (final entry in pkg.workspaceDeps.entries) {
+    final depName = entry.key;
+    if (!workspaceNames.contains(depName)) {
+      continue;
+    }
+    final available = pubDevVersions[depName] ?? [];
+    if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
+      errors.add(
+        '${pkg.name}@${pkg.version} requires $depName ${entry.value} '
+        '(pub.dev has: ${available.join(', ')})',
+      );
+    }
+  }
+  return errors;
+}
+
+/// Waits until [version] of [packageName] appears on pub.dev (fail closed).
+Future<void> waitForVersionOnPubDev({
+  required PubDevGateway catalog,
+  required String packageName,
+  required String version,
+  Duration timeout = const Duration(minutes: 5),
+  Duration pollInterval = const Duration(seconds: 10),
+}) async {
+  final deadline = DateTime.now().add(timeout);
+  while (DateTime.now().isBefore(deadline)) {
+    if (catalog is PubDevCatalog) {
+      catalog.clearVersionCache(packageName);
+    }
+    final versions = await catalog.versionsOnPubDev(packageName);
+    if (versions.contains(version)) {
+      stdout.writeln('pub.dev lists $packageName@$version');
+      return;
+    }
+    stdout.writeln(
+      'Waiting for $packageName@$version on pub.dev '
+      '(have: ${versions.join(', ')})…',
+    );
+    await Future<void>.delayed(pollInterval);
+  }
+  throw StateError(
+    'Timed out after ${timeout.inSeconds}s waiting for $packageName@$version on pub.dev',
+  );
+}
 
 /// Packages scheduled to publish in this run (--co-release only).
 Set<String> computeReleaseSet({
@@ -610,6 +672,41 @@ Future<int> runHostedWorkspaceCheck({
     return 1;
   } on StateError catch (e) {
     stderr.writeln('Publish order check failed: ${e.message}');
+    return 1;
+  }
+}
+
+/// Manifest / pubspec drift only (--manifest-drift-only).
+Future<int> runManifestDriftOnly({
+  required List<WorkspacePackage> packages,
+  required Map<String, String> manifestByName,
+  required PubDevGateway catalog,
+}) async {
+  try {
+    final workspaceNames = packages.map((p) => p.name).toSet();
+    final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    final errors = manifestDriftErrors(
+      packages: packages,
+      manifestByName: manifestByName,
+      pubDevVersions: pubVersions,
+    );
+    if (errors.isEmpty) {
+      stdout.writeln('No manifest/pubspec drift vs pub.dev latest.');
+      return 0;
+    }
+    stderr.writeln('Manifest / pubspec drift vs pub.dev:\n');
+    for (final e in errors) {
+      stderr.writeln('  - $e');
+    }
+    return 1;
+  } on HttpException catch (e) {
+    stderr.writeln('Manifest drift check failed: HTTP error from pub.dev: $e');
+    return 1;
+  } on SocketException catch (e) {
+    stderr.writeln('Manifest drift check failed: could not reach pub.dev: $e');
+    return 1;
+  } on IOException catch (e) {
+    stderr.writeln('Manifest drift check failed: I/O error: $e');
     return 1;
   }
 }
