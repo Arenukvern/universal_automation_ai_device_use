@@ -375,7 +375,8 @@ void main() {
     });
 
     test('pubspec equals pub.dev latest with changes since tag — reuse error', () async {
-      final result = await policyFor(
+      final result = await evaluateVersionPolicy(
+        repoRoot: repoRoot,
         packages: [
           WorkspacePackage(
             name: 'universal_automation_toolkit',
@@ -388,29 +389,55 @@ void main() {
         pubDevVersions: {
           'universal_automation_toolkit': ['0.3.0', '0.4.0'],
         },
-        gitCheck: (_, __) async => true,
+        releaseSet: {'universal_automation_toolkit'},
+        enableTagReuseCheck: true,
+        gitChangesSinceTag: (_, __) async => true,
       );
       expect(result.errors.any((e) => e.contains('version reuse')), isTrue);
     });
 
-    test('pubspec equals pub.dev latest without tag — warning', () async {
-      final result = await policyFor(
+    test('tag reuse skipped when package not in release set', () async {
+      final result = await evaluateVersionPolicy(
+        repoRoot: repoRoot,
         packages: [
           WorkspacePackage(
-            name: 'universal_automation_toolkit',
+            name: 'universal_automation_conformance',
+            version: '0.3.1',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {'universal_automation_conformance': '0.3.1'},
+        pubDevVersions: {
+          'universal_automation_conformance': ['0.3.0', '0.3.1'],
+        },
+        releaseSet: const {},
+        enableTagReuseCheck: true,
+        gitChangesSinceTag: (_, __) async => true,
+      );
+      expect(result.errors, isEmpty);
+    });
+
+    test('tag reuse not run for pending release-set version (ahead of pub.dev)', () async {
+      final result = await evaluateVersionPolicy(
+        repoRoot: repoRoot,
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_interface',
             version: '0.4.0',
             pubspecPath: 'x',
             workspaceDeps: {},
           ),
         ],
-        manifestByName: {'universal_automation_toolkit': '0.4.0'},
+        manifestByName: {'universal_automation_interface': '0.3.0'},
         pubDevVersions: {
-          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+          'universal_automation_interface': ['0.3.0'],
         },
-        gitCheck: (_, __) async => null,
+        releaseSet: {'universal_automation_interface'},
+        enableTagReuseCheck: true,
+        gitChangesSinceTag: (_, __) async => throw StateError('should not run'),
       );
       expect(result.errors, isEmpty);
-      expect(result.warnings, isNotEmpty);
     });
   });
 

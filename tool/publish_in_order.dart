@@ -32,12 +32,14 @@ Future<int> runPublishInOrder({
   bool skipConfirm = false,
   PubDevGateway? catalog,
   Directory? repoRoot,
+  String? manifestPathOverride,
   Future<int> Function(Directory dir, List<String> publishArgs)? publishRunner,
   PublishConfirm? confirmPublish,
 }) async {
   final root = repoRoot ?? findWorkspaceRepoRoot();
   final publishOrderPath = '${root.path}/tool/publish_order.yaml';
-  final manifestPath = '${root.path}/.release-please-manifest.json';
+  final manifestPath =
+      manifestPathOverride ?? '${root.path}/.release-please-manifest.json';
 
   final packages = loadWorkspacePackages(root);
   final workspaceNames = packages.map((p) => p.name).toSet();
@@ -163,16 +165,21 @@ Future<int> runPublishInOrder({
       final pkg = byName[name]!;
 
       pubVersions = await fetchAllPubDevVersions(gateway, workspaceNames);
-      final pubDevOnlyErrors = siblingDepErrorsPubDevOnly(
+      final siblingErrors = siblingDepErrorsAtPublishStep(
         pkg: pkg,
         workspaceNames: workspaceNames,
         pubDevVersions: pubVersions,
+        byName: byName,
+        releaseSet: releaseSet,
+        publishOrder: configuredOrder,
+        simulateCoReleaseTrain: !doPublish,
       );
-      if (pubDevOnlyErrors.isNotEmpty) {
-        stderr.writeln(
-          'Refusing to publish $name: siblings must already be on pub.dev:\n',
-        );
-        for (final e in pubDevOnlyErrors) {
+      if (siblingErrors.isNotEmpty) {
+        final hint = doPublish
+            ? 'siblings must already be on pub.dev'
+            : 'sibling constraints unresolved in publish train';
+        stderr.writeln('Refusing to publish $name: $hint:\n');
+        for (final e in siblingErrors) {
           stderr.writeln('  - $e');
         }
         return 1;

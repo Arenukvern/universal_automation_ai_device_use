@@ -1,6 +1,10 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import 'hosted_deps_resolve_lib.dart';
+import 'publish_in_order.dart';
+import 'workspace_pub_constraints_sync.dart';
 
 class _PollingPubDevGateway implements PubDevGateway {
   _PollingPubDevGateway({
@@ -63,6 +67,49 @@ class _MutablePubDevGateway implements PubDevGateway {
   void close() {}
 }
 
+/// pub.dev version lists aligned with the fix-forward publish table (2026-11-09).
+const _fixForwardPubVersions = <String, List<String>>{
+  'universal_automation_interface': ['0.1.0', '0.1.1', '0.2.0', '0.3.0'],
+  'universal_automation_semantics': ['0.1.0', '0.2.0', '0.4.0', '0.5.0'],
+  'universal_browser_cdp': ['0.1.0', '0.1.1', '0.2.0', '0.3.0', '0.4.0'],
+  'universal_browser_webdriver': ['0.1.1', '0.2.0'],
+  'universal_driver_flutter': ['0.1.0', '0.1.1'],
+  'universal_driver_linux': ['0.1.0', '0.1.1', '0.2.0'],
+  'universal_driver_macos': ['0.1.0', '0.1.1', '0.2.0', '0.2.1', '0.3.0'],
+  'universal_driver_windows': ['0.1.0', '0.1.1', '0.2.0'],
+  'universal_screencast': ['0.1.0', '0.1.1', '0.1.2', '0.2.0'],
+  'universal_automation_conformance': ['0.1.0', '0.2.0', '0.3.0', '0.3.1'],
+  'universal_automation_toolkit': ['0.1.0', '0.1.1', '0.2.0', '0.4.0'],
+  'universal_automation_harness': ['0.1.0', '0.1.1'],
+  'universal_capture_flutter': ['0.1.0', '0.1.1', '0.2.0'],
+  'universal_capture_macos': ['0.1.0', '0.1.1', '0.1.2', '0.2.0'],
+  'universal_tooling_runtime': ['0.2.0', '0.2.2'],
+  'universal_webrtc_raw': ['0.1.0'],
+  'universal_webrtc': ['0.1.0', '0.1.1', '0.2.0'],
+};
+
+const _fixForwardManifest24 = r'''
+{
+  "pkgs/universal_automation_conformance": "0.3.1",
+  "pkgs/universal_automation_harness": "0.1.1",
+  "pkgs/universal_automation_interface": "0.3.0",
+  "pkgs/universal_automation_semantics": "0.5.0",
+  "pkgs/universal_automation_toolkit": "0.4.0",
+  "pkgs/universal_browser_cdp": "0.4.0",
+  "pkgs/universal_browser_webdriver": "0.2.0",
+  "pkgs/universal_capture_flutter": "0.2.0",
+  "pkgs/universal_capture_macos": "0.2.0",
+  "pkgs/universal_driver_flutter": "0.1.1",
+  "pkgs/universal_driver_linux": "0.2.0",
+  "pkgs/universal_driver_macos": "0.3.0",
+  "pkgs/universal_driver_windows": "0.2.0",
+  "pkgs/universal_screencast": "0.2.0",
+  "pkgs/universal_webrtc": "0.2.0",
+  "pkgs/universal_webrtc_raw": "0.1.0",
+  "pkgs/universal_tooling_runtime": "0.2.2"
+}
+''';
+
 void main() {
   group('waitForVersionOnPubDev', () {
     test('succeeds when exact version appears after growing backoff polls', () async {
@@ -109,28 +156,115 @@ void main() {
     });
   });
 
-  group('publish train pub.dev-only gate', () {
+  group('publish train sibling gate', () {
+    late List<WorkspacePackage> packages;
+    late Map<String, WorkspacePackage> byName;
+    late List<String> publishOrder;
+
+    setUp(() {
+      final root = findWorkspaceRepoRoot();
+      packages = loadWorkspacePackages(root);
+      byName = {for (final p in packages) p.name: p};
+      publishOrder = loadPublishOrderYaml('${root.path}/tool/publish_order.yaml');
+    });
+
     test(
-      'refuses semantics when interface 0.4.0 was never published to pub.dev',
+      'dry-run train: pending interface 0.4.0 satisfies ^0.4.0 for cdp',
       () {
-        final semantics = WorkspacePackage(
-          name: 'universal_automation_semantics',
-          version: '0.5.0',
-          pubspecPath: 'x',
-          workspaceDeps: {'universal_automation_interface': '^0.4.0'},
+        final releaseSet = computeReleaseSet(
+          packages: packages,
+          pubDevVersions: _fixForwardPubVersions,
+          coReleaseEnabled: true,
         );
-        final errors = siblingDepErrorsPubDevOnly(
-          pkg: semantics,
-          workspaceNames: {
-            'universal_automation_semantics',
-            'universal_automation_interface',
-          },
-          pubDevVersions: {
-            'universal_automation_interface': ['0.3.0'],
+        expect(releaseSet.contains('universal_automation_interface'), isTrue);
+
+        final cdp = byName['universal_browser_cdp']!;
+        final dryRunErrors = siblingDepErrorsAtPublishStep(
+          pkg: cdp,
+          workspaceNames: packages.map((p) => p.name).toSet(),
+          pubDevVersions: _fixForwardPubVersions,
+          byName: byName,
+          releaseSet: releaseSet,
+          publishOrder: publishOrder,
+          simulateCoReleaseTrain: true,
+        );
+        expect(dryRunErrors, isEmpty);
+
+        final publishErrors = siblingDepErrorsAtPublishStep(
+          pkg: cdp,
+          workspaceNames: packages.map((p) => p.name).toSet(),
+          pubDevVersions: _fixForwardPubVersions,
+          byName: byName,
+          releaseSet: releaseSet,
+          publishOrder: publishOrder,
+          simulateCoReleaseTrain: false,
+        );
+        expect(publishErrors, isNotEmpty);
+        expect(publishErrors.single, contains('^0.4.0'));
+      },
+    );
+
+    test(
+      'fix-forward dry-run: 11-package train completes with mocked pub publish',
+      () async {
+        final root = findWorkspaceRepoRoot();
+        final manifestFile = File('${root.path}/.release-please-manifest.test24.json');
+        addTearDown(() {
+          if (manifestFile.existsSync()) {
+            manifestFile.deleteSync();
+          }
+        });
+        manifestFile.writeAsStringSync(_fixForwardManifest24);
+
+        final gateway = _MutablePubDevGateway(versions: _fixForwardPubVersions);
+        final published = <String>[];
+        final code = await runPublishInOrder(
+          doPublish: false,
+          repoRoot: root,
+          manifestPathOverride: manifestFile.path,
+          catalog: gateway,
+          publishRunner: (dir, args) async {
+            published.add(dir.path);
+            return 0;
           },
         );
-        expect(errors, isNotEmpty);
-        expect(errors.single, contains('^0.4.0'));
+        expect(code, 0);
+        expect(published.length, 11);
+      },
+    );
+
+    test(
+      'real --publish path uses pub.dev-only gate (harness needs interface on pub.dev)',
+      () {
+        final releaseSet = computeReleaseSet(
+          packages: packages,
+          pubDevVersions: _fixForwardPubVersions,
+          coReleaseEnabled: true,
+        );
+        final harness = byName['universal_automation_harness']!;
+        expect(releaseSet.contains('universal_automation_harness'), isTrue);
+
+        final dryRun = siblingDepErrorsAtPublishStep(
+          pkg: harness,
+          workspaceNames: packages.map((p) => p.name).toSet(),
+          pubDevVersions: _fixForwardPubVersions,
+          byName: byName,
+          releaseSet: releaseSet,
+          publishOrder: publishOrder,
+          simulateCoReleaseTrain: true,
+        );
+        expect(dryRun, isEmpty);
+
+        final realPublish = siblingDepErrorsAtPublishStep(
+          pkg: harness,
+          workspaceNames: packages.map((p) => p.name).toSet(),
+          pubDevVersions: _fixForwardPubVersions,
+          byName: byName,
+          releaseSet: releaseSet,
+          publishOrder: publishOrder,
+          simulateCoReleaseTrain: false,
+        );
+        expect(realPublish.any((e) => e.contains('^0.4.0')), isTrue);
       },
     );
   });

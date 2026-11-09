@@ -232,17 +232,64 @@ List<String> siblingDepErrorsPubDevOnly({
   required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
 }) {
+  return siblingDepErrorsAtPublishStep(
+    pkg: pkg,
+    workspaceNames: workspaceNames,
+    pubDevVersions: pubDevVersions,
+    byName: const {},
+    releaseSet: const {},
+    publishOrder: const [],
+    simulateCoReleaseTrain: false,
+  );
+}
+
+/// Per-package sibling check before `dart pub publish`.
+///
+/// With [simulateCoReleaseTrain], release-set siblings listed **before** [pkg]
+/// in [publishOrder] count at their pending pubspec version (dry-run train).
+/// Without it, only pub.dev versions count (real `--publish`).
+List<String> siblingDepErrorsAtPublishStep({
+  required WorkspacePackage pkg,
+  required Set<String> workspaceNames,
+  required Map<String, List<String>> pubDevVersions,
+  required Map<String, WorkspacePackage> byName,
+  required Set<String> releaseSet,
+  required List<String> publishOrder,
+  required bool simulateCoReleaseTrain,
+}) {
   final errors = <String>[];
+  final indexOf = <String, int>{};
+  for (var i = 0; i < publishOrder.length; i++) {
+    indexOf[publishOrder[i]] = i;
+  }
+  final pkgIdx = indexOf[pkg.name];
+  if (pkgIdx == null && simulateCoReleaseTrain) {
+    errors.add(
+      '${pkg.name} is missing from publish_order.yaml (required for train simulation)',
+    );
+    return errors;
+  }
+
   for (final entry in pkg.workspaceDeps.entries) {
     final depName = entry.key;
     if (!workspaceNames.contains(depName)) {
       continue;
     }
-    final available = pubDevVersions[depName] ?? [];
+    final available = <String>{...?pubDevVersions[depName]};
+    if (simulateCoReleaseTrain && pkgIdx != null) {
+      final depIdx = indexOf[depName];
+      final depPkg = byName[depName];
+      if (depIdx != null &&
+          depIdx < pkgIdx &&
+          releaseSet.contains(depName) &&
+          depPkg != null) {
+        available.add(depPkg.version);
+      }
+    }
     if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
       errors.add(
         '${pkg.name}@${pkg.version} requires $depName ${entry.value} '
-        '(pub.dev has: ${available.join(', ')})',
+        '(pub.dev has: ${(pubDevVersions[depName] ?? []).join(', ')})',
       );
     }
   }
@@ -402,10 +449,8 @@ Future<VersionPolicyResult> evaluateVersionPolicy({
   required Map<String, List<String>> pubDevVersions,
   required Set<String> releaseSet,
   bool warnManifestBehindPub = false,
-  /// When true (main/PR co-release with `--warn-manifest-behind-pub`), git-tag
-  /// reuse checks are skipped so blocking releasability is not tied to local tag
-  /// hygiene; release paths run strict checks via `--check-manifest-drift`.
-  bool skipReuseSinceTagCheck = false,
+  /// Tag-reuse since release only when `--check-manifest-drift` (not on PRs).
+  bool enableTagReuseCheck = false,
   GitChangesSinceReleaseTag? gitChangesSinceTag,
 }) async {
   final gitCheck = gitChangesSinceTag ?? defaultGitChangesSinceReleaseTag;
@@ -460,7 +505,9 @@ Future<VersionPolicyResult> evaluateVersionPolicy({
       );
     }
 
-    if (pubspecVersion == pubLatest && !skipReuseSinceTagCheck) {
+    if (pubspecVersion == pubLatest &&
+        enableTagReuseCheck &&
+        releaseSet.contains(pkg.name)) {
       final changed = await gitCheck(repoRoot, pkg);
       if (changed == true) {
         errors.add(
@@ -786,8 +833,7 @@ Future<int> runHostedWorkspaceCheck({
         releaseSet: releaseSet,
         warnManifestBehindPub:
             warnManifestBehindPub && !checkManifestDrift,
-        skipReuseSinceTagCheck:
-            warnManifestBehindPub && !checkManifestDrift,
+        enableTagReuseCheck: checkManifestDrift,
       );
     }
 
@@ -884,7 +930,7 @@ Future<int> runManifestDriftOnly({
       pubDevVersions: pubVersions,
       releaseSet: releaseSet,
       warnManifestBehindPub: warnManifestBehindPub,
-      skipReuseSinceTagCheck: warnManifestBehindPub,
+      enableTagReuseCheck: false,
     );
     if (policy.warnings.isNotEmpty) {
       stderr.writeln('Version policy warnings:\n');
