@@ -2,8 +2,6 @@ import 'dart:async';
 import 'dart:ffi';
 import 'dart:typed_data';
 
-import 'package:universal_automation_interface/universal_automation_interface.dart';
-
 import 'capture_bridge_api.dart' show CaptureBridge;
 import 'capture_exceptions.dart';
 import 'capture_stream_bindings.dart';
