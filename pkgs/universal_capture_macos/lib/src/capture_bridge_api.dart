@@ -21,6 +21,9 @@ abstract final class CaptureBridge {
         'universal_capture_macos only loads on macOS',
       );
     }
+    if (_loaded) {
+      return;
+    }
     _loaded = true;
   }
 
