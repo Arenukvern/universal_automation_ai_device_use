@@ -123,7 +123,7 @@ class MacosDriver
     final roots = _lastSnapshot?.roots;
     if (roots == null || roots.isEmpty) return null;
     final attrs = roots.first.attributes;
-    if (attrs == null || attrs['uaWebRootFound'] == null) return null;
+    if (attrs['uaWebRootFound'] == null) return null;
     return {
       'preferWebContent': attrs['uaPreferWebContent'] == 'true',
       'webRootFound': attrs['uaWebRootFound'] == 'true',

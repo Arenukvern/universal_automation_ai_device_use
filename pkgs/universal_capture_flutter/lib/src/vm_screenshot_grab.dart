@@ -30,7 +30,7 @@ final class VmScreenshotGrabber {
   /// Throws [StateError] when the VM answers but no isolate carries the
   /// toolkit registration — the app must be run with
   /// `MCPToolkitBinding` (debug or profile mode).
-  static Future<VmScreenshotGrabber> connect(final Uri vmServiceUri) async {
+  static Future<VmScreenshotGrabber> connect(Uri vmServiceUri) async {
     final service = await vm_io.vmServiceConnectUri(
       normalizeWsUri(vmServiceUri).toString(),
     );
@@ -73,7 +73,7 @@ final class VmScreenshotGrabber {
   /// Normalizes `http(s)://…/#authToken=…` VM service announcements into
   /// the WS endpoint the vm_service client expects. `ws://`/`wss://`
   /// URIs pass through unchanged.
-  static Uri normalizeWsUri(final Uri uri) {
+  static Uri normalizeWsUri(Uri uri) {
     if (uri.scheme == 'ws' || uri.scheme == 'wss') return uri;
     final path = uri.path.endsWith('/') ? '${uri.path}ws' : '${uri.path}/ws';
     return uri.replace(
