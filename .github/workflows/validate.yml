@@ -19,14 +19,38 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
 
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
       - name: Check intra-workspace pub constraints
         run: dart run tool/sync_workspace_pub_constraints.dart --check
+
+      - name: Releasable workspace (co-release, blocking)
+        run: dart run tool/check_hosted_deps_resolve.dart --co-release --warn-manifest-behind-pub
+
+      - name: Report manifest drift (non-blocking)
+        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        continue-on-error: true
+        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report --warn-manifest-behind-pub
+
+      - name: Report pub.dev audit (non-blocking)
+        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        continue-on-error: true
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published --github-report
+
+      - name: Release-please PR — drift + audit (blocking)
+        if: ${{ github.head_ref == 'release-please--branches--main' }}
+        run: |
+          dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
+          dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Check reusable workflow inputs
         env:

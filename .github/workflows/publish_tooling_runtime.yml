@@ -37,6 +37,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -45,6 +47,11 @@ jobs:
 
       - name: Resolve workspace
         run: dart pub get
+
+      - name: Release batch — hosted deps, drift, pub.dev audit (blocking)
+        run: |
+          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift
+          dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Analyze
         run: dart analyze
