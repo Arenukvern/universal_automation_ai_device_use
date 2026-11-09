@@ -40,12 +40,21 @@ jobs:
         with:
           fetch-depth: 0
 
+      # Nested checkout: sibling Dart workspace for package: resolution; cwd stays
+      # the release tree so findWorkspaceRepoRoot() reads pkgs/ and manifest there.
+      - name: Checkout trusted tooling (triggering main commit)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
 
-      - name: Resolve workspace (tooling)
+      - name: Resolve trusted workspace (tooling)
+        working-directory: trusted
         run: dart pub get
 
       # Only pushes to main trigger this workflow; sync pushes to
@@ -63,13 +72,26 @@ jobs:
           fi
           git fetch origin release-please--branches--main
           git checkout -B release-please--branches--main origin/release-please--branches--main
-          dart run tool/sync_workspace_pub_constraints.dart --write
-          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
+          echo 'trusted/' >> .git/info/exclude
+          dart run trusted/tool/sync_workspace_pub_constraints.dart --write
+          dart run trusted/tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
           if git diff --quiet -- pkgs; then
             echo "Workspace pub constraints already in sync"
             echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            path="${line:3}"
+            case "$path" in
+              pkgs/*) ;;
+              *)
+                echo "Refusing to commit: change outside pkgs/: $path"
+                git status --porcelain
+                exit 1
+                ;;
+            esac
+          done < <(git status --porcelain)
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add pkgs/*/pubspec.yaml

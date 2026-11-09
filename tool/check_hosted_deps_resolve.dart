@@ -11,6 +11,7 @@
 import 'dart:io';
 
 import 'hosted_deps_resolve_lib.dart';
+import 'tool_cli.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 void printUsage() {
@@ -35,11 +36,32 @@ Flags:
 ''');
 }
 
+const _checkFlags = {
+  '--co-release',
+  '--check-manifest-drift',
+  '--release-pr',
+  '--manifest-drift-only',
+  '--warn-manifest-behind-pub',
+  '--audit-published',
+  '--github-report',
+  '--release-manifest',
+  '--publish-order',
+  '--help',
+  '-h',
+};
+
 Future<void> main(List<String> args) async {
   if (args.contains('--help') || args.contains('-h')) {
     printUsage();
     exit(0);
   }
+
+  requireOnlyKnownFlags(
+    args,
+    flags: _checkFlags,
+    valueFlags: {'--release-manifest', '--publish-order'},
+    onUsage: printUsage,
+  );
 
   final auditPublished = args.contains('--audit-published');
   final manifestDriftOnly = args.contains('--manifest-drift-only');
