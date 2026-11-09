@@ -117,12 +117,22 @@ Map<String, String> loadReleaseManifestVersions(
   return byName;
 }
 
-class PubDevCatalog {
+/// Network/API access to pub.dev package metadata (overridable in tests).
+abstract class PubDevGateway {
+  Future<List<String>> versionsOnPubDev(String packageName);
+
+  Future<Map<String, String>> latestPublishedWorkspaceDeps(String packageName);
+
+  void close() {}
+}
+
+class PubDevCatalog implements PubDevGateway {
   PubDevCatalog({HttpClient? client}) : _client = client ?? HttpClient();
 
   final HttpClient _client;
   final _cache = <String, List<String>>{};
 
+  @override
   Future<List<String>> versionsOnPubDev(String packageName) async {
     if (_cache.containsKey(packageName)) {
       return _cache[packageName]!;
@@ -146,6 +156,7 @@ class PubDevCatalog {
     return versions;
   }
 
+  @override
   Future<Map<String, String>> latestPublishedWorkspaceDeps(
     String packageName,
   ) async {
@@ -175,6 +186,7 @@ class PubDevCatalog {
     return out;
   }
 
+  @override
   void close() => _client.close(force: true);
 }
 
@@ -220,6 +232,73 @@ List<String> resolveErrors({
       }
     }
   }
+  return errors;
+}
+
+/// Resolves sibling deps as if packages publish in [publishOrder] sequence.
+/// A manifest version counts only for dependencies listed **before** the
+/// dependent in [publishOrder] (same-release train, topological apply).
+List<String> resolveErrorsAlongPublishOrder({
+  required List<WorkspacePackage> packages,
+  required Set<String> workspaceNames,
+  required Map<String, List<String>> pubDevVersions,
+  required Map<String, String> releaseManifestByName,
+  required List<String> publishOrder,
+}) {
+  final errors = <String>[];
+  final byName = {for (final p in packages) p.name: p};
+  final indexOf = <String, int>{};
+  for (var i = 0; i < publishOrder.length; i++) {
+    indexOf[publishOrder[i]] = i;
+  }
+
+  for (final pkgName in publishOrder) {
+    final pkg = byName[pkgName];
+    if (pkg == null) {
+      continue;
+    }
+    final pkgIdx = indexOf[pkgName]!;
+    for (final entry in pkg.workspaceDeps.entries) {
+      final depName = entry.key;
+      if (!workspaceNames.contains(depName)) {
+        continue;
+      }
+      final depIdx = indexOf[depName];
+      if (depIdx == null) {
+        errors.add(
+          '${pkg.name}@${pkg.version} depends on $depName but $depName '
+          'is missing from publish_order.yaml',
+        );
+        continue;
+      }
+      final constraint = entry.value;
+      final available = <String>{...?pubDevVersions[depName]};
+      if (depIdx < pkgIdx) {
+        final manifestVersion = releaseManifestByName[depName];
+        if (manifestVersion != null) {
+          available.add(manifestVersion);
+        }
+      }
+      if (!constraintSatisfiedByAnyVersion(constraint, available)) {
+        errors.add(
+          '${pkg.name}@${pkg.version} requires $depName $constraint when '
+          'published at publish-order index $pkgIdx '
+          '(pub.dev: ${pubDevVersions[depName]?.join(', ') ?? 'none'}'
+          '${depIdx < pkgIdx && releaseManifestByName[depName] != null ? '; co-release from index $depIdx: ${releaseManifestByName[depName]}' : ''})',
+        );
+      }
+    }
+  }
+
+  for (final pkg in packages) {
+    if (!indexOf.containsKey(pkg.name)) {
+      errors.add(
+        'publish order missing workspace package ${pkg.name} '
+        '(required for batch release check)',
+      );
+    }
+  }
+
   return errors;
 }
 
@@ -367,16 +446,66 @@ List<String> loadPublishOrderYaml(String path) {
 }
 
 Future<Map<String, List<String>>> fetchAllPubDevVersions(
-  PubDevCatalog catalog,
+  PubDevGateway catalog,
   Set<String> packageNames,
 ) async {
   final out = <String, List<String>>{};
   for (final name in packageNames) {
-    try {
-      out[name] = await catalog.versionsOnPubDev(name);
-    } on IOException {
-      out[name] = [];
-    }
+    out[name] = await catalog.versionsOnPubDev(name);
   }
   return out;
+}
+
+/// Runs [--audit-published]: exits the process on fetch/parse failures (fail closed).
+Future<int> runAuditPublished({
+  required List<WorkspacePackage> packages,
+  required Set<String> workspaceNames,
+  required PubDevGateway catalog,
+}) async {
+  try {
+    final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    final latestDeps = <String, Map<String, String>>{};
+    for (final name in workspaceNames) {
+      try {
+        latestDeps[name] = await catalog.latestPublishedWorkspaceDeps(name);
+      } on HttpException catch (e) {
+        stderr.writeln(
+          'pub.dev audit failed: could not read latest pubspec for $name: $e',
+        );
+        return 1;
+      } on SocketException catch (e) {
+        stderr.writeln(
+          'pub.dev audit failed: network error reading $name: $e',
+        );
+        return 1;
+      }
+    }
+    final errors = auditPublishedLatestErrors(
+      packages: packages,
+      workspaceNames: workspaceNames,
+      pubDevVersions: pubVersions,
+      publishedLatestDeps: latestDeps,
+    );
+    if (errors.isEmpty) {
+      stdout.writeln('All pub.dev latest packages resolve sibling deps.');
+      return 0;
+    }
+    stderr.writeln('pub.dev hosted dependency audit failed:\n');
+    for (final e in errors) {
+      stderr.writeln('  - $e');
+    }
+    return 1;
+  } on HttpException catch (e) {
+    stderr.writeln('pub.dev audit failed: HTTP error from pub.dev: $e');
+    return 1;
+  } on SocketException catch (e) {
+    stderr.writeln('pub.dev audit failed: could not reach pub.dev: $e');
+    return 1;
+  } on IOException catch (e) {
+    stderr.writeln('pub.dev audit failed: I/O error talking to pub.dev: $e');
+    return 1;
+  } on FormatException catch (e) {
+    stderr.writeln('pub.dev audit failed: invalid JSON from pub.dev: $e');
+    return 1;
+  }
 }

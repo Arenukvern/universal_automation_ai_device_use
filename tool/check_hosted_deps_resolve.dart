@@ -39,39 +39,15 @@ Future<void> main(List<String> args) async {
 
   final catalog = PubDevCatalog();
   try {
-    final pubVersions = await fetchAllPubDevVersions(
-      catalog,
-      workspaceNames,
-    );
-
     if (auditPublished) {
-      final latestDeps = <String, Map<String, String>>{};
-      for (final name in workspaceNames) {
-        latestDeps[name] = await catalog.latestPublishedWorkspaceDeps(name);
-      }
-      final errors = auditPublishedLatestErrors(
-        packages: packages,
-        workspaceNames: workspaceNames,
-        pubDevVersions: pubVersions,
-        publishedLatestDeps: latestDeps,
+      exit(
+        await runAuditPublished(
+          packages: packages,
+          workspaceNames: workspaceNames,
+          catalog: catalog,
+        ),
       );
-      if (errors.isEmpty) {
-        stdout.writeln('All pub.dev latest packages resolve sibling deps.');
-        return;
-      }
-      stderr.writeln('pub.dev hosted dependency audit failed:\n');
-      for (final e in errors) {
-        stderr.writeln('  - $e');
-      }
-      exit(1);
     }
-
-    final dependencyErrors = resolveErrors(
-      packages: packages,
-      workspaceNames: workspaceNames,
-      pubDevVersions: pubVersions,
-      releaseManifestByName: releaseByName,
-    );
 
     final graph = workspaceDependencyGraph(packages);
     final computedOrder = topologicalPublishOrder(graph);
@@ -80,23 +56,49 @@ Future<void> main(List<String> args) async {
       stdout.writeln('  - $name');
     }
 
-    List<String> orderErrors = [];
+    List<String> configuredOrder;
     try {
-      final configured = loadPublishOrderYaml(publishOrderPath);
-      orderErrors = validatePublishOrderList(configured, graph);
+      configuredOrder = loadPublishOrderYaml(publishOrderPath);
     } on StateError catch (e) {
-      orderErrors = [e.message];
+      stderr.writeln('Publish order check failed: ${e.message}');
+      exit(1);
     }
 
-    if (dependencyErrors.isNotEmpty) {
-      stderr.writeln('Hosted sibling dependency check failed:\n');
-      for (final e in dependencyErrors) {
-        stderr.writeln('  - $e');
-      }
+    final orderErrors = validatePublishOrderList(configuredOrder, graph);
+
+    Map<String, List<String>> pubVersions;
+    try {
+      pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
+    } on HttpException catch (e) {
+      stderr.writeln('Hosted dependency check failed: HTTP error from pub.dev: $e');
+      exit(1);
+    } on SocketException catch (e) {
+      stderr.writeln('Hosted dependency check failed: could not reach pub.dev: $e');
+      exit(1);
+    } on IOException catch (e) {
+      stderr.writeln('Hosted dependency check failed: I/O error talking to pub.dev: $e');
+      exit(1);
     }
+
+    final dependencyErrors = resolveErrorsAlongPublishOrder(
+      packages: packages,
+      workspaceNames: workspaceNames,
+      pubDevVersions: pubVersions,
+      releaseManifestByName: releaseByName,
+      publishOrder: configuredOrder,
+    );
+
     if (orderErrors.isNotEmpty) {
       stderr.writeln('Publish order check failed:\n');
       for (final e in orderErrors) {
+        stderr.writeln('  - $e');
+      }
+    }
+    if (dependencyErrors.isNotEmpty) {
+      stderr.writeln(
+        'Hosted sibling dependency check failed (publish-order batch):\n',
+      );
+      for (final e in dependencyErrors) {
         stderr.writeln('  - $e');
       }
     }
@@ -106,7 +108,8 @@ Future<void> main(List<String> args) async {
     }
 
     stdout.writeln(
-      'Workspace sibling dependencies resolve (pub.dev ∪ release-please manifest).',
+      'Workspace sibling dependencies resolve along publish_order.yaml '
+      '(pub.dev ∪ earlier co-release manifest versions).',
     );
     stdout.writeln('Publish order file is a valid topological order.');
   } finally {
