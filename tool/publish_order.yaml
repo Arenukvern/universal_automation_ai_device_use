@@ -1,0 +1,21 @@
+# Manual pub.dev publish order (dependencies before dependents).
+# Validated by: dart run tool/check_hosted_deps_resolve.dart
+# See also: docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx
+
+- universal_automation_interface
+- universal_automation_semantics
+- universal_browser_cdp
+- universal_browser_webdriver
+- universal_driver_flutter
+- universal_driver_linux
+- universal_driver_macos
+- universal_driver_windows
+- universal_screencast
+- universal_automation_conformance
+- universal_automation_toolkit
+- universal_automation_harness
+- universal_capture_flutter
+- universal_capture_macos
+- universal_tooling_runtime
+- universal_webrtc_raw
+- universal_webrtc
