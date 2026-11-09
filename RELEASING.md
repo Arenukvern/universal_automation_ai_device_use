@@ -46,6 +46,8 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 
 ## Release-please
 
+The **sync-release-pr-constraints** job checks out the release-please branch at the repo root (for `pkgs/` and manifest) and a nested **trusted** checkout of the triggering `main` commit; it runs `dart run trusted/tool/…` from the release tree so guards like `--release-pr` always match CI on `main`.
+
 Merge release-please PRs only when **release-path** CI passes: co-release resolve and release-PR version policy (`--check-manifest-drift --release-pr`) on the release branch.
 
 See also [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) (publish order) and [PR #23](https://github.com/Arenukvern/universal_automation_ai_device_use/pull/23) (guards).
