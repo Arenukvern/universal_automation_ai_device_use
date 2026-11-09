@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_semantics-v0.5.0...universal_automation_semantics-v0.6.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades
+
+### Features
+
+* plugin ([2e51ebe](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/2e51ebe20e6085b7fae44c03e9e460a1a563c1a3))
+* **semantics:** compact render quality — state suffixes, fields honored, honest trim accounting, typed deltas ([45a89a5](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/45a89a5378d311fe9a7cb2dca99c70262cc71a64))
+* **semantics:** SemanticLens — compact and design render usefulness ([1c6f798](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c6f7982a1764ea090860d23aff284c5df073159))
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades ([6862303](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/6862303e56d1fba0a586c29e4ddc8b6157bd1bc7))
+
 ## 0.5.0
 
 - **SemanticLens — switchable render usefulness** (measured in

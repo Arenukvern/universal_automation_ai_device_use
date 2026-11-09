@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.5.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.4.0...universal_automation_toolkit-v0.5.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades
+
+### Features
+
+* **computer-use:** Codex-parity pid pointer, automation_computer, and evidence ([29f22be](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/29f22be3112f97b7080166960840aa20326c3d66))
+* evaluate returns its value; per-page console capture ([5c6a4eb](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/5c6a4eb3f7ca6bfa0469227f61d2ac412cf5558d))
+* **macos:** OS-AX web-first walk, window-local clickAt, automation_preview ([8ab9a39](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/8ab9a39782d2737db145248697a9a5539b14bbfd))
+* native Flutter vmService tier in CLI and MCP server ([64fe556](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/64fe5568eff262b3b7d321bc62de59d5b39ef42f))
+* plugin ([2e51ebe](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/2e51ebe20e6085b7fae44c03e9e460a1a563c1a3))
+* seamless tier routing and optional browser tier (ADR 0003) ([f6c1b68](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f6c1b6868167dd927584ffe9644624e00388f18d))
+* **semantics:** compact render quality — state suffixes, fields honored, honest trim accounting, typed deltas ([45a89a5](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/45a89a5378d311fe9a7cb2dca99c70262cc71a64))
+* **semantics:** SemanticLens — compact and design render usefulness ([1c6f798](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c6f7982a1764ea090860d23aff284c5df073159))
+* universal automation harness v0.1.0 (ADR 0004 §4) ([b40e35b](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/b40e35bb600482f82f24e8cbcfc02a2add31c3cc))
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades ([6862303](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/6862303e56d1fba0a586c29e4ddc8b6157bd1bc7))
+
+
+### Bug Fixes
+
+* **ci:** sync toolkit constraint for universal_driver_flutter 0.1.1 ([04f687a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/04f687ae4af92e7ab9d02967a80b12d165a23be3))
+* **ci:** sync toolkit workspace constraint after driver_flutter 0.1.1 ([f2d15e6](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f2d15e68446ee50e1a72649e79c2c0debb5682e4))
+
 ## 0.4.0
 
 - **Native Flutter vmService tier**: `--vm <vm-service-uri>` (env

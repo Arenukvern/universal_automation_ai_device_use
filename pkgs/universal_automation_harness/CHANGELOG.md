@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.2.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.1.1...universal_automation_harness-v0.2.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades
+
+### Features
+
+* **semantics:** SemanticLens — compact and design render usefulness ([1c6f798](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c6f7982a1764ea090860d23aff284c5df073159))
+* universal automation harness v0.1.0 (ADR 0004 §4) ([b40e35b](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/b40e35bb600482f82f24e8cbcfc02a2add31c3cc))
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades ([6862303](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/6862303e56d1fba0a586c29e4ddc8b6157bd1bc7))
+
 ## [0.2.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.1.1...universal_automation_harness-v0.2.0) (2026-10-27)
 
 

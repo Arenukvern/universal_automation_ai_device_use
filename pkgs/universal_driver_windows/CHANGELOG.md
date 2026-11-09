@@ -1,6 +1,27 @@
 # Changelog
 
 
+## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.2.0...universal_driver_windows-v0.3.0) (2026-11-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades
+
+### Features
+
+* seamless tier routing and optional browser tier (ADR 0003) ([f6c1b68](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f6c1b6868167dd927584ffe9644624e00388f18d))
+* universal_automation_interface 0.3.0 — coordinate actions, promotions, OS facades ([6862303](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/6862303e56d1fba0a586c29e4ddc8b6157bd1bc7))
+
+
+### Bug Fixes
+
+* clear pub validator analyze errors in capture and driver pkgs ([d8df929](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/d8df929395c8c3591ccfd213cd2061141dbda577))
+* pub validator analyze errors in capture and driver packages ([336a966](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/336a966b711705cbbe90104adbd836ea9e7207a3))
+* sync intra-workspace pub constraints for release-please ([84910f2](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/84910f28d94c1881ad0c5e76de8ffc503fa26a6b))
+* sync intra-workspace pub constraints for release-please trains ([0887271](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/0887271c9eef9add9ca63a9eeddc4fc7626b64e7))
+* **train:** conformance 0.3.0 (interface ^0.3.0) + its dependents' constraints ([8396f32](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/8396f320216483faf9ce747e22da6664104b5443))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.2.0...universal_driver_windows-v0.3.0) (2026-10-27)
 
 
