@@ -14,6 +14,7 @@ import 'workspace_pub_constraints_sync.dart';
 Future<void> main(List<String> args) async {
   final auditPublished = args.contains('--audit-published');
   final manifestDriftOnly = args.contains('--manifest-drift-only');
+  final githubReport = args.contains('--github-report');
   final coRelease = args.contains('--co-release');
   final checkManifestDrift = args.contains('--check-manifest-drift');
   final manifestFlag = args.indexOf('--release-manifest');
@@ -48,6 +49,7 @@ Future<void> main(List<String> args) async {
           packages: packages,
           workspaceNames: workspaceNames,
           catalog: catalog,
+          githubReport: githubReport,
         ),
       );
     }
@@ -58,6 +60,7 @@ Future<void> main(List<String> args) async {
           packages: packages,
           manifestByName: releaseByName,
           catalog: catalog,
+          githubReport: githubReport,
         ),
       );
     }

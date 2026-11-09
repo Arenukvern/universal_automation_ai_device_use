@@ -132,6 +132,20 @@ Future<int> runPublishInOrder({
 
     final verb = doPublish ? 'publishes' : 'dry-runs';
     stdout.writeln('\nAll release-set $verb passed (in publish_order.yaml order).');
+
+    if (doPublish) {
+      stdout.writeln('\n--- post-publish audit (--audit-published) ---');
+      final auditCode = await runAuditPublished(
+        packages: packages,
+        workspaceNames: workspaceNames,
+        catalog: gateway,
+      );
+      if (auditCode != 0) {
+        stderr.writeln('Post-publish audit failed.');
+        return auditCode;
+      }
+    }
+
     return 0;
   } on StateError catch (e) {
     stderr.writeln('Publish train failed: $e');

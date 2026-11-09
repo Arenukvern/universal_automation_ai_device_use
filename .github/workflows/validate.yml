@@ -37,24 +37,12 @@ jobs:
       - name: Report manifest drift (non-blocking)
         if: ${{ github.head_ref != 'release-please--branches--main' }}
         continue-on-error: true
-        id: drift_report
-        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
-
-      - name: Annotate manifest drift
-        if: ${{ steps.drift_report.outcome == 'failure' }}
-        run: |
-          echo "::warning::Manifest/pubspec drift vs pub.dev (report only). See 'Report manifest drift' step."
+        run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report
 
       - name: Report pub.dev audit (non-blocking)
         if: ${{ github.head_ref != 'release-please--branches--main' }}
         continue-on-error: true
-        id: audit_report
-        run: dart run tool/check_hosted_deps_resolve.dart --audit-published
-
-      - name: Annotate pub.dev audit
-        if: ${{ steps.audit_report.outcome == 'failure' }}
-        run: |
-          echo "::warning::pub.dev latest packages have unresolved sibling deps (report only). See 'Report pub.dev audit' step."
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published --github-report
 
       - name: Release-please PR — drift + audit (blocking)
         if: ${{ github.head_ref == 'release-please--branches--main' }}

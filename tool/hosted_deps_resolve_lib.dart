@@ -249,32 +249,73 @@ List<String> siblingDepErrorsPubDevOnly({
   return errors;
 }
 
-/// Waits until [version] of [packageName] appears on pub.dev (fail closed).
+/// Writes [errors] to `$GITHUB_STEP_SUMMARY` and one `::warning` per line.
+void emitGithubCiReport({required String title, required List<String> errors}) {
+  if (errors.isEmpty) {
+    return;
+  }
+  for (final error in errors) {
+    final message = error.replaceAll('%', '%25').replaceAll('\r', '').replaceAll('\n', ' ');
+    stderr.writeln('::warning title=$title::$message');
+  }
+  final summaryPath = Platform.environment['GITHUB_STEP_SUMMARY'];
+  if (summaryPath == null || summaryPath.isEmpty) {
+    return;
+  }
+  final buffer = StringBuffer('### $title\n\n');
+  for (final error in errors) {
+    buffer.writeln('- $error');
+  }
+  buffer.writeln();
+  File(summaryPath).writeAsStringSync(buffer.toString(), mode: FileMode.append);
+}
+
+/// Waits until exact [version] appears in pub.dev package versions (fail closed).
 Future<void> waitForVersionOnPubDev({
   required PubDevGateway catalog,
   required String packageName,
   required String version,
   Duration timeout = const Duration(minutes: 5),
-  Duration pollInterval = const Duration(seconds: 10),
+  Duration initialPollInterval = const Duration(seconds: 2),
 }) async {
   final deadline = DateTime.now().add(timeout);
+  var backoff = initialPollInterval;
+  var polls = 0;
+  final apiUrl = '$_pubDevPackageApi/$packageName';
+
   while (DateTime.now().isBefore(deadline)) {
+    polls++;
     if (catalog is PubDevCatalog) {
       catalog.clearVersionCache(packageName);
     }
     final versions = await catalog.versionsOnPubDev(packageName);
     if (versions.contains(version)) {
-      stdout.writeln('pub.dev lists $packageName@$version');
+      stdout.writeln(
+        'pub.dev API lists exact version $packageName@$version '
+        '(poll $polls)',
+      );
       return;
     }
+    final remaining = deadline.difference(DateTime.now());
+    if (remaining <= Duration.zero) {
+      break;
+    }
     stdout.writeln(
-      'Waiting for $packageName@$version on pub.dev '
-      '(have: ${versions.join(', ')})…',
+      'Waiting for exact $packageName@$version in $apiUrl versions '
+      '(poll $polls; have: ${versions.join(', ')})…',
     );
-    await Future<void>.delayed(pollInterval);
+    final sleep = remaining < backoff ? remaining : backoff;
+    await Future<void>.delayed(sleep);
+    final nextMs = (backoff.inMilliseconds * 1.5).round();
+    backoff = Duration(
+      milliseconds: nextMs.clamp(2000, 30000),
+    );
   }
+
   throw StateError(
-    'Timed out after ${timeout.inSeconds}s waiting for $packageName@$version on pub.dev',
+    'pub.dev visibility timeout: $packageName@$version never appeared in '
+    '$apiUrl versions list within ${timeout.inSeconds}s ($polls polls). '
+    'Do not publish dependents until this version is visible.',
   );
 }
 
@@ -704,6 +745,7 @@ Future<int> runManifestDriftOnly({
   required List<WorkspacePackage> packages,
   required Map<String, String> manifestByName,
   required PubDevGateway catalog,
+  bool githubReport = false,
 }) async {
   try {
     final workspaceNames = packages.map((p) => p.name).toSet();
@@ -727,6 +769,9 @@ Future<int> runManifestDriftOnly({
     for (final e in errors) {
       stderr.writeln('  - $e');
     }
+    if (githubReport) {
+      emitGithubCiReport(title: 'Manifest drift', errors: errors);
+    }
     return 1;
   } on HttpException catch (e) {
     stderr.writeln('Manifest drift check failed: HTTP error from pub.dev: $e');
@@ -745,6 +790,7 @@ Future<int> runAuditPublished({
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
   required PubDevGateway catalog,
+  bool githubReport = false,
 }) async {
   try {
     final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
@@ -777,6 +823,9 @@ Future<int> runAuditPublished({
     stderr.writeln('pub.dev hosted dependency audit failed:\n');
     for (final e in errors) {
       stderr.writeln('  - $e');
+    }
+    if (githubReport) {
+      emitGithubCiReport(title: 'pub.dev audit', errors: errors);
     }
     return 1;
   } on HttpException catch (e) {

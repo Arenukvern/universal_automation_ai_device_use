@@ -117,6 +117,34 @@ void main() {
     ];
 
     test(
+      'regression: semantics train without interface in release set fails',
+      () {
+        final errors = resolveErrorsAlongPublishOrder(
+          packages: [
+            WorkspacePackage(
+              name: 'universal_automation_interface',
+              version: '0.4.0',
+              pubspecPath: 'x',
+              workspaceDeps: {},
+            ),
+            WorkspacePackage(
+              name: 'universal_automation_semantics',
+              version: '0.5.0',
+              pubspecPath: 'x',
+              workspaceDeps: {'universal_automation_interface': '^0.4.0'},
+            ),
+          ],
+          workspaceNames: workspaceNames,
+          pubDevVersions: pubDev,
+          releaseSet: {'universal_automation_semantics'},
+          publishOrder: publishOrder,
+        );
+        expect(errors, isNotEmpty);
+        expect(errors.join('\n'), contains('^0.4.0'));
+      },
+    );
+
+    test(
       'co-release plans interface 0.4.0 before semantics (releasable monorepo)',
       () {
         final errors = resolveErrorsAlongPublishOrder(
@@ -187,6 +215,37 @@ void main() {
         releaseSet: {'universal_automation_semantics'},
       );
       expect(errors, isEmpty);
+    });
+
+    test('release path: semantics and toolkit manifest behind pub.dev latest', () {
+      final errors = manifestDriftErrors(
+        packages: [
+          WorkspacePackage(
+            name: 'universal_automation_semantics',
+            version: '0.5.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+          WorkspacePackage(
+            name: 'universal_automation_toolkit',
+            version: '0.4.0',
+            pubspecPath: 'x',
+            workspaceDeps: {},
+          ),
+        ],
+        manifestByName: {
+          'universal_automation_semantics': '0.3.0',
+          'universal_automation_toolkit': '0.3.0',
+        },
+        pubDevVersions: {
+          'universal_automation_semantics': ['0.3.0', '0.5.0'],
+          'universal_automation_toolkit': ['0.3.0', '0.4.0'],
+        },
+      );
+      expect(
+        errors.where((e) => e.contains('lower than pub.dev latest')).length,
+        greaterThanOrEqualTo(2),
+      );
     });
 
     test('manifest lower than pub.dev latest', () {
