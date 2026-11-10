@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:test/test.dart';
 import 'package:universal_automation_conformance/universal_automation_conformance.dart';
 import 'package:universal_capture_flutter/universal_capture_flutter.dart';
-import 'package:universal_screencast/universal_screencast.dart';
 
 final Uint8List _png = Uint8List.fromList(const [
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4,
