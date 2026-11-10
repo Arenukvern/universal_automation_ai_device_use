@@ -16,7 +16,7 @@ resolution: workspace
 
 dependencies:
   test: ^1.24.0
-  universal_automation_interface: ^0.4.0
+  universal_automation_interface: ^0.5.0
   universal_screencast: ^0.3.0
 
 dev_dependencies:

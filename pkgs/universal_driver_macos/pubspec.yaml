@@ -25,9 +25,9 @@ dependencies:
   code_assets: ^2.0.0
   ffi: ^2.2.0
   hooks: ^2.0.0
-  universal_automation_interface: ^0.4.0
+  universal_automation_interface: ^0.5.0
 
 dev_dependencies:
   test: ^1.31.2
-  universal_automation_conformance: ^0.3.1
+  universal_automation_conformance: ^0.4.0
   xsoulspace_lints: ^0.1.2
