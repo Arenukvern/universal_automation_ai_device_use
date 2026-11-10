@@ -6,6 +6,10 @@ name: Publish package to pub.dev
 on:
   workflow_dispatch:
 
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -22,6 +26,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -38,15 +43,16 @@ jobs:
         run: dart run tool/publish_package_guard.dart
 
   ci:
-    name: Analyze, test, wait deps, dry-run
+    name: Analyze, test, release-path checks
     needs: guard
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -56,10 +62,12 @@ jobs:
       - name: Resolve workspace
         run: dart pub get
 
-      - name: Wait for runtime dependencies on pub.dev
+      - name: Release batch — hosted deps, drift (release tag)
         run: |
-          dart run tool/wait_pub_dev_runtime_deps.dart \
-            --package-dir "${{ needs.guard.outputs.pkg_dir }}"
+          dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
+
+      - name: Release batch — pub.dev audit
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Analyze package
         run: dart analyze
@@ -74,14 +82,11 @@ jobs:
             echo "No test/ directory; skipping tests"
           fi
 
-      - name: Publish dry run
-        run: dart pub publish --dry-run
-        working-directory: ${{ needs.guard.outputs.pkg_dir }}
-
   publish:
     name: Publish to pub.dev (OIDC)
     needs: [guard, ci]
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     environment: pub.dev
     permissions:
       id-token: write
@@ -89,6 +94,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -105,13 +113,36 @@ jobs:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
           set -euo pipefail
-          body=$(curl -fsSL "https://pub.dev/api/packages/${PACKAGE_NAME}")
-          if echo "$body" | jq -e --arg v "$VERSION" '.versions | index($v)' >/dev/null; then
+          tmp=$(mktemp)
+          code=$(curl -sSL -o "$tmp" -w "%{http_code}" \
+            "https://pub.dev/api/packages/${PACKAGE_NAME}")
+          if [ "$code" = "404" ]; then
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+            echo "First publish for ${PACKAGE_NAME} (not on pub.dev yet)."
+            exit 0
+          fi
+          if [ "$code" != "200" ]; then
+            echo "::error::pub.dev API HTTP ${code} for ${PACKAGE_NAME}"
+            exit 1
+          fi
+          if jq -e --arg v "$VERSION" '.versions | index($v)' "$tmp" >/dev/null; then
             echo "skip=true" >> "$GITHUB_OUTPUT"
             echo "::notice::${PACKAGE_NAME}@${VERSION} is already on pub.dev; skipping publish"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Wait for runtime dependencies on pub.dev
+        if: steps.skip.outputs.skip != 'true'
+        run: |
+          dart run tool/wait_pub_dev_runtime_deps.dart \
+            --package-dir "${{ needs.guard.outputs.pkg_dir }}" \
+            --timeout-minutes 50
+
+      - name: Publish dry run
+        if: steps.skip.outputs.skip != 'true'
+        run: dart pub publish --dry-run
+        working-directory: ${{ needs.guard.outputs.pkg_dir }}
 
       - name: Mint pub.dev OIDC token and publish
         if: steps.skip.outputs.skip != 'true'
@@ -143,6 +174,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          persist-credentials: false
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
