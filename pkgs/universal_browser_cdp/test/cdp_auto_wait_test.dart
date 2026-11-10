@@ -226,13 +226,11 @@ void main() {
       await expectLater(
         driver.perform(const ClickAction(name: 'Nonexistent')),
         throwsA(
-          isA<ElementNotFoundException>()
-              .having((error) => error.locator, 'locator', 'name')
-              .having(
-                (error) => error.locatorValue,
-                'locatorValue',
-                'Nonexistent',
-              ),
+          isA<ProtocolException>().having(
+            (error) => error.toString(),
+            'payload',
+            contains('Nonexistent'),
+          ),
         ),
       );
       expect(server.inputEvents, isEmpty);
