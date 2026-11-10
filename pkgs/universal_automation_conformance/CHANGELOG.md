@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### Breaking changes
+
+- Require `universal_automation_interface` `^0.4.0`: conformance entrypoints
+  (`automationDriverConformanceTests`, frame source/sink suites) take types from
+  interface 0.4, so consumers on interface 0.3 must upgrade before adopting this
+  release. Also align `universal_screencast` to `^0.3.0` (republish after silent
+  drift: chore constraint sync never bumped pub.dev `0.3.1`).
+
 ## 0.3.1
 
 - `universal_screencast` constraint widens to `^0.2.0` (missed when the
