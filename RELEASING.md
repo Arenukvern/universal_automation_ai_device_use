@@ -27,6 +27,7 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 - **Manifest** (release-please) = last released version on `main`; on an open **release-please PR** the manifest is bumped to the **next** version together with pubspec (not yet on pub.dev).
 - **Blocking everywhere** except on **`main` and ordinary PRs** until companion PR **#24** lands: manifest markers that trail pub.dev (`manifest < pub.dev latest`, or manifest version never shipped) are **warnings** on the blocking `--co-release --warn-manifest-behind-pub` step (not errors). **Release paths** keep manifest-behind blocking; see the table below for manifest-not-on-pub.dev. **Git-tag reuse** runs only on `--check-manifest-drift` paths, and only for packages in the **release set** (not on ordinary PR validate).
 - Pubspec < pub.dev latest → error (backward). Pubspec equals pub.dev latest → OK only if unchanged since git tag `<package>-v<version>` (else version reuse error; no tag → OK with warning). Pubspec on pub.dev but not latest → reuse error. Pending packages (ahead of pub.dev, not published) satisfy sibling constraints via co-release in `publish_order.yaml` order.
+- **Published exact-version constraint parity** (release paths + `--audit-published`): if pubspec version **V** is already on pub.dev, every local `universal_*` dependency constraint must match the `https://pub.dev/api/packages/<name>/versions/<V>` tarball (not merely resolve). Pending release-set packages are exempt (same as `--release-pr` pending releases). Drift → land `fix(<package>)` on `main` so release-please bumps and republish.
 
 | Context | Command | Manifest not on pub.dev |
 | --- | --- | --- |
@@ -45,6 +46,12 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 2. Optionally re-run the workflow: **Actions → Post-publish audit → Run workflow** (`post_publish_audit.yml`), which runs `dart run tool/check_hosted_deps_resolve.dart --audit-published` (blocking, fail closed).
 
 ## Release-please
+
+### Intra-workspace constraint sync
+
+The **sync-release-pr-constraints** job writes sibling pins on the release-please branch and commits them as **`chore: sync intra-workspace pub dependency constraints`** so release-please does **not** treat the commit as a releasable package change. That is intentional for *pending* releases on the release PR.
+
+If pins change for a package whose **current pubspec version is already on pub.dev**, the chore sync is not enough: land a scoped **`fix(<package>)`** on `main` (or merge a maintainer commit that bumps that package) so release-please opens a republish PR. We do **not** switch the sync bot to `fix()` per package — that would force unrelated version bumps across the workspace.
 
 The **sync-release-pr-constraints** job checks out the release-please branch at the repo root (for `pkgs/` and manifest) and a nested **trusted** checkout of the triggering `main` commit; it runs `dart run trusted/tool/…` from the release tree so guards like `--release-pr` always match CI on `main`.
 

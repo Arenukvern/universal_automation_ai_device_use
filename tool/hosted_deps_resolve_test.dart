@@ -8,14 +8,18 @@ class _FakePubDevGateway implements PubDevGateway {
   _FakePubDevGateway({
     this.versions = const {},
     this.latestDeps = const {},
+    this.versionDeps = const {},
     this.failOnVersionsFor,
     this.failOnLatestFor,
+    this.failOnVersionDepsFor,
   });
 
   final Map<String, List<String>> versions;
   final Map<String, Map<String, String>> latestDeps;
+  final Map<String, Map<String, String>> versionDeps;
   final String? failOnVersionsFor;
   final String? failOnLatestFor;
+  final String? failOnVersionDepsFor;
 
   @override
   Future<List<String>> versionsOnPubDev(String packageName) async {
@@ -33,6 +37,18 @@ class _FakePubDevGateway implements PubDevGateway {
       throw HttpException('simulated 503', uri: Uri.parse('https://pub.dev'));
     }
     return latestDeps[packageName] ?? {};
+  }
+
+  @override
+  Future<Map<String, String>> publishedWorkspaceDepsAtVersion(
+    String packageName,
+    String version,
+  ) async {
+    final key = publishedDepsAtVersionKey(packageName, version);
+    if (failOnVersionDepsFor == key) {
+      throw HttpException('simulated 503', uri: Uri.parse('https://pub.dev'));
+    }
+    return versionDeps[key] ?? {};
   }
 
   @override
@@ -503,6 +519,84 @@ void main() {
     });
   });
 
+  group('publishedExactVersionWorkspaceConstraintDriftErrors', () {
+    test('flags drift for shipped version constraints', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_automation_conformance',
+          version: '0.3.1',
+          pubspecPath: 'x',
+          workspaceDeps: {
+            'universal_automation_interface': '^0.4.0',
+            'universal_screencast': '^0.3.0',
+          },
+        ),
+      ];
+      final errors = publishedExactVersionWorkspaceConstraintDriftErrors(
+        packages: packages,
+        pubDevVersions: {
+          'universal_automation_conformance': ['0.3.1'],
+        },
+        releaseSet: {},
+        publishedDepsAtExactVersion: {
+          publishedDepsAtVersionKey(
+            'universal_automation_conformance',
+            '0.3.1',
+          ): {
+            'universal_automation_interface': '^0.3.0',
+            'universal_screencast': '^0.2.0',
+          },
+        },
+      );
+      expect(errors.length, 2);
+      expect(errors.first, contains('universal_automation_conformance@0.3.1'));
+      expect(errors.first, contains('fix(universal_automation_conformance)'));
+    });
+
+    test('skips pending release-set package', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_automation_conformance',
+          version: '0.3.2',
+          pubspecPath: 'x',
+          workspaceDeps: {'universal_automation_interface': '^0.4.0'},
+        ),
+      ];
+      final errors = publishedExactVersionWorkspaceConstraintDriftErrors(
+        packages: packages,
+        pubDevVersions: {'universal_automation_conformance': ['0.3.1']},
+        releaseSet: {'universal_automation_conformance'},
+        publishedDepsAtExactVersion: {},
+      );
+      expect(errors, isEmpty);
+    });
+
+    test('passes when constraints match shipped tarball', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_automation_conformance',
+          version: '0.3.1',
+          pubspecPath: 'x',
+          workspaceDeps: {'universal_automation_interface': '^0.3.0'},
+        ),
+      ];
+      final errors = publishedExactVersionWorkspaceConstraintDriftErrors(
+        packages: packages,
+        pubDevVersions: {
+          'universal_automation_conformance': ['0.3.1'],
+        },
+        releaseSet: {},
+        publishedDepsAtExactVersion: {
+          publishedDepsAtVersionKey(
+            'universal_automation_conformance',
+            '0.3.1',
+          ): {'universal_automation_interface': '^0.3.0'},
+        },
+      );
+      expect(errors, isEmpty);
+    });
+  });
+
   group('runAuditPublished', () {
     test('fails closed when pub.dev is unreachable', () async {
       final packages = [
@@ -518,6 +612,38 @@ void main() {
         workspaceNames: {'universal_automation_interface'},
         catalog: _FakePubDevGateway(
           failOnVersionsFor: 'universal_automation_interface',
+        ),
+      );
+      expect(code, 1);
+    });
+
+    test('reports exact-version constraint drift against pub.dev archives', () async {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_automation_conformance',
+          version: '0.3.1',
+          pubspecPath: 'x',
+          workspaceDeps: {
+            'universal_automation_interface': '^0.4.0',
+            'universal_screencast': '^0.3.0',
+          },
+        ),
+      ];
+      final key = publishedDepsAtVersionKey(
+        'universal_automation_conformance',
+        '0.3.1',
+      );
+      final code = await runAuditPublished(
+        packages: packages,
+        workspaceNames: {'universal_automation_conformance'},
+        catalog: _FakePubDevGateway(
+          versions: {'universal_automation_conformance': ['0.3.1']},
+          versionDeps: {
+            key: {
+              'universal_automation_interface': '^0.3.0',
+              'universal_screencast': '^0.2.0',
+            },
+          },
         ),
       );
       expect(code, 1);
