@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.6.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.0...universal_browser_cdp-v0.6.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_browser_cdp:** update auto-wait refusal test to the structured protocol error contract ([26f34fa](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/26f34fa186bd78535a84e358001a9ac3660b6f84))
+
 ## [0.6.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.5.0...universal_browser_cdp-v0.6.0) (2026-11-10)
 
 

@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_macos-v0.3.1...universal_capture_macos-v0.3.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_capture_macos:** drop unused screencast imports from tests ([cd943fb](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/cd943fbaf3ff2696af568d1735f7192e53667da8))
+
 ## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_macos-v0.3.0...universal_capture_macos-v0.3.1) (2026-11-10)
 
 
