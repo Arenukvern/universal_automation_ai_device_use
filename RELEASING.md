@@ -46,6 +46,13 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 
 ## Release-please
 
+Release Please runs on pushes to `main` and can be **re-run manually** after tag or manifest fixes (no new code push required). Manual dispatch must use **`main`** as the ref: the workflow is gated with `if: github.ref == 'refs/heads/main'` so an unreviewed branch cannot run Release Please or trust-check out arbitrary `tool/` at that SHA.
+
+- **GitHub:** Actions → **Release Please** → **Run workflow** (branch `main` only).
+- **CLI:** `gh workflow run release-please.yml --repo Arenukvern/universal_automation_ai_device_use --ref main`
+
+Release Please discovers the last release from the `<package>-v<version>` git tag that matches the version in `.release-please-manifest.json`. If you manually published a version and then **backfill** that tag, point it at the **published source commit** — not an arbitrary SHA — or the next release PR can miscompute the baseline.
+
 The **sync-release-pr-constraints** job checks out the release-please branch at the repo root (for `pkgs/` and manifest) and a nested **trusted** checkout of the triggering `main` commit; it runs `dart run trusted/tool/…` from the release tree so guards like `--release-pr` always match CI on `main`.
 
 Merge release-please PRs only when **release-path** CI passes: co-release resolve and release-PR version policy (`--check-manifest-drift --release-pr`) on the release branch.
