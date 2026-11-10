@@ -11,7 +11,7 @@ gh workflow run publish_package.yml \
   --ref universal_<package>-vX.Y.Z
 ```
 
-The publish workflow waits for runtime `universal_*` dependencies on pub.dev, runs analyze/test/dry-run, mints an OIDC token immediately before `dart pub publish --force`, skips if that exact version is already on pub.dev, then verifies the version appears in the pub.dev API.
+Jobs: **guard** (tag ref + pubspec) → **ci** (release-path `check_hosted_deps_resolve` co-release + drift `--release-pr` + `--audit-published`, then analyze/test at the tag ref) → **publish** (one **`pub.dev` environment approval per package** — up to **17** approvals in a full release train) → skip-if-published (HTTP **404** from the pub.dev package API means first publish; proceed) → **exact-version** runtime dep wait → dry-run → **fresh** OIDC mint → `dart pub publish --force` → **verify**. Dependency wait and dry-run run only after approval so downstream packages (e.g. harness waiting for toolkit 0.5.0) do not time out while earlier packages await Anton. Same-tag reruns are serialized (`concurrency: publish-${{ github.ref }}`). Skips publish if that exact version is already listed on pub.dev.
 
 ### Manual fallback (`publish_in_order`)
 
