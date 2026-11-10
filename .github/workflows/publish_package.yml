@@ -1,0 +1,162 @@
+# Per-package pub.dev publish (OIDC). workflow_dispatch only; ref must be a release tag.
+# release-please.yml dispatches this workflow after each released package tag.
+
+name: Publish package to pub.dev
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  guard:
+    name: Validate tag ref and pubspec
+    runs-on: ubuntu-latest
+    outputs:
+      pkg_dir: ${{ steps.guard.outputs.pkg_dir }}
+      package_name: ${{ steps.guard.outputs.package_name }}
+      version: ${{ steps.guard.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Guard publish tag and pubspec
+        id: guard
+        env:
+          GITHUB_REF: ${{ github.ref }}
+        run: dart run tool/publish_package_guard.dart
+
+  ci:
+    name: Analyze, test, wait deps, dry-run
+    needs: guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Wait for runtime dependencies on pub.dev
+        run: |
+          dart run tool/wait_pub_dev_runtime_deps.dart \
+            --package-dir "${{ needs.guard.outputs.pkg_dir }}"
+
+      - name: Analyze package
+        run: dart analyze
+        working-directory: ${{ needs.guard.outputs.pkg_dir }}
+
+      - name: Test package
+        working-directory: ${{ needs.guard.outputs.pkg_dir }}
+        run: |
+          if [ -d test ]; then
+            dart test --concurrency=1
+          else
+            echo "No test/ directory; skipping tests"
+          fi
+
+      - name: Publish dry run
+        run: dart pub publish --dry-run
+        working-directory: ${{ needs.guard.outputs.pkg_dir }}
+
+  publish:
+    name: Publish to pub.dev (OIDC)
+    needs: [guard, ci]
+    runs-on: ubuntu-latest
+    environment: pub.dev
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace
+        run: dart pub get
+
+      - name: Skip if version already on pub.dev
+        id: skip
+        env:
+          PACKAGE_NAME: ${{ needs.guard.outputs.package_name }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          set -euo pipefail
+          body=$(curl -fsSL "https://pub.dev/api/packages/${PACKAGE_NAME}")
+          if echo "$body" | jq -e --arg v "$VERSION" '.versions | index($v)' >/dev/null; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "::notice::${PACKAGE_NAME}@${VERSION} is already on pub.dev; skipping publish"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Mint pub.dev OIDC token and publish
+        if: steps.skip.outputs.skip != 'true'
+        working-directory: ${{ needs.guard.outputs.pkg_dir }}
+        run: |
+          set -euo pipefail
+          if [ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || [ -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]; then
+            echo "::error::OIDC is unavailable (ACTIONS_ID_TOKEN_REQUEST_URL or ACTIONS_ID_TOKEN_REQUEST_TOKEN missing). Use the pub.dev environment with id-token: write — do not set these vars in workflow env (oka #24)."
+            exit 1
+          fi
+          OIDC_JSON=$(curl -fsSL \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=https://pub.dev")
+          PUB_TOKEN=$(echo "$OIDC_JSON" | jq -r .value)
+          if [ -z "$PUB_TOKEN" ] || [ "$PUB_TOKEN" = "null" ]; then
+            echo "::error::Failed to parse OIDC token from ACTIONS_ID_TOKEN_REQUEST_URL response"
+            exit 1
+          fi
+          echo "::add-mask::${PUB_TOKEN}"
+          export PUB_TOKEN
+          dart pub token add https://pub.dev --env-var PUB_TOKEN >/dev/null
+          dart pub publish --force
+
+  verify:
+    name: Verify version on pub.dev
+    needs: [guard, publish]
+    if: needs.publish.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Wait for exact version on pub.dev
+        env:
+          PACKAGE_NAME: ${{ needs.guard.outputs.package_name }}
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          dart run tool/wait_pub_dev_exact_version.dart \
+            --package "$PACKAGE_NAME" \
+            --version "$VERSION"

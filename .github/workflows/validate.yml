@@ -55,6 +55,9 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: dart run tool/check_reusable_workflow_inputs.dart
 
+      - name: Tool unit tests
+        run: dart test tool/
+
       - name: Resolve workspace
         run: dart pub get
 
