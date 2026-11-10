@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.5.0...universal_automation_toolkit-v0.5.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_automation_toolkit:** remove analyzer warnings from examples and mcp server ([a6e2199](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/a6e21999578b645a15bcb604404547f241d24157))
+
 ## [0.5.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.4.0...universal_automation_toolkit-v0.5.0) (2026-11-10)
 
 

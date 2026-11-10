@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.2.3](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.2...universal_capture_flutter-v0.2.3) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_capture_flutter:** drop unused screencast import from test ([f8e8023](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f8e8023d8ec326db5fef999bcbe0e17a34d71090))
+
 ## [0.2.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.1...universal_capture_flutter-v0.2.2) (2026-11-10)
 
 

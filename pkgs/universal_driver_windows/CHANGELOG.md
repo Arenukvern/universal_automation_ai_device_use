@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.3.1...universal_driver_windows-v0.3.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_driver_windows:** drop unused dart:async import from test ([95ff6be](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/95ff6be1c4b25e9bec6a8a8e547443aa56f5c036))
+
 ## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.3.0...universal_driver_windows-v0.3.1) (2026-11-10)
 
 

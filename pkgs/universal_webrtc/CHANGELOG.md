@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.3.1...universal_webrtc-v0.3.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_webrtc:** drop unused import and variable from debug_connect tool ([04c973e](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/04c973e532e2e0f2847d895e716b3b3306d32d48))
+
 ## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.3.0...universal_webrtc-v0.3.1) (2026-11-10)
 
 
