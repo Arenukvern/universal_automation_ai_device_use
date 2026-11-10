@@ -61,7 +61,7 @@ Future<void> main(List<String> args) async {
         pid = int.tryParse(text.split('\n').first);
       }
     }
-    if (pid != null && pid! > 0) {
+    if (pid != null && pid > 0) {
       final anchored = MacosDriver(
         bridge: driver.bridge,
         targetPid: pid,
@@ -103,7 +103,7 @@ Future<void> main(List<String> args) async {
         captureError = error;
       }
     }
-    check('screenshotMeta', frame != null && frame!.width > 0, captureError);
+    check('screenshotMeta', frame != null && frame.width > 0, captureError);
     if (frame == null || live == null) {
       check('computerLoop', false, 'no capturable window for pid $pid');
     } else {

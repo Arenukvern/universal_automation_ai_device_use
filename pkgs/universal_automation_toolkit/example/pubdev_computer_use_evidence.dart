@@ -136,7 +136,7 @@ Future<void> main(List<String> args) async {
         continue;
       }
     }
-    check('screenshotMeta', frame != null && frame!.width > 0);
+    check('screenshotMeta', frame != null && frame.width > 0);
     if (frame != null && live != null) {
       evidence['bind'] = {
         'windowId': live.windowId,

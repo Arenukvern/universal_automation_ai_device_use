@@ -894,7 +894,7 @@ final class ToolkitMcpServer {
     Map<String, Object?> arguments,
   ) {
     if (driver is! MacosDriver) return;
-    (driver as MacosDriver).preferWebContent =
+    driver.preferWebContent =
         arguments['preferWebContent'] != false;
   }
 
