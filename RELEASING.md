@@ -1,8 +1,21 @@
 # Releasing workspace packages to pub.dev
 
-## Sanctioned publish path
+## Sanctioned publish path (CI default)
 
-Run the publish train **on the owner’s Mac** with their own pub.dev credentials (`dart pub token` / interactive login). CI does not publish family packages.
+After **release-please** merges and tags `<package>-v<version>`, **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** on each release tag. Publish uses **OIDC** (`environment: pub.dev`, Anton required reviewer) — no long-lived `PUB_TOKEN` in GitHub secrets.
+
+```bash
+# Manual recovery (same workflow as CI):
+gh workflow run publish_package.yml \
+  --repo Arenukvern/universal_automation_ai_device_use \
+  --ref universal_<package>-vX.Y.Z
+```
+
+Jobs: **guard** (tag ref + pubspec) → **ci** (release-path `check_hosted_deps_resolve` co-release + drift `--release-pr` + `--audit-published`, then analyze/test at the tag ref) → **publish** (one **`pub.dev` environment approval per package** — up to **17** approvals in a full release train) → skip-if-published (HTTP **404** from the pub.dev package API means first publish; proceed) → **exact-version** runtime dep wait → dry-run → **fresh** OIDC mint → `dart pub publish --force` → **verify**. Dependency wait and dry-run run only after approval so downstream packages (e.g. harness waiting for toolkit 0.5.0) do not time out while earlier packages await Anton. Same-tag reruns are serialized (`concurrency: publish-${{ github.ref }}`). Skips publish if that exact version is already listed on pub.dev.
+
+### Manual fallback (`publish_in_order`)
+
+For bulk trains or offline recovery, run the publish train **on the owner’s Mac** with local pub.dev credentials (`dart pub token` / interactive login):
 
 ```bash
 dart pub get
@@ -16,11 +29,9 @@ dart run tool/publish_in_order.dart --publish --yes
 # non-interactive confirm (scripts only; prefer interactive)
 ```
 
-Default is **dry-run** (`dart pub publish --dry-run` per release-set package). Real publishes need `--publish` plus confirmation (`publish` on stdin) or `--yes`.
+`tool/publish_in_order.dart` reads `tool/publish_order.yaml`, selects the **release set**, runs version policy + co-release resolve, publishes in order, waits for each exact version on pub.dev, then runs **`--audit-published`**.
 
-`tool/publish_in_order.dart` reads `tool/publish_order.yaml`, selects the **release set** (pubspec > pub.dev latest and not yet on pub.dev), runs the full **version policy** + co-release resolve, verifies siblings are already on pub.dev before each package, runs `dart pub publish` per package in order, **waits** for each exact version on the pub.dev API, then runs **`--audit-published`** at the end.
-
-**Do not** run bare `dart pub publish` from package directories outside this train — order and pub.dev visibility are not enforced.
+**Do not** run bare `dart pub publish` from package directories outside CI or this train — order and pub.dev visibility are not enforced.
 
 ### Version policy (CI + publish train)
 
@@ -39,7 +50,7 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 
 `--release-pr` is only valid with `--check-manifest-drift`. Pre-publish `--audit-published` runs from `publish_in_order.dart` and `post_publish_audit.yml`, not from the release-please constraint sync job.
 
-`universal_tooling_runtime` additionally has [`.github/workflows/publish_tooling_runtime.yml`](.github/workflows/publish_tooling_runtime.yml) (tag dispatch). All other family packages are manual via `publish_in_order.dart`.
+All release-please packages publish via [`.github/workflows/publish_package.yml`](.github/workflows/publish_package.yml) (OIDC, `workflow_dispatch` on the release tag). See pub.dev automated publishing config: tag pattern `<pkg>-v{{version}}`.
 
 ## After every publish train
 

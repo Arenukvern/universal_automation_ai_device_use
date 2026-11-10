@@ -14,8 +14,8 @@ jobs:
       contents: write
       pull-requests: write
     outputs:
-      tooling_runtime_release_created: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--release_created'] }}
-      tooling_runtime_tag_name: ${{ steps.release.outputs['pkgs/universal_tooling_runtime--tag_name'] }}
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      release_outputs_json: ${{ toJSON(steps.release.outputs) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -118,18 +118,29 @@ jobs:
           gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
           gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
 
-  dispatch-tooling-runtime-publish:
+  dispatch-package-publish:
     needs: release-please
-    if: ${{ needs.release-please.outputs.tooling_runtime_release_created == 'true' }}
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       actions: write
     steps:
-      - name: Dispatch pub.dev publish (universal_tooling_runtime)
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Dispatch pub.dev publish per released package
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          TAG: ${{ needs.release-please.outputs.tooling_runtime_tag_name }}
-        run: |
-          echo "Dispatching publish_tooling_runtime.yml for tag ${TAG}"
-          gh workflow run publish_tooling_runtime.yml --repo "${GH_REPO}" --ref "${TAG}"
+          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+        run: dart run tool/dispatch_pub_dev_publish.dart

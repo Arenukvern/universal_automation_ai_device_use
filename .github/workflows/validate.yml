@@ -58,6 +58,9 @@ jobs:
       - name: Resolve workspace
         run: dart pub get
 
+      - name: Tool unit tests
+        run: dart test tool/
+
       - name: Analyze packages (steward.yaml quality.validate)
         run: |
           set -euo pipefail
