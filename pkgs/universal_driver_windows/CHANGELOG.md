@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.3.0...universal_driver_windows-v0.3.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* clear pub validator analyze errors in capture and driver pkgs ([d8df929](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/d8df929395c8c3591ccfd213cd2061141dbda577))
+* pub validator analyze errors in capture and driver packages ([336a966](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/336a966b711705cbbe90104adbd836ea9e7207a3))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_driver_windows-v0.2.0...universal_driver_windows-v0.3.0) (2026-10-27)
 
 

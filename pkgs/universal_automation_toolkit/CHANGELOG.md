@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.4.0...universal_automation_toolkit-v0.5.0) (2026-11-10)
+
+
+### Features
+
+* **semantics:** SemanticLens — compact and design render usefulness ([1c6f798](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c6f7982a1764ea090860d23aff284c5df073159))
+
+
+### Bug Fixes
+
+* **ci:** sync toolkit constraint for universal_driver_flutter 0.1.1 ([04f687a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/04f687ae4af92e7ab9d02967a80b12d165a23be3))
+* **ci:** sync toolkit workspace constraint after driver_flutter 0.1.1 ([f2d15e6](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f2d15e68446ee50e1a72649e79c2c0debb5682e4))
+
 ## 0.4.0
 
 - **Native Flutter vmService tier**: `--vm <vm-service-uri>` (env

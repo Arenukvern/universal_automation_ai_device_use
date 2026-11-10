@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_conformance-v0.3.1...universal_automation_conformance-v0.4.0) (2026-11-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* **conformance:** conformance suites now target universal_automation_interface 0.4 types (AutomationDriver and related APIs used by automationDriverConformanceTests, FrameSource, and FrameSink conformance entrypoints). Consumers on interface 0.3 must upgrade before adopting this release.
+
+### Bug Fixes
+
+* **conformance:** require interface ^0.4.0 and screencast ^0.3.0 ([bf39be8](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/bf39be85f09167a37fc29784033ba892c1eebb27))
+
 ## 0.3.1
 
 - `universal_screencast` constraint widens to `^0.2.0` (missed when the

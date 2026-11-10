@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_webdriver-v0.3.0...universal_browser_webdriver-v0.3.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_browser_webdriver:** sync workspace dependency constraints for the 0.5.0/0.6.0 release cycle ([e187d0d](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/e187d0da0bf06dac6a101f885d266c4332c7a3dc))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_webdriver-v0.2.0...universal_browser_webdriver-v0.3.0) (2026-10-27)
 
 
