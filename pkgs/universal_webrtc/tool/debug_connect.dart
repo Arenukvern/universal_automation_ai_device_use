@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -69,12 +68,10 @@ Future<void> main() async {
     ),
   );
   log('frame pushed; waiting 15s for frame event...');
-  List<SidecarEvent> received;
   try {
-    received = await frames.timeout(const Duration(seconds: 15));
+    await frames.timeout(const Duration(seconds: 15));
     } on TimeoutException {
     log('TIMEOUT waiting for frame event');
-    received = const <SidecarEvent>[];
   }
   await sink.close();
   await sourceFactory.close();
