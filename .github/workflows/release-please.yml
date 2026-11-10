@@ -4,9 +4,11 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   release-please:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -47,6 +49,7 @@ jobs:
         with:
           ref: ${{ github.sha }}
           path: trusted
+          persist-credentials: false
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -57,8 +60,9 @@ jobs:
         working-directory: trusted
         run: dart pub get
 
-      # Only pushes to main trigger this workflow; sync pushes to
-      # release-please--branches--main cannot re-enter release-please.
+      # Runs on push to main or workflow_dispatch from main (see release-please
+      # job `if`). Sync pushes to release-please--branches--main cannot re-enter
+      # this workflow via push; dispatch from non-main refs is refused.
       - name: Sync intra-workspace pub constraints on release PR
         id: sync_constraints
         env:
