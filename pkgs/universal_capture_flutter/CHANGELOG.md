@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.2.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.1...universal_capture_flutter-v0.2.2) (2026-11-10)
+
+
+### Bug Fixes
+
+* clear pub validator analyze errors in capture and driver pkgs ([d8df929](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/d8df929395c8c3591ccfd213cd2061141dbda577))
+* pub validator analyze errors in capture and driver packages ([336a966](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/336a966b711705cbbe90104adbd836ea9e7207a3))
+
 ## [0.2.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.0...universal_capture_flutter-v0.2.1) (2026-10-27)
 
 

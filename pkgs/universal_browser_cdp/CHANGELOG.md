@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.6.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.5.0...universal_browser_cdp-v0.6.0) (2026-11-10)
+
+
+### Features
+
+* evaluate returns its value; per-page console capture ([5c6a4eb](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/5c6a4eb3f7ca6bfa0469227f61d2ac412cf5558d))
+
 ## [0.5.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.4.0...universal_browser_cdp-v0.5.0) (2026-10-27)
 
 

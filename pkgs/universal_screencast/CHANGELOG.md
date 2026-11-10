@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_screencast-v0.3.0...universal_screencast-v0.3.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_screencast:** sync workspace dependency constraints for the 0.5.0/0.6.0 release cycle ([b4af311](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/b4af3115104c8c3f2a3b57e154b13673b5833fc4))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_screencast-v0.2.0...universal_screencast-v0.3.0) (2026-10-27)
 
 

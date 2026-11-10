@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.3.0...universal_webrtc-v0.3.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_webrtc:** sync workspace dependency constraints for the 0.5.0/0.6.0 release cycle ([02f0498](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/02f0498327bae0afa7999eb7157215e3a789053e))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.2.0...universal_webrtc-v0.3.0) (2026-10-27)
 
 

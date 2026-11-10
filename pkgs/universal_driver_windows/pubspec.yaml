@@ -3,7 +3,7 @@ description: >-
   Windows accessibility driver for the universal automation family: a
   UI Automation (UIA) driver over a Rust sidecar, mapping the Windows
   control tree onto the family's semantic snapshot model.
-version: 0.3.0
+version: 0.3.1
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -21,9 +21,9 @@ resolution: workspace
 
 dependencies:
   meta: ^1.19.0
-  universal_automation_interface: ^0.4.0
+  universal_automation_interface: ^0.5.0
 
 dev_dependencies:
   test: ^1.31.2
-  universal_automation_conformance: ^0.3.1
+  universal_automation_conformance: ^0.4.0
   xsoulspace_lints: ^0.1.2

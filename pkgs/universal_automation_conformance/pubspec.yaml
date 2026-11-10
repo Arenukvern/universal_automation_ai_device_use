@@ -3,7 +3,7 @@ description: >-
   Conformance suites for the universal automation family: prove drivers,
   frame sources, and frame sinks are swappable by adopting one call in
   your tests.
-version: 0.3.1
+version: 0.4.0
 homepage: https://github.com/Arenukvern/universal_automation_ai_device_use
 repository: https://github.com/Arenukvern/universal_automation_ai_device_use
 issue_tracker: https://github.com/Arenukvern/universal_automation_ai_device_use/issues
@@ -16,8 +16,8 @@ resolution: workspace
 
 dependencies:
   test: ^1.24.0
-  universal_automation_interface: ^0.4.0
-  universal_screencast: ^0.3.0
+  universal_automation_interface: ^0.5.0
+  universal_screencast: ^0.3.1
 
 dev_dependencies:
   xsoulspace_lints: ^0.1.2

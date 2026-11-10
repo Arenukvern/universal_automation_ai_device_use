@@ -1,6 +1,20 @@
 # Changelog
 
 
+## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.2.0...universal_automation_harness-v0.3.0) (2026-11-10)
+
+
+### Features
+
+* **semantics:** SemanticLens — compact and design render usefulness ([1c6f798](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c6f7982a1764ea090860d23aff284c5df073159))
+
+
+### Bug Fixes
+
+* **universal_automation_harness:** document toolkit ^0.5.0 requirement ([0ff3134](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/0ff3134b3ec29d7dafe114ce8732f44263599502))
+* **universal_automation_harness:** release with toolkit 0.5.0 constraint sync ([ddeb7b4](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/ddeb7b41854e98ce6916ab78a2780ff933a279f9))
+* **universal_automation_harness:** release with toolkit 0.5.0 constraint sync ([bff1854](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/bff1854a492d5f53b7170cc7427406c7f5a9b67b))
+
 ## [0.2.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.1.1...universal_automation_harness-v0.2.0) (2026-10-27)
 
 

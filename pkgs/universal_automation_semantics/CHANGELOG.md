@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_semantics-v0.5.0...universal_automation_semantics-v0.5.1) (2026-11-10)
+
+
+### Bug Fixes
+
+* **universal_automation_semantics:** sync workspace dependency constraints for the 0.5.0/0.6.0 release cycle ([895bce5](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/895bce5adbecaef3f4f6287c23f1eed09ec00dfa))
+
 ## 0.5.0
 
 - **SemanticLens — switchable render usefulness** (measured in
