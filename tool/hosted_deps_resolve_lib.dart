@@ -746,7 +746,7 @@ List<String> publishedExactVersionWorkspaceConstraintDriftErrors({
         '${pkg.name}@${pkg.version}: workspace $depName constraint '
         '${local ?? '(missing)'} differs from pub.dev ${pkg.version} '
         '(${remote ?? '(missing)'}). '
-        'Land a fix(${pkg.name}) commit so release-please bumps it and republish.',
+        'Land a fix(${pkg.name}) commit so release-please bumps it and you can publish a new version.',
       );
     }
   }

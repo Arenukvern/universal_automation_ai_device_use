@@ -46,11 +46,9 @@ jobs:
         continue-on-error: true
         run: dart run tool/check_hosted_deps_resolve.dart --audit-published --github-report
 
-      - name: Release-please PR — drift + audit (blocking)
+      - name: Release-please PR — co-release + drift (blocking)
         if: ${{ github.head_ref == 'release-please--branches--main' }}
-        run: |
-          dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only
-          dart run tool/check_hosted_deps_resolve.dart --audit-published
+        run: dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
 
       - name: Check reusable workflow inputs
         env:

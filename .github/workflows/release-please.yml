@@ -77,7 +77,7 @@ jobs:
           dart run trusted/tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
           # Constraint sync commits stay `chore:` (no release-please bump). When
           # a pub.dev-shipped package's universal_* pins change, land a scoped
-          # fix(<package>) on main so release-please opens a republish PR — see
+          # fix(<package>) on main so release-please bumps — see
           # RELEASING.md "Intra-workspace constraint sync".
           if git diff --quiet -- pkgs; then
             echo "Workspace pub constraints already in sync"
