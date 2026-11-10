@@ -2,7 +2,11 @@
 
 Conformance suites proving `AutomationDriver`, `FrameSource`, and
 `FrameSink` implementations are swappable. Adoption is one call, exactly
-like `universal_storage_conformance`:
+like `universal_storage_conformance`.
+
+**Breaking from 0.3.x:** depends on `universal_automation_interface` `^0.4.0`
+(interface 0.4 `AutomationDriver` / frame types in the suite APIs) and
+`universal_screencast` `^0.3.0`.
 
 ```dart
 void main() {

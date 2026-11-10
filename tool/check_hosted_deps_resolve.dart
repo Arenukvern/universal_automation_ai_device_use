@@ -28,7 +28,8 @@ Flags:
                             "claimed release never shipped".
   --manifest-drift-only     Version policy only (no co-release resolve)
   --warn-manifest-behind-pub  Downgrade manifest-behind-pub.dev to warnings
-  --audit-published         Post-publish: every workspace package on pub.dev
+  --audit-published         Post-publish: pub.dev latest resolves + shipped-version
+                            workspace constraint parity vs pub.dev archives
   --github-report           Emit workflow commands for GitHub Actions
   --release-manifest <path> Alternate release-please manifest JSON
   --publish-order <path>    Alternate publish_order.yaml

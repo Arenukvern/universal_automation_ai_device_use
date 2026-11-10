@@ -38,6 +38,12 @@ class _PollingPubDevGateway implements PubDevGateway {
   Future<Map<String, String>> latestPublishedWorkspaceDeps(String name) async => {};
 
   @override
+  Future<Map<String, String>> publishedWorkspaceDepsAtVersion(
+    String packageName,
+    String version,
+  ) async => {};
+
+  @override
   void close() {}
 }
 
@@ -62,6 +68,12 @@ class _MutablePubDevGateway implements PubDevGateway {
   ) async {
     return Map<String, String>.from(_latestDeps[packageName] ?? {});
   }
+
+  @override
+  Future<Map<String, String>> publishedWorkspaceDepsAtVersion(
+    String packageName,
+    String version,
+  ) async => {};
 
   @override
   void close() {}

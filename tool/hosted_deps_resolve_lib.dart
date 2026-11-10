@@ -123,6 +123,12 @@ abstract class PubDevGateway {
 
   Future<Map<String, String>> latestPublishedWorkspaceDeps(String packageName);
 
+  /// `universal_*` dependency constraints from the pub.dev version archive API.
+  Future<Map<String, String>> publishedWorkspaceDepsAtVersion(
+    String packageName,
+    String version,
+  );
+
   void close() {}
 }
 
@@ -176,6 +182,37 @@ class PubDevCatalog implements PubDevGateway {
     final decoded = jsonDecode(body) as Map<String, dynamic>;
     final latest = decoded['latest'] as Map<String, dynamic>;
     final pubspec = latest['pubspec'] as Map<String, dynamic>;
+    final deps = pubspec['dependencies'] as Map<String, dynamic>? ?? {};
+    final out = <String, String>{};
+    for (final entry in deps.entries) {
+      if (entry.key.startsWith('universal_')) {
+        out[entry.key] = entry.value.toString();
+      }
+    }
+    return out;
+  }
+
+  @override
+  Future<Map<String, String>> publishedWorkspaceDepsAtVersion(
+    String packageName,
+    String version,
+  ) async {
+    final uri = Uri.parse('$_pubDevPackageApi/$packageName/versions/$version');
+    final request = await _client.getUrl(uri);
+    request.headers.set(HttpHeaders.acceptHeader, 'application/json');
+    final response = await request.close();
+    if (response.statusCode == 404) {
+      return {};
+    }
+    if (response.statusCode != 200) {
+      throw HttpException(
+        'pub.dev ${response.statusCode} for $packageName@$version',
+        uri: uri,
+      );
+    }
+    final body = await response.transform(utf8.decoder).join();
+    final decoded = jsonDecode(body) as Map<String, dynamic>;
+    final pubspec = decoded['pubspec'] as Map<String, dynamic>;
     final deps = pubspec['dependencies'] as Map<String, dynamic>? ?? {};
     final out = <String, String>{};
     for (final entry in deps.entries) {
@@ -664,6 +701,79 @@ List<String> auditPublishedLatestErrors({
   return errors;
 }
 
+String publishedDepsAtVersionKey(String packageName, String version) =>
+    '$packageName@$version';
+
+/// For packages whose **pubspec version is already on pub.dev**, workspace
+/// `universal_*` constraints must match that exact published tarball (not
+/// merely "resolve" against pub.dev). Pending packages in [releaseSet] are
+/// skipped (same exemption as version reuse under `--release-pr`).
+List<String> publishedExactVersionWorkspaceConstraintDriftErrors({
+  required List<WorkspacePackage> packages,
+  required Map<String, List<String>> pubDevVersions,
+  required Set<String> releaseSet,
+  required Map<String, Map<String, String>> publishedDepsAtExactVersion,
+}) {
+  final errors = <String>[];
+  for (final pkg in packages) {
+    final pubListed = pubDevVersions[pkg.name] ?? [];
+    if (!pubListed.contains(pkg.version)) {
+      continue;
+    }
+    if (releaseSet.contains(pkg.name)) {
+      continue;
+    }
+    final key = publishedDepsAtVersionKey(pkg.name, pkg.version);
+    final published = publishedDepsAtExactVersion[key];
+    if (published == null) {
+      errors.add(
+        '${pkg.name}@${pkg.version}: missing pub.dev metadata for shipped '
+        'version (cannot verify workspace constraints)',
+      );
+      continue;
+    }
+    final allKeys = {
+      ...pkg.workspaceDeps.keys,
+      ...published.keys,
+    };
+    for (final depName in allKeys) {
+      final local = pkg.workspaceDeps[depName];
+      final remote = published[depName];
+      if (local == remote) {
+        continue;
+      }
+      errors.add(
+        '${pkg.name}@${pkg.version}: workspace $depName constraint '
+        '${local ?? '(missing)'} differs from pub.dev ${pkg.version} '
+        '(${remote ?? '(missing)'}). '
+        'Land a fix(${pkg.name}) commit so release-please bumps it and you can publish a new version.',
+      );
+    }
+  }
+  return errors;
+}
+
+Future<Map<String, Map<String, String>>>
+fetchPublishedWorkspaceDepsForShippedPubspecVersions({
+  required List<WorkspacePackage> packages,
+  required Map<String, List<String>> pubDevVersions,
+  required PubDevGateway catalog,
+}) async {
+  final out = <String, Map<String, String>>{};
+  for (final pkg in packages) {
+    final pubListed = pubDevVersions[pkg.name] ?? [];
+    if (!pubListed.contains(pkg.version)) {
+      continue;
+    }
+    final key = publishedDepsAtVersionKey(pkg.name, pkg.version);
+    out[key] = await catalog.publishedWorkspaceDepsAtVersion(
+      pkg.name,
+      pkg.version,
+    );
+  }
+  return out;
+}
+
 String _maxVersion(List<String> versions) {
   return versions.reduce(
     (a, b) => Version.parse(a) > Version.parse(b) ? a : b,
@@ -857,6 +967,23 @@ Future<int> runHostedWorkspaceCheck({
         )
         : <String>[];
 
+    List<String> publishedConstraintErrors = [];
+    if (checkManifestDrift) {
+      final publishedAtVersion =
+          await fetchPublishedWorkspaceDepsForShippedPubspecVersions(
+        packages: packages,
+        pubDevVersions: pubVersions,
+        catalog: catalog,
+      );
+      publishedConstraintErrors =
+          publishedExactVersionWorkspaceConstraintDriftErrors(
+        packages: packages,
+        pubDevVersions: pubVersions,
+        releaseSet: releaseSet,
+        publishedDepsAtExactVersion: publishedAtVersion,
+      );
+    }
+
     if (policy != null && policy.warnings.isNotEmpty) {
       stderr.writeln('Version policy warnings:\n');
       for (final w in policy.warnings) {
@@ -889,9 +1016,24 @@ Future<int> runHostedWorkspaceCheck({
         stderr.writeln('  - $e');
       }
     }
+    if (publishedConstraintErrors.isNotEmpty) {
+      stderr.writeln(
+        'Published exact-version workspace constraint drift:\n',
+      );
+      for (final e in publishedConstraintErrors) {
+        stderr.writeln('  - $e');
+      }
+      if (githubReport) {
+        emitGithubCiReport(
+          title: 'Published constraint drift',
+          errors: publishedConstraintErrors,
+        );
+      }
+    }
 
     if ((policy?.errors.isNotEmpty ?? false) ||
         dependencyErrors.isNotEmpty ||
+        publishedConstraintErrors.isNotEmpty ||
         orderErrors.isNotEmpty) {
       return 1;
     }
@@ -951,16 +1093,44 @@ Future<int> runManifestDriftOnly({
         emitGithubCiReport(title: 'Version policy warning', errors: policy.warnings);
       }
     }
-    if (policy.errors.isEmpty) {
+    final publishedAtVersion =
+        await fetchPublishedWorkspaceDepsForShippedPubspecVersions(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      catalog: catalog,
+    );
+    final publishedConstraintErrors =
+        publishedExactVersionWorkspaceConstraintDriftErrors(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      releaseSet: releaseSet,
+      publishedDepsAtExactVersion: publishedAtVersion,
+    );
+
+    if (policy.errors.isEmpty && publishedConstraintErrors.isEmpty) {
       stdout.writeln('Version policy check passed (no blocking errors).');
       return 0;
     }
-    stderr.writeln('Version policy errors:\n');
-    for (final e in policy.errors) {
-      stderr.writeln('  - $e');
+    if (policy.errors.isNotEmpty) {
+      stderr.writeln('Version policy errors:\n');
+      for (final e in policy.errors) {
+        stderr.writeln('  - $e');
+      }
+      if (githubReport) {
+        emitGithubCiReport(title: 'Version policy', errors: policy.errors);
+      }
     }
-    if (githubReport) {
-      emitGithubCiReport(title: 'Version policy', errors: policy.errors);
+    if (publishedConstraintErrors.isNotEmpty) {
+      stderr.writeln('Published exact-version workspace constraint drift:\n');
+      for (final e in publishedConstraintErrors) {
+        stderr.writeln('  - $e');
+      }
+      if (githubReport) {
+        emitGithubCiReport(
+          title: 'Published constraint drift',
+          errors: publishedConstraintErrors,
+        );
+      }
     }
     return 1;
   } on HttpException catch (e) {
@@ -1006,16 +1176,35 @@ Future<int> runAuditPublished({
       pubDevVersions: pubVersions,
       publishedLatestDeps: latestDeps,
     );
-    if (errors.isEmpty) {
+    final releaseSet = computeReleaseSet(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      coReleaseEnabled: true,
+    );
+    final publishedAtVersion =
+        await fetchPublishedWorkspaceDepsForShippedPubspecVersions(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      catalog: catalog,
+    );
+    final constraintDriftErrors =
+        publishedExactVersionWorkspaceConstraintDriftErrors(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      releaseSet: releaseSet,
+      publishedDepsAtExactVersion: publishedAtVersion,
+    );
+    final allErrors = [...errors, ...constraintDriftErrors];
+    if (allErrors.isEmpty) {
       stdout.writeln('All pub.dev latest packages resolve sibling deps.');
       return 0;
     }
     stderr.writeln('pub.dev hosted dependency audit failed:\n');
-    for (final e in errors) {
+    for (final e in allErrors) {
       stderr.writeln('  - $e');
     }
     if (githubReport) {
-      emitGithubCiReport(title: 'pub.dev audit', errors: errors);
+      emitGithubCiReport(title: 'pub.dev audit', errors: allErrors);
     }
     return 1;
   } on HttpException catch (e) {

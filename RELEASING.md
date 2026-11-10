@@ -27,12 +27,14 @@ Default is **dry-run** (`dart pub publish --dry-run` per release-set package). R
 - **Manifest** (release-please) = last released version on `main`; on an open **release-please PR** the manifest is bumped to the **next** version together with pubspec (not yet on pub.dev).
 - **Blocking everywhere** except on **`main` and ordinary PRs** until companion PR **#24** lands: manifest markers that trail pub.dev (`manifest < pub.dev latest`, or manifest version never shipped) are **warnings** on the blocking `--co-release --warn-manifest-behind-pub` step (not errors). **Release paths** keep manifest-behind blocking; see the table below for manifest-not-on-pub.dev. **Git-tag reuse** runs only on `--check-manifest-drift` paths, and only for packages in the **release set** (not on ordinary PR validate).
 - Pubspec < pub.dev latest → error (backward). Pubspec equals pub.dev latest → OK only if unchanged since git tag `<package>-v<version>` (else version reuse error; no tag → OK with warning). Pubspec on pub.dev but not latest → reuse error. Pending packages (ahead of pub.dev, not published) satisfy sibling constraints via co-release in `publish_order.yaml` order.
+- **Published exact-version constraint parity** (release paths + `--audit-published` on `main`/ordinary PRs only): if pubspec version **V** is already on pub.dev, every local `universal_*` dependency constraint must match the `https://pub.dev/api/packages/<name>/versions/<V>` tarball (not merely resolve). Pending release-set packages are exempt (same as `--release-pr` pending releases). Drift → land `fix(<package>)` on `main` so release-please bumps it and you publish a new version (pub.dev cannot replace an existing version).
 
 | Context | Command | Manifest not on pub.dev |
 | --- | --- | --- |
 | `main` / ordinary PR validate | `--co-release --warn-manifest-behind-pub` | Warning (if manifest trails policy) |
 | Publish / tag workflows | `--co-release --check-manifest-drift` | Error: claimed release never shipped |
 | **Release-please PR** sync job | `--co-release --check-manifest-drift --release-pr` | OK when manifest == pubspec **>** pub.dev latest (pending release); otherwise error |
+| **Release-please PR** validate CI | `--co-release --check-manifest-drift --release-pr` (blocking; no `--audit-published`) | Same as sync job — pending versions are not on pub.dev yet |
 | Post-publish | `--audit-published` | N/A (all workspace versions must exist on pub.dev) |
 
 `--release-pr` is only valid with `--check-manifest-drift`. Pre-publish `--audit-published` runs from `publish_in_order.dart` and `post_publish_audit.yml`, not from the release-please constraint sync job.
@@ -52,6 +54,12 @@ Release Please runs on pushes to `main` and can be **re-run manually** after tag
 - **CLI:** `gh workflow run release-please.yml --repo Arenukvern/universal_automation_ai_device_use --ref main`
 
 Release Please discovers the last release from the `<package>-v<version>` git tag that matches the version in `.release-please-manifest.json`. If you manually published a version and then **backfill** that tag, point it at the **published source commit** — not an arbitrary SHA — or the next release PR can miscompute the baseline.
+
+### Intra-workspace constraint sync
+
+The **sync-release-pr-constraints** job writes sibling pins on the release-please branch and commits them as **`chore: sync intra-workspace pub dependency constraints`** so release-please does **not** treat the commit as a releasable package change. That is intentional for *pending* releases on the release PR.
+
+If pins change for a package whose **current pubspec version is already on pub.dev**, the chore sync is not enough: land a scoped **`fix(<package>)`** on `main` (or merge a maintainer commit that bumps that package) so release-please opens a version-bump PR and you **publish a new version**. We do **not** switch the sync bot to `fix()` per package — that would force unrelated version bumps across the workspace.
 
 The **sync-release-pr-constraints** job checks out the release-please branch at the repo root (for `pkgs/` and manifest) and a nested **trusted** checkout of the triggering `main` commit; it runs `dart run trusted/tool/…` from the release tree so guards like `--release-pr` always match CI on `main`.
 
