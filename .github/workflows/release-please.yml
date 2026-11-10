@@ -56,9 +56,11 @@ jobs:
         with:
           sdk: stable
 
-      - name: Resolve trusted workspace (tooling)
-        working-directory: trusted
-        run: dart pub get
+      # No `dart pub get` anywhere in this job before the constraint sync. It
+      # previously resolved the trusted checkout of the triggering main commit
+      # first — and that commit is transiently unresolvable exactly when
+      # constraint repair is needed (the documented fix()-before-release-merge
+      # flow), so the job died before the sync tool ever ran.
 
       # Runs on push to main or workflow_dispatch from main (see release-please
       # job `if`). Sync pushes to release-please--branches--main cannot re-enter
@@ -77,7 +79,15 @@ jobs:
           git fetch origin release-please--branches--main
           git checkout -B release-please--branches--main origin/release-please--branches--main
           echo 'trusted/' >> .git/info/exclude
-          dart run trusted/tool/sync_workspace_pub_constraints.dart --write
+          # Plain `dart`, NOT `dart run`: the release tree's stale sibling
+          # constraints are exactly what this tool repairs, so its success
+          # must not depend on package resolution at all — `dart run` does an
+          # implicit pub get whose failure is only advisory-tolerated on some
+          # SDK versions. The tool's entry chain is SDK-only; a test guards it.
+          dart trusted/tool/sync_workspace_pub_constraints.dart --write
+          # Needs package:pub_semver, so it resolves the release tree via
+          # `dart run`. Post-sync that tree resolves; a tree the sync could not
+          # repair fails loudly here instead of committing a broken state.
           dart run trusted/tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
           # Constraint sync commits stay `chore:` (no release-please bump). When
           # a pub.dev-shipped package's universal_* pins change, land a scoped

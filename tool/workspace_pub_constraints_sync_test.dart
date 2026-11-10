@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:test/test.dart';
 
 import 'workspace_pub_constraints_sync.dart';
@@ -45,6 +47,33 @@ description: nested name: fake
         syncDependencyLine('  meta: ^1.19.0', versions),
         '  meta: ^1.19.0',
       );
+    });
+  });
+
+  group('sync entrypoint SDK-only invariant', () {
+    // The release-please sync job invokes the tool with plain `dart` (no
+    // `dart run`) so its success never depends on package resolution: it
+    // repairs a tree whose sibling constraints do not resolve yet, and
+    // `dart run`'s tolerance of failed implicit pub gets is an SDK-version
+    // detail, not a contract. A `package:` import anywhere in the entry
+    // chain would quietly reintroduce that dependency.
+    test('entry chain has no package: imports', () {
+      final root = findWorkspaceRepoRoot();
+      const chain = [
+        'sync_workspace_pub_constraints.dart',
+        'tool_cli.dart',
+        'workspace_pub_constraints_sync.dart',
+      ];
+      for (final name in chain) {
+        final source = File('${root.path}/tool/$name').readAsStringSync();
+        expect(
+          RegExp(r"^\s*import\s+'package:").hasMatch(source),
+          isFalse,
+          reason:
+              'tool/$name must stay SDK-only: the release-please sync job '
+              'runs it with plain `dart` before pub resolution exists',
+        );
+      }
     });
   });
 }
