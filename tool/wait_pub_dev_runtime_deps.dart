@@ -45,10 +45,12 @@ Future<void> main(List<String> args) async {
     timeout = Duration(minutes: int.parse(args[tIdx + 1]));
   }
 
+  final repoRoot = findWorkspaceRepoRoot();
   final catalog = PubDevCatalog();
   try {
     await waitForRuntimeDepsOnPubDev(
-      packageDir: Directory('${findWorkspaceRepoRoot().path}/$pkgDir'),
+      packageDir: Directory('${repoRoot.path}/$pkgDir'),
+      repoRoot: repoRoot,
       catalog: catalog,
       timeout: timeout,
     );

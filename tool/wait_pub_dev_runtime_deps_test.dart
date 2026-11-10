@@ -34,12 +34,57 @@ class _SeqPubDevGateway implements PubDevGateway {
   void close() {}
 }
 
+void _writeMiniWorkspace(Directory root, {required String toolkitVersion}) {
+  Directory('${root.path}/pkgs/universal_automation_toolkit').createSync(
+    recursive: true,
+  );
+  File('${root.path}/pkgs/universal_automation_toolkit/pubspec.yaml')
+      .writeAsStringSync('''
+name: universal_automation_toolkit
+version: $toolkitVersion
+environment:
+  sdk: ^3.13.0
+''');
+}
+
 void main() {
+  group('planRuntimeDepWait', () {
+    test('exact wait when workspace 0.4.1 not on pub.dev (^0.4.0)', () {
+      final plan = planRuntimeDepWait(
+        constraint: '^0.4.0',
+        siblingWorkspaceVersion: '0.4.1',
+        pubDevVersions: ['0.4.0'],
+      );
+      expect(plan.strategy, RuntimeDepWaitStrategy.exactWorkspaceVersion);
+      expect(plan.exactVersion, '0.4.1');
+    });
+
+    test('any satisfying when workspace version already on pub.dev', () {
+      final plan = planRuntimeDepWait(
+        constraint: '^0.4.0',
+        siblingWorkspaceVersion: '0.4.0',
+        pubDevVersions: ['0.4.0'],
+      );
+      expect(plan.strategy, RuntimeDepWaitStrategy.anySatisfyingVersion);
+    });
+
+    test('exact wait for in-train 0.5.0 when only 0.4.0 is on pub.dev', () {
+      final plan = planRuntimeDepWait(
+        constraint: '^0.5.0',
+        siblingWorkspaceVersion: '0.5.0',
+        pubDevVersions: ['0.4.0'],
+      );
+      expect(plan.strategy, RuntimeDepWaitStrategy.exactWorkspaceVersion);
+      expect(plan.exactVersion, '0.5.0');
+    });
+  });
+
   group('waitForRuntimeDepsOnPubDev', () {
-    test('succeeds when constraint becomes satisfiable', () async {
-      final dir = Directory.systemTemp.createTempSync('wait-deps');
-      Directory('${dir.path}/pkg').createSync();
-      File('${dir.path}/pkg/pubspec.yaml').writeAsStringSync('''
+    test('waits for exact in-train sibling, not older satisfiers', () async {
+      final root = Directory.systemTemp.createTempSync('wait-exact-root');
+      _writeMiniWorkspace(root, toolkitVersion: '0.5.0');
+      Directory('${root.path}/pkg').createSync();
+      File('${root.path}/pkg/pubspec.yaml').writeAsStringSync('''
 name: universal_automation_harness
 version: 0.2.1
 dependencies:
@@ -48,17 +93,46 @@ dependencies:
       final gateway = _SeqPubDevGateway({
         'universal_automation_toolkit': [
           ['0.4.0'],
+          ['0.4.0'],
           ['0.4.0', '0.5.0'],
         ],
       });
       await waitForRuntimeDepsOnPubDev(
-        packageDir: Directory('${dir.path}/pkg'),
+        packageDir: Directory('${root.path}/pkg'),
+        repoRoot: root,
         catalog: gateway,
         timeout: const Duration(seconds: 5),
         initialPollInterval: const Duration(milliseconds: 1),
         maxPollInterval: const Duration(milliseconds: 5),
       );
-      dir.deleteSync(recursive: true);
+      root.deleteSync(recursive: true);
+    });
+
+    test('succeeds when any satisfying version appears (shipped sibling)', () async {
+      final root = Directory.systemTemp.createTempSync('wait-any-root');
+      _writeMiniWorkspace(root, toolkitVersion: '0.4.0');
+      Directory('${root.path}/pkg').createSync();
+      File('${root.path}/pkg/pubspec.yaml').writeAsStringSync('''
+name: universal_automation_harness
+version: 0.2.0
+dependencies:
+  universal_automation_toolkit: ^0.4.0
+''');
+      final gateway = _SeqPubDevGateway({
+        'universal_automation_toolkit': [
+          ['0.3.0'],
+          ['0.3.0', '0.4.0'],
+        ],
+      });
+      await waitForRuntimeDepsOnPubDev(
+        packageDir: Directory('${root.path}/pkg'),
+        repoRoot: root,
+        catalog: gateway,
+        timeout: const Duration(seconds: 5),
+        initialPollInterval: const Duration(milliseconds: 1),
+        maxPollInterval: const Duration(milliseconds: 5),
+      );
+      root.deleteSync(recursive: true);
     });
 
     test('live pub.dev: harness 0.2.1 runtime deps (^0.5.0 toolkit)', () async {
