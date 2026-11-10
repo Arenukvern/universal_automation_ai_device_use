@@ -2,7 +2,6 @@ import 'dart:io';
 
 import 'package:test/test.dart';
 import 'package:universal_capture_macos/universal_capture_macos.dart';
-import 'package:universal_screencast/universal_screencast.dart';
 
 void main() {
   test(
