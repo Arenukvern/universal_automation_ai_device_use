@@ -30,6 +30,8 @@ Flags:
   --warn-manifest-behind-pub  Downgrade manifest-behind-pub.dev to warnings
   --audit-published         Post-publish: pub.dev latest resolves + shipped-version
                             workspace constraint parity vs pub.dev archives
+                            With --release-pr: treat in-train workspace versions as
+                            pending (do not resolve siblings from pub.dev only).
   --github-report           Emit workflow commands for GitHub Actions
   --release-manifest <path> Alternate release-please manifest JSON
   --publish-order <path>    Alternate publish_order.yaml
@@ -81,8 +83,8 @@ Future<void> main(List<String> args) async {
     manifestPath = args[manifestFlag + 1];
   }
 
-  if (releasePrMode && !checkManifestDrift) {
-    stderr.writeln('--release-pr requires --check-manifest-drift');
+  if (releasePrMode && !checkManifestDrift && !auditPublished) {
+    stderr.writeln('--release-pr requires --check-manifest-drift or --audit-published');
     exit(64);
   }
 
@@ -110,6 +112,7 @@ Future<void> main(List<String> args) async {
           catalog: catalog,
           githubReport: githubReport,
           repoRoot: repoRoot,
+          releasePrMode: releasePrMode,
         ),
       );
     }

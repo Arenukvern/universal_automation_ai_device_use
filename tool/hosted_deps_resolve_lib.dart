@@ -674,9 +674,15 @@ List<String> auditPublishedLatestErrors({
   required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
   required Map<String, Map<String, String>> publishedLatestDeps,
+  Set<String> releaseSet = const {},
 }) {
   final errors = <String>[];
+  final byName = {for (final p in packages) p.name: p};
+
   for (final pkg in packages) {
+    if (releaseSet.contains(pkg.name)) {
+      continue;
+    }
     final versions = pubDevVersions[pkg.name];
     if (versions == null || versions.isEmpty) {
       continue;
@@ -690,11 +696,18 @@ List<String> auditPublishedLatestErrors({
       if (!workspaceNames.contains(entry.key)) {
         continue;
       }
-      final available = pubDevVersions[entry.key] ?? [];
+      final available = List<String>.from(pubDevVersions[entry.key] ?? const []);
+      if (releaseSet.contains(entry.key)) {
+        final inTrain = byName[entry.key]?.version;
+        if (inTrain != null && !available.contains(inTrain)) {
+          available.add(inTrain);
+        }
+      }
       if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
         errors.add(
           'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
-          '(pub.dev has: ${available.join(', ')})',
+          '(pub.dev has: ${(pubDevVersions[entry.key] ?? []).join(', ')}'
+          '${releaseSet.contains(entry.key) ? '; in-train: ${byName[entry.key]?.version}' : ''})',
         );
       }
     }
@@ -1153,6 +1166,7 @@ Future<int> runAuditPublished({
   required PubDevGateway catalog,
   bool githubReport = false,
   Directory? repoRoot,
+  bool releasePrMode = false,
 }) async {
   try {
     final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
@@ -1172,16 +1186,17 @@ Future<int> runAuditPublished({
         return 1;
       }
     }
+    final releaseSet = computeReleaseSet(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      coReleaseEnabled: releasePrMode,
+    );
     final errors = auditPublishedLatestErrors(
       packages: packages,
       workspaceNames: workspaceNames,
       pubDevVersions: pubVersions,
       publishedLatestDeps: latestDeps,
-    );
-    final releaseSet = computeReleaseSet(
-      packages: packages,
-      pubDevVersions: pubVersions,
-      coReleaseEnabled: true,
+      releaseSet: releaseSet,
     );
     final publishedAtVersion =
         await fetchPublishedWorkspaceDepsForShippedPubspecVersions(

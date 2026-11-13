@@ -8,6 +8,15 @@ import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
   final repoRoot = findWorkspaceRepoRoot();
+  final rootResolve = await Process.run(
+    'dart',
+    ['pub', 'get'],
+    workingDirectory: repoRoot.path,
+  );
+  if (rootResolve.exitCode != 0) {
+    stderr.write(rootResolve.stderr);
+    exit(1);
+  }
   final orderPath = '${repoRoot.path}/tool/publish_order.yaml';
   final names = loadPublishOrderYaml(orderPath);
   final packages = loadWorkspacePackages(repoRoot);
@@ -47,6 +56,17 @@ Future<void> main(List<String> args) async {
     if (test.exitCode != 0) {
       stderr.write(test.stdout);
       stderr.write(test.stderr);
+      failures++;
+      continue;
+    }
+    final dryRun = await Process.run(
+      'dart',
+      ['pub', 'publish', '--dry-run'],
+      workingDirectory: dir.path,
+    );
+    if (dryRun.exitCode != 0) {
+      stderr.write(dryRun.stdout);
+      stderr.write(dryRun.stderr);
       failures++;
     }
   }

@@ -3,14 +3,15 @@
 ## Zero-touch publish path (default)
 
 1. **Release Please** opens `release-please--branches--main` with version bumps and changelogs.
-2. **Green CI on that PR is the gate** — `Validate` runs the same checks the publisher uses:
-   co-release resolve, manifest drift (`--release-pr`), **every publishable package** `dart analyze` + `dart test` (`tool/validate_publishable_packages.dart`), and blocking `--audit-published` (including tag-source provenance vs pub.dev).
+2. **Green CI on that PR is the gate** — steward review on the release PR plus green `Validate`. CI mirrors the publisher: co-release resolve, manifest drift (`--release-pr`), **every publishable package** `dart analyze` + `dart test` + `dart pub publish --dry-run` via workspace resolution (`tool/validate_publishable_packages.dart`), and blocking `--audit-published --release-pr` (in-train versions count as pending; siblings are not resolved from pub.dev alone).
 3. Merge the release PR to `main`. Release Please tags `universal_<package>-v<version>` for each released component.
-4. **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** once per tag (`workflow_dispatch` on the tag ref). There are **no environment reviewers** on `pub.dev`; OIDC mints a **fresh** token immediately before `dart pub publish --force`.
-5. **`wait-package-publish`** waits on each dispatched publish run (`gh run list` / `gh run watch`), **re-dispatches once** on a retryable failure (already-published versions are an idempotent skip thanks to `tool/pub_dev_version_listed.dart`), prints per-package results, then runs **`check_hosted_deps_resolve.dart --audit-published`** as a blocking final step.
+4. **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** once per tag (`workflow_dispatch` on the tag ref). **Pub.dev environment reviewers were removed** (Anton’s decision: zero-touch publishing). Human review is the **release PR** (second-steward review) plus green CI — not per-package deployment approvals. OIDC still mints a **fresh** token immediately before `dart pub publish --force`.
+5. **`wait-package-publish`** (180-minute job timeout) waits on each dispatched publish run, watching **new** `workflow_dispatch` runs only, **re-dispatches once** when the **publish** job actually failed (not skipped/cancelled/waiting), then runs **`check_hosted_deps_resolve.dart --audit-published`** as a blocking step. If an environment **approval gate is ever re-added** on `pub.dev`, publishes may still complete after this job times out red — treat **`post_publish_audit.yml`** as the authoritative final audit and re-run it manually when that happens.
 6. **Post-publish audit** remains available manually: Actions → **Post-publish audit** → Run workflow.
 
-Tags are **immutable** (repository ruleset; Admin-only bypass). Do not move or recreate tags to “fix” constraint drift — land a new version instead.
+**Deployment policy:** GitHub can deploy only from tag refs matching `universal_*-v*`. Tags are **immutable** via the `release-tags-immutable` ruleset (Admin-only bypass). Do not move or recreate tags to “fix” constraint drift — land a new version instead.
+
+Constraint sync dispatches `validate.yml` on branch `release-please--branches--main` with `expected_sha` so CI verifies the exact synced commit (workflow_dispatch cannot target a bare SHA ref).
 
 ### Manual publish recovery (single package)
 

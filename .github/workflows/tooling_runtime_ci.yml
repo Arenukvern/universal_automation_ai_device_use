@@ -15,6 +15,11 @@ on:
       - '.github/workflows/publish_package.yml'
   # Dispatched from release-please.yml after constraint sync (see Validate).
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: Exact commit on release-please--branches--main to verify.
+        required: false
+        type: string
 
 jobs:
   ci:
@@ -24,6 +29,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+
+      - name: Verify expected sync SHA
+        if: ${{ inputs.expected_sha != '' }}
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          expected='${{ inputs.expected_sha }}'
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Expected checkout $expected but HEAD is $actual"
+            exit 1
+          fi
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1

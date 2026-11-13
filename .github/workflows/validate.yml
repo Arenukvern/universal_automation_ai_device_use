@@ -7,6 +7,13 @@ on:
       - main
   # GITHUB_TOKEN pushes to release-please--branches--main do not trigger pull_request.
   workflow_dispatch:
+    inputs:
+      expected_sha:
+        description: >-
+          When dispatched from release-please constraint sync, the exact commit
+          on release-please--branches--main that must be checked out.
+        required: false
+        type: string
 
 env:
   IS_RELEASE_PLEASE: >-
@@ -25,6 +32,18 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Verify expected sync SHA
+        if: ${{ inputs.expected_sha != '' }}
+        run: |
+          set -euo pipefail
+          actual=$(git rev-parse HEAD)
+          expected='${{ inputs.expected_sha }}'
+          if [ "$actual" != "$expected" ]; then
+            echo "::error::Expected checkout $expected but HEAD is $actual"
+            exit 1
+          fi
+          echo "Verified checkout at synced release PR commit $actual"
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
@@ -60,7 +79,7 @@ jobs:
 
       - name: Release-please PR — pub.dev audit (blocking)
         if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
-        run: dart run tool/check_hosted_deps_resolve.dart --audit-published
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published --release-pr
 
       - name: Check reusable workflow inputs
         env:

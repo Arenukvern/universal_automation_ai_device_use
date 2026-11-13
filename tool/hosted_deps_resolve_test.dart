@@ -597,6 +597,62 @@ void main() {
     });
   });
 
+  group('auditPublishedLatestErrors', () {
+    test('release-PR in-train sibling satisfies constraints not on pub.dev yet', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_a',
+          version: '0.3.0',
+          pubspecPath: 'x/a',
+          workspaceDeps: {},
+        ),
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.2.0',
+          pubspecPath: 'x/b',
+          workspaceDeps: {'universal_pkg_a': '^0.3.0'},
+        ),
+      ];
+      final errors = auditPublishedLatestErrors(
+        packages: packages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        pubDevVersions: {
+          'universal_pkg_a': ['0.2.0'],
+          'universal_pkg_b': ['0.1.0'],
+        },
+        publishedLatestDeps: {
+          'universal_pkg_b': {'universal_pkg_a': '^0.2.0'},
+        },
+        releaseSet: {'universal_pkg_a', 'universal_pkg_b'},
+      );
+      expect(errors, isEmpty);
+    });
+
+    test('without release set, in-train constraint would fail', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.1.0',
+          pubspecPath: 'x',
+          workspaceDeps: {},
+        ),
+      ];
+      final errors = auditPublishedLatestErrors(
+        packages: packages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        pubDevVersions: {
+          'universal_pkg_a': ['0.2.0'],
+          'universal_pkg_b': ['0.1.0'],
+        },
+        publishedLatestDeps: {
+          'universal_pkg_b': {'universal_pkg_a': '^0.3.0'},
+        },
+        releaseSet: const {},
+      );
+      expect(errors, isNotEmpty);
+    });
+  });
+
   group('runAuditPublished', () {
     test('fails closed when pub.dev is unreachable', () async {
       final packages = [
@@ -615,6 +671,38 @@ void main() {
         ),
       );
       expect(code, 1);
+    });
+
+    test('release-pr mode allows pending in-train train on audit', () async {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_a',
+          version: '0.3.0',
+          pubspecPath: 'x/a',
+          workspaceDeps: {},
+        ),
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.2.0',
+          pubspecPath: 'x/b',
+          workspaceDeps: {'universal_pkg_a': '^0.3.0'},
+        ),
+      ];
+      final code = await runAuditPublished(
+        packages: packages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        catalog: _FakePubDevGateway(
+          versions: {
+            'universal_pkg_a': ['0.2.0'],
+            'universal_pkg_b': ['0.1.0'],
+          },
+          latestDeps: {
+            'universal_pkg_b': {'universal_pkg_a': '^0.2.0'},
+          },
+        ),
+        releasePrMode: true,
+      );
+      expect(code, 0);
     });
 
     test('reports exact-version constraint drift against pub.dev archives', () async {

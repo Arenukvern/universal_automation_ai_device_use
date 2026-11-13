@@ -127,9 +127,12 @@ jobs:
           GH_REPO: ${{ github.repository }}
           SYNC_SHA: ${{ steps.sync_constraints.outputs.sync_commit_sha }}
         run: |
-          echo "Dispatching Validate and tooling_runtime CI at release PR ${SYNC_SHA}"
-          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${SYNC_SHA}"
-          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${SYNC_SHA}"
+          RELEASE_BRANCH=release-please--branches--main
+          echo "Dispatching Validate and tooling_runtime CI on ${RELEASE_BRANCH} @ ${SYNC_SHA}"
+          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
+          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
 
   dispatch-package-publish:
     needs: release-please
@@ -165,7 +168,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
-      actions: read
+      actions: write
       contents: read
     steps:
       - name: Checkout

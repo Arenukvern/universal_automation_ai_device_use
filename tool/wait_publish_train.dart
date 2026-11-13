@@ -29,23 +29,68 @@ Future<void> main() async {
 
   for (final tag in tags) {
     stdout.writeln('Waiting for publish_package.yml on $tag …');
-    var conclusion = await _waitLatestRun(repo, tag, env);
-  if (isRetryablePublishFailure(conclusion, 'completed')) {
-      stdout.writeln('Retrying publish for $tag (conclusion=$conclusion)');
+    final dispatchedAt = DateTime.now().toUtc();
+    var watched = await _waitForRunAfterDispatch(
+      repo: repo,
+      tag: tag,
+      env: env,
+      dispatchedAfter: dispatchedAt,
+    );
+    if (watched == null) {
+      results[tag] = 'unknown';
+      continue;
+    }
+
+    var conclusion = await _conclusionForRun(repo, watched.databaseId, env);
+    var jobs = await _jobsForRun(repo, watched.databaseId, env);
+
+    if (shouldRetryPublishWorkflow(
+      workflowConclusion: conclusion,
+      workflowStatus: 'completed',
+      jobs: jobs,
+    )) {
+      stdout.writeln(
+        'Retrying publish for $tag (publish job failed, run=${watched.databaseId})',
+      );
+      final failedRunId = watched.databaseId;
+      final redispatchAt = DateTime.now().toUtc();
       final redispatch = await Process.run(
         'gh',
-        ['workflow', 'run', 'publish_package.yml', '--repo', repo, '--ref', tag],
+        [
+          'workflow',
+          'run',
+          'publish_package.yml',
+          '--repo',
+          repo,
+          '--ref',
+          tag,
+        ],
         environment: env,
       );
       if (redispatch.exitCode != 0) {
         stderr.writeln('::error::re-dispatch failed for $tag');
+        stderr.write(redispatch.stderr);
         exit(1);
       }
-      conclusion = await _waitLatestRun(repo, tag, env);
+      watched = await _waitForRunAfterDispatch(
+        repo: repo,
+        tag: tag,
+        env: env,
+        dispatchedAfter: redispatchAt,
+        excludeRunId: failedRunId,
+      );
+      if (watched == null) {
+        results[tag] = 'unknown';
+        continue;
+      }
+      conclusion = await _conclusionForRun(repo, watched.databaseId, env);
     }
+
     results[tag] = conclusion ?? 'unknown';
     if (conclusion != 'success') {
-      stderr.writeln('::error::publish failed for $tag (conclusion=$conclusion)');
+      stderr.writeln(
+        '::error::publish failed for $tag (conclusion=$conclusion)',
+      );
     }
   }
 
@@ -68,12 +113,57 @@ Future<void> main() async {
   exit(audit.exitCode);
 }
 
-Future<String?> _waitLatestRun(
+Future<GhWorkflowRun?> _waitForRunAfterDispatch({
+  required String repo,
+  required String tag,
+  required Map<String, String> env,
+  required DateTime dispatchedAfter,
+  int? excludeRunId,
+}) async {
+  final deadline = DateTime.now().add(defaultDispatchRunDiscoveryTimeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final list = await _listDispatchRuns(repo, tag, env);
+    if (list.exitCode != 0) {
+      stderr.write(list.stderr);
+      return null;
+    }
+    final runs = parseGhWorkflowRunList(list.stdout as String);
+    final selected = selectNewDispatchRun(
+      runs: runs,
+      dispatchedAfter: dispatchedAfter,
+      excludeRunId: excludeRunId,
+    );
+    if (selected != null) {
+      await Process.run(
+        'gh',
+        [
+          'run',
+          'watch',
+          '${selected.databaseId}',
+          '--repo',
+          repo,
+          '--exit-status',
+        ],
+        environment: env,
+      );
+      return selected;
+    }
+    await Future<void>.delayed(const Duration(seconds: 15));
+  }
+  stderr.writeln(
+    '::error::No new workflow_dispatch publish run for $tag within '
+    '${defaultDispatchRunDiscoveryTimeout.inMinutes} minutes '
+    '(excluded run: ${excludeRunId ?? 'none'})',
+  );
+  return null;
+}
+
+Future<ProcessResult> _listDispatchRuns(
   String repo,
   String tag,
   Map<String, String> env,
-) async {
-  final list = await Process.run(
+) {
+  return Process.run(
     'gh',
     [
       'run',
@@ -84,45 +174,62 @@ Future<String?> _waitLatestRun(
       'publish_package.yml',
       '--branch',
       tag,
-      '--limit',
-      '1',
+      '--event',
+      'workflow_dispatch',
       '--json',
-      'databaseId,conclusion,status',
+      'databaseId,createdAt,status,conclusion,event',
+      '--limit',
+      '20',
     ],
     environment: env,
   );
-  if (list.exitCode != 0) {
-    stderr.write(list.stderr);
-    return null;
-  }
-  final runs = jsonDecode(list.stdout as String) as List<dynamic>;
-  if (runs.isEmpty) {
-    stderr.writeln('No publish run found yet for $tag; waiting briefly …');
-    await Future<void>.delayed(const Duration(seconds: 15));
-    return _waitLatestRun(repo, tag, env);
-  }
-  final id = (runs.first as Map<String, dynamic>)['databaseId'];
-  final watch = await Process.run(
-    'gh',
-    ['run', 'watch', '$id', '--repo', repo, '--exit-status'],
-    environment: env,
-  );
-  final after = await Process.run(
+}
+
+Future<String?> _conclusionForRun(
+  String repo,
+  int runId,
+  Map<String, String> env,
+) async {
+  final view = await Process.run(
     'gh',
     [
       'run',
       'view',
-      '$id',
+      '$runId',
       '--repo',
       repo,
       '--json',
-      'conclusion',
+      'conclusion,status',
     ],
     environment: env,
   );
-  if (after.exitCode != 0) {
-    return watch.exitCode == 0 ? 'success' : 'failure';
+  if (view.exitCode != 0) {
+    return null;
   }
-  final decoded = jsonDecode(after.stdout as String) as Map<String, dynamic>;
+  final decoded = jsonDecode(view.stdout as String) as Map<String, dynamic>;
   return decoded['conclusion'] as String?;
+}
+
+Future<List<GhWorkflowJob>> _jobsForRun(
+  String repo,
+  int runId,
+  Map<String, String> env,
+) async {
+  final view = await Process.run(
+    'gh',
+    [
+      'run',
+      'view',
+      '$runId',
+      '--repo',
+      repo,
+      '--json',
+      'jobs',
+    ],
+    environment: env,
+  );
+  if (view.exitCode != 0) {
+    return [];
+  }
+  return parseGhWorkflowJobs(view.stdout as String);
 }
