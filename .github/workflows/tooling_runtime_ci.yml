@@ -32,12 +32,17 @@ jobs:
 
       - name: Verify expected sync SHA
         if: ${{ inputs.expected_sha != '' }}
+        env:
+          EXPECTED_SHA: ${{ inputs.expected_sha }}
         run: |
           set -euo pipefail
+          if ! [[ "$EXPECTED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::expected_sha must be a 40-character git SHA (got: $EXPECTED_SHA)"
+            exit 1
+          fi
           actual=$(git rev-parse HEAD)
-          expected='${{ inputs.expected_sha }}'
-          if [ "$actual" != "$expected" ]; then
-            echo "::error::Expected checkout $expected but HEAD is $actual"
+          if [ "$actual" != "$EXPECTED_SHA" ]; then
+            echo "::error::Expected checkout $EXPECTED_SHA but HEAD is $actual"
             exit 1
           fi
 

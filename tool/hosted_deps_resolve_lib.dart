@@ -668,21 +668,35 @@ List<String> resolveErrorsAlongPublishOrder({
   return errors;
 }
 
+/// Outcome of checking pub.dev **latest** tarball sibling constraints.
+class AuditPublishedLatestFindings {
+  AuditPublishedLatestFindings({
+    required this.errors,
+    required this.warnings,
+  });
+
+  final List<String> errors;
+  final List<String> warnings;
+}
+
 /// Checks pub.dev **latest** tarball pubspecs for unresolved sibling deps.
-List<String> auditPublishedLatestErrors({
+///
+/// On a release-please PR ([releasePrMode]), unresolved latest constraints for
+/// a package in [releaseSet] or involving a sibling in [releaseSet] are
+/// warnings (fix-forward train), not blocking errors.
+AuditPublishedLatestFindings auditPublishedLatestErrors({
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
   required Map<String, Map<String, String>> publishedLatestDeps,
   Set<String> releaseSet = const {},
+  bool releasePrMode = false,
 }) {
   final errors = <String>[];
+  final warnings = <String>[];
   final byName = {for (final p in packages) p.name: p};
 
   for (final pkg in packages) {
-    if (releaseSet.contains(pkg.name)) {
-      continue;
-    }
     final versions = pubDevVersions[pkg.name];
     if (versions == null || versions.isEmpty) {
       continue;
@@ -704,15 +718,21 @@ List<String> auditPublishedLatestErrors({
         }
       }
       if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
-        errors.add(
-          'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
-          '(pub.dev has: ${(pubDevVersions[entry.key] ?? []).join(', ')}'
-          '${releaseSet.contains(entry.key) ? '; in-train: ${byName[entry.key]?.version}' : ''})',
-        );
+        final msg =
+            'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
+            '(pub.dev has: ${(pubDevVersions[entry.key] ?? []).join(', ')}'
+            '${releaseSet.contains(entry.key) ? '; in-train: ${byName[entry.key]?.version}' : ''})';
+        final pendingFix = releasePrMode &&
+            (releaseSet.contains(pkg.name) || releaseSet.contains(entry.key));
+        if (pendingFix) {
+          warnings.add('PENDING RELEASE (pub.dev latest drift): $msg');
+        } else {
+          errors.add(msg);
+        }
       }
     }
   }
-  return errors;
+  return AuditPublishedLatestFindings(errors: errors, warnings: warnings);
 }
 
 String publishedDepsAtVersionKey(String packageName, String version) =>
@@ -1191,12 +1211,13 @@ Future<int> runAuditPublished({
       pubDevVersions: pubVersions,
       coReleaseEnabled: releasePrMode,
     );
-    final errors = auditPublishedLatestErrors(
+    final latestFindings = auditPublishedLatestErrors(
       packages: packages,
       workspaceNames: workspaceNames,
       pubDevVersions: pubVersions,
       publishedLatestDeps: latestDeps,
       releaseSet: releaseSet,
+      releasePrMode: releasePrMode,
     );
     final publishedAtVersion =
         await fetchPublishedWorkspaceDepsForShippedPubspecVersions(
@@ -1223,8 +1244,15 @@ Future<int> runAuditPublished({
       provenanceWarnings = provenance.warnings;
       provenanceErrors = provenance.errors;
     }
-  final allErrors = [...errors, ...constraintDriftErrors, ...provenanceErrors];
-    for (final w in provenanceWarnings) {
+  final allErrors = [
+      ...latestFindings.errors,
+      ...constraintDriftErrors,
+      ...provenanceErrors,
+    ];
+    for (final w in [
+      ...latestFindings.warnings,
+      ...provenanceWarnings,
+    ]) {
       stdout.writeln('::warning::$w');
     }
     if (allErrors.isEmpty) {

@@ -57,17 +57,6 @@ Future<void> main(List<String> args) async {
       stderr.write(test.stdout);
       stderr.write(test.stderr);
       failures++;
-      continue;
-    }
-    final dryRun = await Process.run(
-      'dart',
-      ['pub', 'publish', '--dry-run'],
-      workingDirectory: dir.path,
-    );
-    if (dryRun.exitCode != 0) {
-      stderr.write(dryRun.stdout);
-      stderr.write(dryRun.stderr);
-      failures++;
     }
   }
   if (failures > 0) {

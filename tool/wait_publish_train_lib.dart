@@ -31,6 +31,9 @@ const publishWorkflowJobName = 'Publish to pub.dev (OIDC)';
 
 const defaultDispatchRunDiscoveryTimeout = Duration(minutes: 10);
 
+/// Clock-skew margin when matching a re-dispatch to a new workflow run.
+const dispatchRunDiscoveryClockSkew = Duration(seconds: 60);
+
 final class GhWorkflowRun {
   GhWorkflowRun({
     required this.databaseId,
@@ -92,11 +95,10 @@ List<GhWorkflowJob> parseGhWorkflowJobs(String stdout) {
       .toList();
 }
 
-/// After a dispatch, pick the newest `workflow_dispatch` run created strictly
-/// after [dispatchedAfter], excluding [excludeRunId] when set.
-GhWorkflowRun? selectNewDispatchRun({
+/// Newest `workflow_dispatch` run on a tag ref (first wait — dispatch already
+/// happened in the prior job).
+GhWorkflowRun? selectLatestDispatchRun({
   required List<GhWorkflowRun> runs,
-  required DateTime dispatchedAfter,
   int? excludeRunId,
 }) {
   GhWorkflowRun? best;
@@ -107,7 +109,31 @@ GhWorkflowRun? selectNewDispatchRun({
     if (excludeRunId != null && run.databaseId == excludeRunId) {
       continue;
     }
-    if (!run.createdAt.isAfter(dispatchedAfter)) {
+    if (best == null || run.databaseId > best.databaseId) {
+      best = run;
+    }
+  }
+  return best;
+}
+
+/// After a re-dispatch, pick the newest `workflow_dispatch` run at or after
+/// [dispatchedAfter] minus [clockSkew], excluding [excludeRunId].
+GhWorkflowRun? selectNewDispatchRun({
+  required List<GhWorkflowRun> runs,
+  required DateTime dispatchedAfter,
+  int? excludeRunId,
+  Duration clockSkew = dispatchRunDiscoveryClockSkew,
+}) {
+  final cutoff = dispatchedAfter.subtract(clockSkew);
+  GhWorkflowRun? best;
+  for (final run in runs) {
+    if (run.event != null && run.event != 'workflow_dispatch') {
+      continue;
+    }
+    if (excludeRunId != null && run.databaseId == excludeRunId) {
+      continue;
+    }
+    if (run.createdAt.isBefore(cutoff)) {
       continue;
     }
     if (best == null || run.databaseId > best.databaseId) {

@@ -29,12 +29,11 @@ Future<void> main() async {
 
   for (final tag in tags) {
     stdout.writeln('Waiting for publish_package.yml on $tag …');
-    final dispatchedAt = DateTime.now().toUtc();
-    var watched = await _waitForRunAfterDispatch(
+    var watched = await _waitForDispatchRun(
       repo: repo,
       tag: tag,
       env: env,
-      dispatchedAfter: dispatchedAt,
+      afterRedispatch: false,
     );
     if (watched == null) {
       results[tag] = 'unknown';
@@ -72,10 +71,11 @@ Future<void> main() async {
         stderr.write(redispatch.stderr);
         exit(1);
       }
-      watched = await _waitForRunAfterDispatch(
+      watched = await _waitForDispatchRun(
         repo: repo,
         tag: tag,
         env: env,
+        afterRedispatch: true,
         dispatchedAfter: redispatchAt,
         excludeRunId: failedRunId,
       );
@@ -113,11 +113,12 @@ Future<void> main() async {
   exit(audit.exitCode);
 }
 
-Future<GhWorkflowRun?> _waitForRunAfterDispatch({
+Future<GhWorkflowRun?> _waitForDispatchRun({
   required String repo,
   required String tag,
   required Map<String, String> env,
-  required DateTime dispatchedAfter,
+  required bool afterRedispatch,
+  DateTime? dispatchedAfter,
   int? excludeRunId,
 }) async {
   final deadline = DateTime.now().add(defaultDispatchRunDiscoveryTimeout);
@@ -128,11 +129,13 @@ Future<GhWorkflowRun?> _waitForRunAfterDispatch({
       return null;
     }
     final runs = parseGhWorkflowRunList(list.stdout as String);
-    final selected = selectNewDispatchRun(
-      runs: runs,
-      dispatchedAfter: dispatchedAfter,
-      excludeRunId: excludeRunId,
-    );
+    final GhWorkflowRun? selected = afterRedispatch
+        ? selectNewDispatchRun(
+            runs: runs,
+            dispatchedAfter: dispatchedAfter!,
+            excludeRunId: excludeRunId,
+          )
+        : selectLatestDispatchRun(runs: runs);
     if (selected != null) {
       await Process.run(
         'gh',
@@ -151,9 +154,9 @@ Future<GhWorkflowRun?> _waitForRunAfterDispatch({
     await Future<void>.delayed(const Duration(seconds: 15));
   }
   stderr.writeln(
-    '::error::No new workflow_dispatch publish run for $tag within '
+    '::error::No workflow_dispatch publish run for $tag within '
     '${defaultDispatchRunDiscoveryTimeout.inMinutes} minutes '
-    '(excluded run: ${excludeRunId ?? 'none'})',
+    '(afterRedispatch=$afterRedispatch, excluded run: ${excludeRunId ?? 'none'})',
   );
   return null;
 }
