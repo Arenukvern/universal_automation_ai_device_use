@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:pub_semver/pub_semver.dart';
 
+import 'tag_pubspec_provenance_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 const _pubDevPackageApi = 'https://pub.dev/api/packages';
@@ -1151,6 +1152,7 @@ Future<int> runAuditPublished({
   required Set<String> workspaceNames,
   required PubDevGateway catalog,
   bool githubReport = false,
+  Directory? repoRoot,
 }) async {
   try {
     final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
@@ -1194,7 +1196,22 @@ Future<int> runAuditPublished({
       releaseSet: releaseSet,
       publishedDepsAtExactVersion: publishedAtVersion,
     );
-    final allErrors = [...errors, ...constraintDriftErrors];
+    var provenanceWarnings = <String>[];
+    var provenanceErrors = <String>[];
+    if (repoRoot != null) {
+      final provenance = await evaluateTagSourcePubDevProvenance(
+        packages: packages,
+        pubDevVersions: pubVersions,
+        publishedDepsAtExactVersion: publishedAtVersion,
+        repoRoot: repoRoot,
+      );
+      provenanceWarnings = provenance.warnings;
+      provenanceErrors = provenance.errors;
+    }
+  final allErrors = [...errors, ...constraintDriftErrors, ...provenanceErrors];
+    for (final w in provenanceWarnings) {
+      stdout.writeln('::warning::$w');
+    }
     if (allErrors.isEmpty) {
       stdout.writeln('All pub.dev latest packages resolve sibling deps.');
       return 0;

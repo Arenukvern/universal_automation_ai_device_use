@@ -493,7 +493,7 @@ Future<int> _dispatch(List<String> arguments) async {
       arguments.contains('--help') ||
       arguments.contains('-h')) {
     stderr.writeln(parser.usage);
-    return exitUsage;
+    return exitOk;
   }
   ArgResults options;
   try {

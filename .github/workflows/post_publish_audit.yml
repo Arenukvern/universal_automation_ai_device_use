@@ -1,11 +1,12 @@
 # Manual post-publish verification: every workspace package latest on pub.dev
 # must resolve sibling dependencies (fail closed).
 #
-# Also runs automatically at the end of `dart run tool/publish_in_order.dart --publish`.
+# Also runs automatically at the end of the release-please publish train waiter.
 
 name: Post-publish audit
 
 on:
+  workflow_call:
   workflow_dispatch:
 
 permissions:
@@ -19,6 +20,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1

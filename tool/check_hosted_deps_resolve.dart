@@ -109,6 +109,7 @@ Future<void> main(List<String> args) async {
           workspaceNames: workspaceNames,
           catalog: catalog,
           githubReport: githubReport,
+          repoRoot: repoRoot,
         ),
       );
     }

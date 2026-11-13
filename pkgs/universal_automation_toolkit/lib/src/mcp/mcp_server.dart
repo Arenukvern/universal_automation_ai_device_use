@@ -15,6 +15,7 @@ import '../plan/checks.dart';
 import '../plan/plan.dart';
 import '../plan/steps.dart';
 import '../runner/jobs.dart';
+import '../package_version.dart';
 import '../runner/registry.dart';
 import '../runner/runner.dart';
 
@@ -25,10 +26,10 @@ part 'computer_use_tool.dart';
 const mcpSupportedVersions = ['2024-11-05', '2025-03-26', '2025-06-18'];
 
 /// Server identity advertised at `initialize`.
-const mcpServerInfo = {
+final Map<String, String> mcpServerInfo = {
   'name': 'universal-automation-toolkit',
   'title': 'Universal Automation Toolkit',
-  'version': '0.1.0',
+  'version': toolkitPackageVersion,
 };
 
 /// The toolkit's MCP face: observe/act/verify ad-hoc verbs plus plan

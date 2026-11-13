@@ -8,11 +8,15 @@ on:
   # GITHUB_TOKEN pushes to release-please--branches--main do not trigger pull_request.
   workflow_dispatch:
 
+env:
+  IS_RELEASE_PLEASE: >-
+    ${{ github.head_ref == 'release-please--branches--main' || github.ref_name == 'release-please--branches--main' }}
+
 jobs:
   analyze:
     name: dart analyze (steward gate)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     permissions:
       contents: read
 
@@ -37,18 +41,26 @@ jobs:
         run: dart run tool/check_hosted_deps_resolve.dart --co-release --warn-manifest-behind-pub
 
       - name: Report manifest drift (non-blocking)
-        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         continue-on-error: true
         run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report --warn-manifest-behind-pub
 
       - name: Report pub.dev audit (non-blocking)
-        if: ${{ github.head_ref != 'release-please--branches--main' }}
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
         continue-on-error: true
         run: dart run tool/check_hosted_deps_resolve.dart --audit-published --github-report
 
       - name: Release-please PR — co-release + drift (blocking)
-        if: ${{ github.head_ref == 'release-please--branches--main' }}
+        if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
         run: dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
+
+      - name: Release-please PR — publishable packages analyze/test (blocking)
+        if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
+        run: dart run tool/validate_publishable_packages.dart
+
+      - name: Release-please PR — pub.dev audit (blocking)
+        if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
+        run: dart run tool/check_hosted_deps_resolve.dart --audit-published
 
       - name: Check reusable workflow inputs
         env:

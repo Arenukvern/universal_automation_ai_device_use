@@ -8,7 +8,7 @@
   "skills": "./skills",
   "mcpServers": {
     "universal-automation": {
-      "command": "${UNIVERSAL_AUTOMATION_BIN:-universal-automation}",
+      "command": "universal-automation",
       "args": [
         "serve",
         "--os"

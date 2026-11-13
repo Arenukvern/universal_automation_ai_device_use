@@ -76,6 +76,11 @@ void main() {
     );
   });
 
+  test('bare --help prints usage and exits 0', () async {
+    final code = await runToolkitCli(['--help']);
+    expect(code, exitOk);
+  });
+
   test('act without a verb is a usage error (exit 2)', () async {
     final code = await runToolkitCli([
       'act',
