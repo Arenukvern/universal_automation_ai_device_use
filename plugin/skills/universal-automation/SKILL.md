@@ -13,10 +13,16 @@ description: >
 
 # Universal Automation Toolkit
 
+**One MCP server** with platform adapters behind the same tools (ADR 0009).
+Never add a separate per-platform MCP server (`android-use`, `ios-use`, …).
+Add a `universal_driver_*` / `universal_browser_*` adapter and register its
+factory on the toolkit registry; keep a single client `mcp.json` entry.
+
 One vocabulary for the observe/act/verify loop across browser and OS
-tiers (ADR 0046). Attach-only: it never spawns or stops processes —
-launch targets yourself (or point at oka-published session handles) and
-aim the toolkit at the debug endpoint.
+tiers (ADR 0046). **Never owns target lifecycle** (apps, emulators, simulators):
+oka creates targets and declares `oka_devices` id + typed `vmServiceUri` before
+attach — never scrape `flutter run` or tool output. UA still runs **bounded tool
+calls** (`adb`, `xcrun`, …) through **`oka_process`** / **`universal_tooling_runtime`**.
 
 **Dart is the source of truth; YAML/JSON documents are snapshots** (the
 agent interchange). Code steps make plans first-class code: terminal
@@ -255,3 +261,29 @@ When the model emits pixel `click(x,y)` / `screenshot` / `type` (not AX locators
 7. Rebuild native bridge after driver changes: `./plugin/install.sh`
 
 Semantic `automation_observe` / `automation_act` remain preferred when roles and names exist.
+
+## Adding a platform adapter (checklist, ADR 0009)
+
+1. Implement `AutomationDriver` (+ capability facades as needed) in a new or existing
+   `universal_driver_*` / `universal_browser_*` package — not a new MCP binary.
+2. Add conformance coverage in `universal_automation_conformance` for the tier’s honest verbs.
+3. Register a `DriverFactory` on the composition root / registry; expose routing via existing
+   `automation_*` tools (shared observe / act / capture first).
+4. **Declared target only** — oka creates apps/emulators/simulators and hands inputs before
+   the run: **`oka_devices`** id + typed **`vmServiceUri`** from oka's session manifest (never
+   scraped output). UA never owns target lifecycle. Subprocesses for action/capture (`adb`,
+   `xcrun`, …) are bounded **`oka_process`** calls; wire through **`universal_tooling_runtime`**,
+   not ad-hoc spawn policy. **oka hosts UA** under supervision when deployed that way — do not
+   embed oka runners in the MCP server.
+5. Put truly platform-only verbs in a **named tool group** (namespace prefix) on the same
+   server; list the group in `tools/list` **only** when the adapter package is installed **and**
+   its declared target is attached or reachable; emit
+   `notifications/tools/list_changed` when the group appears or disappears (keep the agent
+   catalog lean — agents pick worse from 100+ tools).
+6. Flutter tier: thin over **mcp_flutter's published attach-only driver** (today `VmClient` plus
+   `ToolkitDriver` in `flutter_mcp_harness`, planned to split into its own attach-only package);
+   fix gaps upstream in mcp_flutter — do not fork a second MCP product.
+7. Document install-time optional dependencies; default lean install stays core + desktop OS +
+   browser.
+8. Update [ADR 0009](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs/decisions/0009_one_mcp_server_with_adapters.mdx)
+   only if the decision itself changes — otherwise extend README and this skill.

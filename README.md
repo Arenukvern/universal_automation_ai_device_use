@@ -47,6 +47,43 @@ Windows, CDP, WebDriver), screencast/capture helpers, and WebRTC sidecars. The
 agent-facing CLI and MCP server live in
 [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/).
 
+## Architecture: one MCP server, many adapters
+
+Universal Automation exposes **one MCP server** (`universal-automation serve …`) and
+one `automation_*` tool surface (observe, act, capture/verify). Platform code plugs
+in as **adapter packages** registered on a single runtime registry — macOS, Windows,
+Linux, browser (CDP/WebDriver), and future Android, iOS, and Flutter tiers.
+
+Do **not** ship or configure separate per-platform MCP servers (`android-use`,
+`ios-use`, `macos-use`, …). That would duplicate browser tooling, capture, and
+config, let implementations drift, and force agents to learn which server to call.
+
+| Layer | Role |
+| --- | --- |
+| `universal_automation_interface` | Contracts only; no native code (ADR 0004) |
+| `universal_driver_*` / `universal_browser_*` | Adapters chosen at install or composition time |
+| `universal_automation_toolkit` | Plans, runner, MCP face, registry |
+
+**Lean default:** core + desktop OS adapter + optional browser tier (`serve --os`,
+`--cdp`). Flutter, mobile adapters, and harness/SDK are opt-in adapter dependencies on
+the **same** MCP entry. **oka may host UA** under its supervisor; UA does not embed or
+launch oka runners. Shared tools
+(screenshot, semantics tree, tap) cover common work; truly platform-specific
+behavior (e.g. Flutter hot reload) lives in named tool groups on that server, not a
+forked product. UA **never owns target lifecycle** (apps, emulators, simulators): **oka**
+creates targets and hands declared **`oka_devices`** id and typed **`vmServiceUri`** from
+its session manifest — UA never scrapes discovery output. Bounded subprocesses for tools
+like `adb` / `xcrun` go through **`oka_process`**; **`universal_tooling_runtime`** thins
+over that contract. The Flutter
+adapter stays thin over
+[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only driver
+(today `VmClient` plus `ToolkitDriver` in `flutter_mcp_harness`, planned as its own
+attach-only package). Optional adapter tool groups appear in `tools/list` only when the
+package is installed **and** the target is reachable, with `tools/list_changed` on
+appear/disappear — so agents are not drowned in 100+ tools by default.
+
+Durable rule: [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx).
+
 ## Packages
 
 | Package | Role |

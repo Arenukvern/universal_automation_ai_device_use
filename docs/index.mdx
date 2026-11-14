@@ -13,9 +13,16 @@ desktop, mobile, browser, and tiers this family adds over time.
 | AI agent | [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) · [plugin skill](https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/plugin/skills/universal-automation) |
 | Charter / ethics | [North Star](/NORTH_STAR) |
 
+## MCP shape
+
+**One server, many adapters** ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)):
+one MCP entry; add platforms as adapter packages. UA never owns target lifecycle — oka
+declares `oka_devices` id and `vmServiceUri` before attach. **oka hosts UA** when
+supervised; UA does not embed oka runners.
+
 ## Packages (monorepo)
 
-- `universal_automation_*` — contracts, semantics, conformance, toolkit (CLI + MCP)
+- `universal_automation_*` — contracts, semantics, conformance, toolkit (CLI + one MCP server)
 - `universal_driver_*` / `universal_browser_*` — platform drivers
 - `universal_screencast`, `universal_capture_*`, `universal_webrtc*`
 - [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon) — not vendored in this workspace

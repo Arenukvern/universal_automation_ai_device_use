@@ -30,6 +30,7 @@ Run the following commands to interact with the project's agentic tools:
 | Publish packages | README → Publish order; `dart pub publish --dry-run` per package |
 | Wire a consumer | path override to `pkgs/<name>` (not DFP) |
 | Install MCP + skill plugin | `plugin/install.sh` (see [plugin/README.md](plugin/README.md)) |
+| Add a platform tier | [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx) — add an **adapter package**, never a new MCP server |
 
 ## North Star Impact
 
@@ -71,6 +72,25 @@ Skills are installed locally under `.agents/skills/`. You can view them using:
 For more information on the project charter and decisions:
 - Read [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) (charter)
 - Read [ADR Index](docs/decisions/README) (if present)
+- Read [ADR 0009 — one MCP server with adapters](docs/decisions/0009_one_mcp_server_with_adapters.mdx) before adding platforms or MCP surfaces
+
+## MCP product rule (ADR 0009)
+
+- **One** Universal Automation MCP server; **one** `automation_*` tool surface and registry.
+- New macOS / Windows / Linux / Android / iOS / Flutter / browser support → **adapter**
+  (`universal_driver_*`, `universal_browser_*`, …) + factory registration, **not** a
+  separate MCP server product.
+- Lean default wiring: interface + desktop OS adapter + browser; mobile, Flutter, harness/SDK
+  are opt-in adapter deps on the same server config. **oka hosts UA** when supervised — UA
+  does not embed or launch oka runners.
+- **Declared targets:** oka creates apps/emulators/simulators and hands `oka_devices` id +
+  typed `vmServiceUri` before attach; UA never scrapes output; **never owns target lifecycle**.
+- **Bounded subprocesses:** `adb` / `xcrun` / similar tool calls via **`oka_process`**;
+  **`universal_tooling_runtime`** thins over it — not a parallel spawn policy.
+- Flutter seam: `mcp_flutter`'s published attach-only driver (`VmClient` + `ToolkitDriver` in
+  `flutter_mcp_harness` today; planned attach-only package split) — not value-type-only crates.
+- **Tool visibility:** optional adapter groups in `tools/list` only when installed **and**
+  target reachable; namespace prefix per group; `notifications/tools/list_changed` on change.
 
 <!-- codemap-index:start -->
 # Codemap — navigate this repo

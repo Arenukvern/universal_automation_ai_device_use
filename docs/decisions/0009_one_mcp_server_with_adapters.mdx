@@ -1,0 +1,120 @@
+---
+title: One MCP server with adapters
+status: accepted
+date: 2026-11-14
+---
+
+# ADR 0009 — One MCP server with adapters
+
+**Status:** Accepted (2026-11-14)  
+**Builds on:** [ADR 0004 — Harness layer and packaging boundaries](/decisions/0004_harness_layer_and_packaging_boundaries)  
+**North-star impact:** `amends` — states the durable MCP product shape agents and clients must assume.
+
+## Context
+
+Agents and MCP clients should learn **one** automation surface: observe, act, capture
+(and verify), backed by **one** runtime registry in `universal_automation_toolkit`.
+Platform differences belong behind **adapters** (Dart driver packages registered at
+install or composition time), not behind separate MCP server products.
+
+A per-platform server family (`android-use`, `ios-use`, `macos-use`, …) would
+duplicate browser tooling, capture plumbing, configuration, and consent flows. Those
+servers would drift apart, and every agent would need a routing table for which
+server to call for which task.
+
+Modularity already lives at the **package and install** layer:
+`universal_automation_interface` is the pure contract surface (no native code;
+see ADR 0004). Adapter packages (`universal_driver_*`, `universal_browser_*`,
+future mobile tiers) are selected when the operator or embedder wires the
+composition root. The MCP **face** stays stable.
+
+**oka** owns boot, discovery, and teardown of apps, emulators, and simulators.
+Universal Automation **attaches** to targets oka **declares** before a run — an
+**`oka_devices`** device id and a typed **`vmServiceUri`** from oka's session manifest —
+and **never** discovers them by scraping command output. UA **never owns target
+lifecycle**. Bounded helper subprocesses for actions and capture (`adb`, `xcrun`, …)
+run through **`oka_process`**'s contract; **`universal_tooling_runtime`** thins over
+that contract (see ADR 0006).
+
+## Decision
+
+1. **Single MCP server.** Ship one Universal Automation MCP server (`universal-automation serve …`)
+   with a unified `automation_*` tool surface and one registry. Agents call the same tools
+   regardless of macOS, Windows, Linux, Android, iOS, Flutter, or browser targets.
+
+2. **Adapters behind the registry.** Each platform tier implements `AutomationDriver` (and
+   optional capability facades from ADR 0004/0005) and registers a `DriverFactory` on the
+   runtime registry. Routing picks the adapter; the MCP schema does not fork per OS.
+
+3. **Lean default install.** Default wiring is **core + one desktop OS adapter + browser**
+   (as today’s `serve --os` + optional `--cdp`). Flutter VM, Android, iOS, and harness/SDK
+   packages are **opt-in adapter dependencies** on the **same** MCP server binary and client
+   config entry. When operators run automations under the oka supervisor, **oka hosts UA**
+   (budgets, restart policy) — Universal Automation does **not** embed, host, or launch oka
+   runners.
+
+4. **Shared tools first.** Screenshot, semantics tree, tap/click, navigate, verify, and
+   consent requests are the common vocabulary. Only capabilities with no honest cross-tier
+   mapping (e.g. Flutter hot reload) appear in a **named tool group**, not a separate server.
+
+5. **Declared targets (every adapter).** UA never creates targets (apps, emulators,
+   simulators). **oka** creates them and hands **declared inputs** before the run:
+   **`oka_devices`** device id and typed **`vmServiceUri`** from oka's session manifest.
+   UA never discovers targets by scraping output. Each adapter **attaches** only:
+   - **Browser / desktop OS:** declared endpoint URI, handle artifact, or session binding
+     (existing `serve --cdp`, `--os`, oka handle files).
+   - **Flutter:** manifest **`vmServiceUri`** — never from `flutter run` logs.
+   - **Android / iOS:** declared serial or simulator id via **`oka_devices`** types.
+   Booting, discovery, and teardown stay in **oka**. Action/capture subprocesses
+   (`adb`, `xcrun`, …) are **bounded tool calls** through **`oka_process`**; UA does
+   not invent a parallel spawn policy — **`universal_tooling_runtime`** thins over
+   **`oka_process`**.
+
+6. **Flutter adapter boundary.** The Flutter tier is a thin adapter over
+   [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only
+   driver (today `VmClient` plus `ToolkitDriver` in `flutter_mcp_harness`, planned to split
+   out into its own attach-only package). Value-type packages alone cannot drive an app.
+   Gaps in Flutter-specific capabilities are fixed **upstream in mcp_flutter**, not by
+   forking a second MCP product.
+
+7. **Tool visibility.** An adapter's optional tool group appears in `tools/list` **only**
+   when its package is **installed** and its declared target is **attached or reachable**.
+   Each group keeps its own **namespace prefix**. The server sends
+   `notifications/tools/list_changed` when a group appears or disappears. Rationale:
+   agents choose worse from oversized catalogs; the lean default must stay small in what
+   an agent **sees**, not only in what the install graph contains.
+
+## Consequences
+
+- MCP client configuration stays **one** `mcp.json` / plugin entry; enabling a tier is
+  dependency + factory registration, not a new server name.
+- Documentation, skills, and ADRs treat “add a platform” as “add an adapter package,”
+  never “add an MCP server.”
+- Drift risk shifts to registry wiring and adapter conformance — where conformance tests
+  already belong — instead of duplicated MCP tool catalogs.
+- Flutter-specific tools may grow in a grouped namespace on the **same** server; they must
+  not justify a standalone “Flutter MCP server” in this family.
+- Agent-facing tool catalogs stay bounded: optional groups materialize only when wired and
+  reachable, with `tools/list_changed` keeping MCP clients honest.
+
+## Rejected alternatives
+
+### One MCP server per platform
+
+Separate servers per OS or runtime (e.g. dedicated Android-use / iOS-use / macOS-use MCP
+binaries) were rejected because they:
+
+- Duplicate browser automation, capture options, consent tools, and plan/MCP codecs.
+- Force agents to maintain a server picker and divergent tool names for the same verbs.
+- Multiply client configuration, security review, and registry publication work without
+  improving isolation (adapters already bound native code at the package layer).
+
+Per-platform **packages** remain; per-platform **MCP servers** do not.
+
+## Non-claims
+
+- This ADR does not require every adapter tier to be production-ready today; it governs
+  product shape only.
+- This ADR does not merge `mcp_flutter` into this repository; it defines the seam.
+- UA does not embed oka's supervisor or own app/emulator/simulator lifecycle; oka-hosted
+  UA is an operator deployment choice, not something `serve` bundles or launches.
