@@ -90,7 +90,7 @@ jobs:
           - triple: darwin-arm64
             runner: macos-15
           - triple: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
           - triple: linux-x64
             runner: ubuntu-latest
           - triple: windows-x64

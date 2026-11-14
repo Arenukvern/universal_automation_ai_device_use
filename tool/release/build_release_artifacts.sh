@@ -84,7 +84,7 @@ EOF
       if [[ "$host_os" == "Darwin" && "$host_arch" == "arm64" ]]; then
         cat >&2 <<EOF
 darwin-x64 requires an Intel macOS host (or Rosetta-capable cross build).
-Use macos-13 (x64) in CI when available.
+Use macos-15-intel in CI (GitHub Intel macOS runner).
 EOF
         exit 1
       fi

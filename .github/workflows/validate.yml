@@ -20,6 +20,31 @@ env:
     ${{ github.head_ref == 'release-please--branches--main' || github.ref_name == 'release-please--branches--main' }}
 
 jobs:
+  release-binary-contracts:
+    name: Release binary contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Release tooling contract tests
+        run: |
+          set -euo pipefail
+          chmod +x tool/release/*.sh tool/contracts/*.sh install.sh
+          bash tool/contracts/check_release_workflow.sh
+          bash tool/contracts/check_macos_release_shell_compat.sh
+          bash tool/contracts/check_plugin_version_sync.sh
+          bash tool/contracts/test_resolve_release_tag.sh
+          bash tool/contracts/test_verify_release_tarball_architecture.sh
+          bash tool/contracts/test_release_recovery_flow.sh
+          shellcheck -x tool/release/*.sh install.sh
+
   analyze:
     name: dart analyze (steward gate)
     runs-on: ubuntu-latest
@@ -92,18 +117,6 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: dart run tool/check_reusable_workflow_inputs.dart
-
-      - name: Release binary contracts (shell)
-        run: |
-          set -euo pipefail
-          chmod +x tool/release/*.sh tool/contracts/*.sh
-          bash tool/contracts/check_release_workflow.sh
-          bash tool/contracts/check_macos_release_shell_compat.sh
-          bash tool/contracts/check_plugin_version_sync.sh
-          bash tool/contracts/test_resolve_release_tag.sh
-          bash tool/contracts/test_verify_release_tarball_architecture.sh
-          bash tool/contracts/test_release_recovery_flow.sh
-          command -v shellcheck >/dev/null 2>&1 && shellcheck -x tool/release/*.sh install.sh || true
 
       - name: Resolve workspace
         run: dart pub get

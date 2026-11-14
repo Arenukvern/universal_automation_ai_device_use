@@ -14,7 +14,7 @@ fi
 
 REPO="${UNIVERSAL_AUTOMATION_REPO:-Arenukvern/universal_automation_ai_device_use}"
 VERSION="${UNIVERSAL_AUTOMATION_VERSION:-$DEFAULT_VERSION}"
-BASE_URL="${UNIVERSAL_AUTOMATION_BASE_URL:-}"
+BASE_URL="${UNIVERSAL_AUTOMATION_BASE_URL:-${UA_RELEASE_BASE_URL:-}}"
 ROLLBACK=0
 
 SHARE_ROOT="${UNIVERSAL_AUTOMATION_SHARE:-$HOME/.local/share/universal-automation}"
@@ -33,6 +33,7 @@ If no prebuilt asset matches, build from source instead:
   # or from a clone: ./plugin/install.sh
 
 Override: UNIVERSAL_AUTOMATION_VERSION or --version.
+Testing: UA_RELEASE_BASE_URL or UNIVERSAL_AUTOMATION_BASE_URL (e.g. local file server).
 USAGE
 }
 
@@ -83,7 +84,11 @@ if [[ "$ROLLBACK" -eq 1 ]]; then
     exit 1
   fi
   ver_dir="$(dirname "$current")"
-  prev="$(ls -1d "$SHARE_ROOT"/[0-9]* 2>/dev/null | sort -V | grep -v "$(basename "$ver_dir")" | tail -n1 || true)"
+  prev="$(find "$SHARE_ROOT" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | while IFS= read -r d; do
+    [[ "$(basename "$d")" =~ ^[0-9] ]] || continue
+    [[ "$d" == "$ver_dir" ]] && continue
+    printf '%s\n' "$d"
+  done | sort -V | tail -n1)"
   if [[ -z "$prev" ]]; then
     echo "No previous version under $SHARE_ROOT" >&2
     exit 1
@@ -142,7 +147,6 @@ if [[ -z "$BASE_URL" ]]; then
 fi
 
 work_parent="$(mktemp -d)"
-work_dir="${work_parent}/staging"
 trap 'rm -rf "$work_parent"' EXIT
 
 fetch() {

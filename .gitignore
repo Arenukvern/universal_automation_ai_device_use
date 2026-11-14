@@ -14,3 +14,4 @@ pubspec.lock
 .steward/
 pubspec_overrides.yaml
 **/pubspec_overrides.yaml
+dist/release/

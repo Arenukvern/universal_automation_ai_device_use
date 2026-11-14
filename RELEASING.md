@@ -92,8 +92,9 @@ trigger other workflows**, so binary builds are started only via explicit
    `paths_released` (same train as pub.dev publish).
 2. **`.github/workflows/release_binaries.yml`** checks out **trusted tooling on
    `main`** plus **immutable tag source**, builds `dart build cli` per matrix
-   (darwin-arm64 on `macos-15`, darwin-x64 on `macos-13` when the runner is
-   available, linux-x64, windows-x64 zip), verifies architectures (CLI **and**
+   (darwin-arm64 on `macos-15`, darwin-x64 on `macos-15-intel` — GitHub retired
+   `macos-13` on 2025-12-04; Intel runners sunset **Aug 2027**, linux-x64,
+   windows-x64 zip), verifies architectures (CLI **and**
    bundled `.dylib`/`.so`/`.dll`), uploads assets to the **existing** toolkit
    release, writes `checksums.txt`, and **postflight**
    `assert_release_assets_complete.sh` asserts every expected asset is present.
