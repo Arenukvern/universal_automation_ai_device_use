@@ -251,11 +251,9 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
     if (!uses.contains('release_binaries.yml')) {
       errors.add('$label: job ${entry.key} must use release_binaries.yml');
     }
-    if (!uses.contains('refs/heads/cursor/release-binaries-auto-99f0') &&
-        !uses.contains('./.github/workflows/release_binaries.yml')) {
+    if (!uses.contains('./.github/workflows/release_binaries.yml')) {
       errors.add(
-        '$label: job ${entry.key} must reference release_binaries.yml '
-        '(./ when on main, or refs/heads/cursor/… until merged)',
+        '$label: job ${entry.key} must use ./.github/workflows/release_binaries.yml',
       );
     }
     final withMap = job['with'];

@@ -33,8 +33,7 @@ concurrency:
 
 jobs:
   smoke:
-    # Pin branch (slashes need refs/heads/ — bare @cursor/… is parsed as owner/path).
-    uses: Arenukvern/universal_automation_ai_device_use/.github/workflows/release_binaries.yml@refs/heads/cursor/release-binaries-auto-99f0
+    uses: ./.github/workflows/release_binaries.yml
     permissions:
       contents: read
     with:
