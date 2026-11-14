@@ -618,11 +618,6 @@ void main() {
       'universal_pkg_b': ['0.2.0'],
     };
 
-    /// pub.dev latest of A is broken (requires B ^0.4.0; 0.3.0 in-train too low).
-    const fixForwardLatestDeps = {
-      'universal_pkg_a': {'universal_pkg_b': '^0.4.0'},
-    };
-
     const fixForwardReleaseSet = {'universal_pkg_a', 'universal_pkg_b'};
 
     test('release-PR in-train sibling satisfies with in-train version', () {
@@ -631,29 +626,109 @@ void main() {
         workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
         pubDevVersions: fixForwardPubVersions,
         publishedLatestDeps: {
-          'universal_pkg_b': {'universal_pkg_a': '^0.2.0'},
+          'universal_pkg_b': {'universal_pkg_a': '^0.5.0'},
         },
         releaseSet: fixForwardReleaseSet,
         releasePrMode: true,
       );
       expect(findings.errors, isEmpty);
+      expect(findings.warnings, isEmpty);
     });
 
-    test('release-PR warns when pub.dev latest is broken but train fixes it', () {
+    test('release-PR warns when in-train satisfies but dep not in release set', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_x',
+          version: '2.0.0',
+          pubspecPath: 'x/x',
+          workspaceDeps: {},
+        ),
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.5.0',
+          pubspecPath: 'x/b',
+          workspaceDeps: {},
+        ),
+      ];
       final findings = auditPublishedLatestErrors(
-        packages: fixForwardPackages,
-        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
-        pubDevVersions: fixForwardPubVersions,
-        publishedLatestDeps: fixForwardLatestDeps,
-        releaseSet: fixForwardReleaseSet,
+        packages: packages,
+        workspaceNames: {'universal_pkg_x', 'universal_pkg_b'},
+        pubDevVersions: {
+          'universal_pkg_x': ['1.0.0'],
+          'universal_pkg_b': ['0.4.0'],
+        },
+        publishedLatestDeps: {
+          'universal_pkg_x': {'universal_pkg_b': '^0.5.0'},
+        },
+        releaseSet: {'universal_pkg_x'},
         releasePrMode: true,
       );
       expect(findings.errors, isEmpty);
       expect(findings.warnings, isNotEmpty);
-      expect(
-        findings.warnings.any((w) => w.contains('universal_pkg_a@0.4.0')),
-        isTrue,
+    });
+
+    test('release-PR errors when in-train does not satisfy (^0.5.0 vs 0.4.1)', () {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_x',
+          version: '2.0.0',
+          pubspecPath: 'x/x',
+          workspaceDeps: {},
+        ),
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.4.1',
+          pubspecPath: 'x/b',
+          workspaceDeps: {},
+        ),
+      ];
+      final findings = auditPublishedLatestErrors(
+        packages: packages,
+        workspaceNames: {'universal_pkg_x', 'universal_pkg_b'},
+        pubDevVersions: {
+          'universal_pkg_x': ['1.0.0'],
+          'universal_pkg_b': ['0.4.0'],
+        },
+        publishedLatestDeps: {
+          'universal_pkg_x': {'universal_pkg_b': '^0.5.0'},
+        },
+        releaseSet: {'universal_pkg_x', 'universal_pkg_b'},
+        releasePrMode: true,
       );
+      expect(findings.errors, isNotEmpty);
+      expect(findings.warnings, isEmpty);
+    });
+
+    test('release-PR audit exits 1 when train cannot satisfy constraint', () async {
+      final packages = [
+        WorkspacePackage(
+          name: 'universal_pkg_x',
+          version: '2.0.0',
+          pubspecPath: 'x/x',
+          workspaceDeps: {},
+        ),
+        WorkspacePackage(
+          name: 'universal_pkg_b',
+          version: '0.4.1',
+          pubspecPath: 'x/b',
+          workspaceDeps: {},
+        ),
+      ];
+      final code = await runAuditPublished(
+        packages: packages,
+        workspaceNames: {'universal_pkg_x', 'universal_pkg_b'},
+        catalog: _FakePubDevGateway(
+          versions: {
+            'universal_pkg_x': ['1.0.0'],
+            'universal_pkg_b': ['0.4.0'],
+          },
+          latestDeps: {
+            'universal_pkg_x': {'universal_pkg_b': '^0.5.0'},
+          },
+        ),
+        releasePrMode: true,
+      );
+      expect(code, 1);
     });
 
     test('main/post-publish still errors on broken pub.dev latest', () {
@@ -661,38 +736,14 @@ void main() {
         packages: fixForwardPackages,
         workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
         pubDevVersions: fixForwardPubVersions,
-        publishedLatestDeps: fixForwardLatestDeps,
+        publishedLatestDeps: {
+          'universal_pkg_a': {'universal_pkg_b': '^0.4.0'},
+        },
         releaseSet: fixForwardReleaseSet,
         releasePrMode: false,
       );
       expect(findings.errors, isNotEmpty);
       expect(findings.warnings, isEmpty);
-    });
-
-    test('version-bump: B requires A in-train; release-PR audit passes', () async {
-      final code = await runAuditPublished(
-        packages: fixForwardPackages,
-        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
-        catalog: _FakePubDevGateway(
-          versions: fixForwardPubVersions,
-          latestDeps: fixForwardLatestDeps,
-        ),
-        releasePrMode: true,
-      );
-      expect(code, 0);
-    });
-
-    test('without release-pr, in-train train still blocks on main audit', () async {
-      final code = await runAuditPublished(
-        packages: fixForwardPackages,
-        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
-        catalog: _FakePubDevGateway(
-          versions: fixForwardPubVersions,
-          latestDeps: fixForwardLatestDeps,
-        ),
-        releasePrMode: false,
-      );
-      expect(code, 1);
     });
   });
 

@@ -31,6 +31,13 @@ const publishWorkflowJobName = 'Publish to pub.dev (OIDC)';
 
 const defaultDispatchRunDiscoveryTimeout = Duration(minutes: 10);
 
+/// Strict main-mode post-publish audit (`--release-pr` omitted; errors block).
+const strictPostPublishAuditArgs = <String>[
+  'run',
+  'tool/check_hosted_deps_resolve.dart',
+  '--audit-published',
+];
+
 /// Clock-skew margin when matching a re-dispatch to a new workflow run.
 const dispatchRunDiscoveryClockSkew = Duration(seconds: 60);
 

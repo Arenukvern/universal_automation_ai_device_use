@@ -141,6 +141,8 @@ jobs:
             --package-dir "${{ needs.guard.outputs.pkg_dir }}" \
             --timeout-minutes 50
 
+      # Hosted-resolution proof after exact-version siblings are on pub.dev
+      # (exit 65 warnings block here — release-PR dry-run gate should catch them).
       - name: Publish dry run
         if: steps.skip.outputs.skip != 'true'
         run: dart pub publish --dry-run

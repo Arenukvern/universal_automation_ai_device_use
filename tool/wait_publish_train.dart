@@ -20,8 +20,8 @@ Future<void> main() async {
   final outputs = jsonDecode(raw) as Map<String, dynamic>;
   final tags = releasePleasePublishTags(outputs: outputs);
   if (tags.isEmpty) {
-    stdout.writeln('No release tags; skipping publish train wait');
-    exit(0);
+    stdout.writeln('No release tags; skipping publish waits');
+    exit(await _runStrictPostPublishAudit());
   }
 
   final env = {...Platform.environment, 'GH_TOKEN': token};
@@ -103,14 +103,17 @@ Future<void> main() async {
     exit(1);
   }
 
-  stdout.writeln('Running post-publish audit …');
-  final audit = await Process.run(
-    'dart',
-    ['run', 'tool/check_hosted_deps_resolve.dart', '--audit-published'],
+  exit(await _runStrictPostPublishAudit());
+}
+
+Future<int> _runStrictPostPublishAudit() async {
+  stdout.writeln(
+    'Running strict post-publish audit (main mode; broken pub.dev latest = error) …',
   );
+  final audit = await Process.run('dart', strictPostPublishAuditArgs);
   stdout.write(audit.stdout);
   stderr.write(audit.stderr);
-  exit(audit.exitCode);
+  return audit.exitCode;
 }
 
 Future<GhWorkflowRun?> _waitForDispatchRun({

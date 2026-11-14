@@ -681,9 +681,9 @@ class AuditPublishedLatestFindings {
 
 /// Checks pub.dev **latest** tarball pubspecs for unresolved sibling deps.
 ///
-/// On a release-please PR ([releasePrMode]), unresolved latest constraints for
-/// a package in [releaseSet] or involving a sibling in [releaseSet] are
-/// warnings (fix-forward train), not blocking errors.
+/// On a release-please PR ([releasePrMode]), pub.dev-latest drift becomes a
+/// warning only when the workspace in-train [entry.key] version satisfies the
+/// failing constraint (fix-forward). If in-train does not satisfy, stay error.
 AuditPublishedLatestFindings auditPublishedLatestErrors({
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
@@ -722,9 +722,12 @@ AuditPublishedLatestFindings auditPublishedLatestErrors({
             'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
             '(pub.dev has: ${(pubDevVersions[entry.key] ?? []).join(', ')}'
             '${releaseSet.contains(entry.key) ? '; in-train: ${byName[entry.key]?.version}' : ''})';
+        final inTrainVer = byName[entry.key]?.version;
+        final inTrainSatisfies = inTrainVer != null &&
+            constraintSatisfiedByAnyVersion(entry.value, [inTrainVer]);
         final pendingFix = releasePrMode &&
             (releaseSet.contains(pkg.name) || releaseSet.contains(entry.key));
-        if (pendingFix) {
+        if (pendingFix && inTrainSatisfies) {
           warnings.add('PENDING RELEASE (pub.dev latest drift): $msg');
         } else {
           errors.add(msg);
