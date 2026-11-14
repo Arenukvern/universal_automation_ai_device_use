@@ -1,0 +1,9 @@
+name: Meta broken production-shaped workflow
+on:
+  workflow_dispatch:
+jobs:
+  lint_probe:
+    needs: []
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo probe

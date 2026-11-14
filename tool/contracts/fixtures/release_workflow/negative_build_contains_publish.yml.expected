@@ -1,1 +1,1 @@
-negative_build_contains_publish.yml: unexpected job publish (allowed: prepare, build, dry-run-bundle)
+negative_build_contains_publish.yml: _validateReusableCalleeJobAllowlist: unexpected job publish (allowed: prepare, build, dry-run-bundle)
