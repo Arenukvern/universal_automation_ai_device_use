@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   smoke:
-    uses: Arenukvern/universal_automation_ai_device_use/.github/workflows/release_binaries.yml@cursor/release-binaries-auto-99f0
+    uses: Arenukvern/universal_automation_ai_device_use/.github/workflows/release_binaries.yml@refs/heads/cursor/release-binaries-auto-99f0
     permissions:
       contents: read
     with:
