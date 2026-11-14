@@ -1,0 +1,1 @@
+negative_matrix_fifth_platform.yml: build matrix must include exactly darwin-arm64, darwin-x64, linux-x64, windows-x64

@@ -1,0 +1,1 @@
+negative_fail_on_unmatched_false.yml: action-gh-release must set fail_on_unmatched_files: true

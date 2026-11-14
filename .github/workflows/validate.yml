@@ -49,6 +49,7 @@ jobs:
           bash tool/contracts/check_release_workflow.sh
           bash tool/contracts/check_macos_release_shell_compat.sh
           bash tool/contracts/check_plugin_version_sync.sh
+          bash tool/contracts/test_audit_release_binaries_train.sh
           bash tool/contracts/test_resolve_release_tag.sh
           bash tool/contracts/test_verify_release_tarball_architecture.sh
           bash tool/contracts/test_release_recovery_flow.sh

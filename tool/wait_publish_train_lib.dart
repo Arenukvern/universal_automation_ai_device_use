@@ -29,49 +29,6 @@ List<String> releasePleasePublishTags({
 
 const publishWorkflowJobName = 'Publish to pub.dev (OIDC)';
 
-const toolkitPackagePath = 'pkgs/universal_automation_toolkit';
-
-const releaseBinariesWorkflowFile = 'release_binaries.yml';
-
-/// Must match `run-name:` in `.github/workflows/release_binaries.yml`.
-const releaseBinariesRunNamePrefix = 'release-binaries ';
-
-/// `gh run list --json` field names for release-binaries discovery.
-const releaseBinariesRunListJsonFields =
-    'databaseId,createdAt,status,conclusion,event,displayTitle';
-
-/// Parses toolkit tag from workflow run display title (`run-name`).
-String? releaseTagFromDisplayTitle(String? displayTitle) {
-  if (displayTitle == null || displayTitle.isEmpty) {
-    return null;
-  }
-  if (!displayTitle.startsWith(releaseBinariesRunNamePrefix)) {
-    return null;
-  }
-  final tag = displayTitle.substring(releaseBinariesRunNamePrefix.length).trim();
-  if (tag.isEmpty) {
-    return null;
-  }
-  final pattern = RegExp(r'^universal_automation_toolkit-v\d+\.\d+\.\d+$');
-  if (!pattern.hasMatch(tag)) {
-    return null;
-  }
-  return tag;
-}
-
-/// Toolkit tag from release-please outputs when the toolkit was released.
-String? toolkitReleaseTag({required Map<String, dynamic> outputs}) {
-  final created = outputs['$toolkitPackagePath--release_created'];
-  if (created != true && created != 'true') {
-    return null;
-  }
-  final tag = outputs['$toolkitPackagePath--tag_name'] as String?;
-  if (tag == null || tag.isEmpty) {
-    return null;
-  }
-  return tag;
-}
-
 const defaultDispatchRunDiscoveryTimeout = Duration(minutes: 10);
 
 /// Strict main-mode post-publish audit (`--release-pr` omitted; errors block).

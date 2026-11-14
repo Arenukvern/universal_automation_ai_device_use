@@ -1,0 +1,1 @@
+negative_set_plus_e_before_verify.yml: step `Verify archive architecture (tooling script)` must not use exit 0/set +e before verify_release_tarball_architecture.sh

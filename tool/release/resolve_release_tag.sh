@@ -16,13 +16,7 @@ DRY_RUN_TRUTHY() {
 }
 
 resolve_production_tag() {
-  local tag=""
-  if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-    tag="$DISPATCH_TAG"
-  else
-    fail "unsupported GITHUB_EVENT_NAME: $EVENT_NAME (dispatch only)"
-  fi
-
+  local tag="$DISPATCH_TAG"
   if [[ -z "$tag" ]]; then
     fail "empty release tag"
   fi
@@ -37,11 +31,12 @@ resolve_production_tag() {
 
 resolve_dry_run_ref() {
   local ref=""
-  if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-    ref="$DISPATCH_TAG"
-  else
-    fail "unsupported GITHUB_EVENT_NAME: $EVENT_NAME (dispatch only)"
-  fi
+  case "$EVENT_NAME" in
+    workflow_dispatch | workflow_call | pull_request | push) ref="$DISPATCH_TAG" ;;
+    *)
+      fail "unsupported GITHUB_EVENT_NAME: $EVENT_NAME for dry_run"
+      ;;
+  esac
   [[ -n "$ref" ]] || fail "empty git ref for dry_run"
   if [[ ${#ref} -eq 40 && "$ref" =~ ^[0-9a-f]{40}$ ]]; then
     printf '%s' "$ref"

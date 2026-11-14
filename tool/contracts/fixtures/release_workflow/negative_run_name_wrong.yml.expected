@@ -1,0 +1,1 @@
+negative_run_name_wrong.yml: run-name must be exactly `release-binaries-build ${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}`

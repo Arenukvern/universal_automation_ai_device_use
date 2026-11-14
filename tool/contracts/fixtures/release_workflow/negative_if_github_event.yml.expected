@@ -1,0 +1,1 @@
+negative_if_github_event.yml: job dry-run-bundle if must be exactly `inputs.dry_run == true`
