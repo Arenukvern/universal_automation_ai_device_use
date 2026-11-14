@@ -100,13 +100,21 @@ function Record-PreviousInstall {
   }
 }
 
+function Normalize-PathKey([string]$Path) {
+  if ([string]::IsNullOrWhiteSpace($Path)) { return "" }
+  return [System.IO.Path]::GetFullPath($Path).TrimEnd('\').ToLowerInvariant()
+}
+
 function Prune-VersionDirs([string]$Ver, [string]$KeepCurrent, [string]$KeepPrevious) {
   if (-not (Test-Path $VersionsDir)) { return }
+  $keepCurrentKey = Normalize-PathKey $KeepCurrent
+  $keepPreviousKey = Normalize-PathKey $KeepPrevious
   Get-ChildItem -Path $VersionsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
     $name = $_.Name
     if ($name -notlike "$Ver-*" -and $name -notlike "$Ver.staging.*") { return }
-    if ($_.FullName -eq $KeepCurrent) { return }
-    if ($KeepPrevious -and $_.FullName -eq $KeepPrevious) { return }
+    $fullKey = Normalize-PathKey $_.FullName
+    if ($fullKey -eq $keepCurrentKey) { return }
+    if ($keepPreviousKey -and $fullKey -eq $keepPreviousKey) { return }
     try {
       Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
     } catch {
@@ -191,17 +199,17 @@ try {
   Record-PreviousInstall
   Switch-CurrentJunction $installRoot
 
-  $keepPrevious = $null
-  if (Test-Path $PreviousFile) {
-    $keepPrevious = (Get-Content -Raw $PreviousFile).Trim()
-  }
-  Prune-VersionDirs -Ver $Version -KeepCurrent $installRoot -KeepPrevious $keepPrevious
-
   $activeExe = Resolve-CliInTree $CurrentLink
   if (-not $activeExe) {
     $phys = Resolve-PhysicalRoot $CurrentLink
     throw "Active CLI missing under $CurrentLink (resolved: $phys)"
   }
+
+  $keepPrevious = $null
+  if (Test-Path $PreviousFile) {
+    $keepPrevious = (Get-Content -Raw $PreviousFile).Trim()
+  }
+  Prune-VersionDirs -Ver $Version -KeepCurrent $installRoot -KeepPrevious $keepPrevious
   & $activeExe --help | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Active CLI --help failed" }
   $ver = & $activeExe --version
