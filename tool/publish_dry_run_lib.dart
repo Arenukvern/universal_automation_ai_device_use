@@ -14,8 +14,9 @@ String formatPublishDryRunGateFailure({
   final kind = exitCode == pubPublishDryRunWarningsExitCode
       ? 'warnings (exit 65)'
       : 'errors (exit $exitCode)';
+  final summary = 'pub publish --dry-run failed: $kind';
   final buffer = StringBuffer()
-    ..writeln('::$packageName:: pub publish --dry-run failed: $kind');
+    ..writeln('::error title=$packageName::$summary');
   for (final line in combinedOutput.split('\n')) {
     final trimmed = line.trim();
     if (trimmed.isEmpty) continue;

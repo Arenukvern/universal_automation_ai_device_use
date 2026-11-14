@@ -7,7 +7,7 @@
 3. Merge the release PR to `main`. Release Please tags `universal_<package>-v<version>` for each released component.
 4. **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** once per tag (`workflow_dispatch` on the tag ref). **Pub.dev environment reviewers were removed** (Anton’s decision: zero-touch publishing). Human review is the **release PR** (second-steward review) plus green CI — not per-package deployment approvals. OIDC still mints a **fresh** token immediately before `dart pub publish --force`.
 5. **`wait-package-publish`** (180-minute job timeout) runs `tool/wait_publish_train.dart`: waits on each dispatched publish run (new `workflow_dispatch` only; one retry when the publish job failed), then runs a **blocking strict** `dart run tool/check_hosted_deps_resolve.dart --audit-published` on the merged **`main`** checkout — **main mode** (no `--release-pr`; broken pub.dev latest = error). The train **fails** if that audit exits non-zero. With **no** released tags, it still runs that same strict audit. If an environment **approval gate is ever re-added** on `pub.dev`, publishes may still complete after this job times out red — re-run **`post_publish_audit.yml`** manually when that happens.
-6. **`post_publish_audit.yml`** — same strict audit, on **workflow_dispatch**, **workflow_call**, and **weekly** schedule (`0 6 * * 1` UTC) for manual or off-train publishes.
+6. **`post_publish_audit.yml`** — same strict audit, on **workflow_dispatch**, **workflow_call**, and **daily** schedule (`0 6 * * *` UTC) for manual or off-train publishes.
 
 **Deployment policy:** GitHub can deploy only from tag refs matching `universal_*-v*`. Tags are **immutable** via the `release-tags-immutable` ruleset (Admin-only bypass). Do not move or recreate tags to “fix” constraint drift — land a new version instead.
 
@@ -21,7 +21,7 @@ Constraint sync dispatches `validate.yml` on branch `release-please--branches--m
 | Ordinary PR | report only (`continue-on-error`) | no |
 | Push to `main` (`Validate`) | **skipped** (would race in-flight publishes; was report-only anyway) | — |
 | **`wait-package-publish` (train end)** | strict main mode | **yes** |
-| `post_publish_audit.yml` | strict main mode | yes (manual / weekly / callable) |
+| `post_publish_audit.yml` | strict main mode | yes (manual / daily / callable) |
 
 The **authoritative strict audit after a release merge** is the tail of **`wait-package-publish`**, not `Validate` on the same push.
 

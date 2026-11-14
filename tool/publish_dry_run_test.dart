@@ -24,8 +24,12 @@ void main() {
         exitCode: 65,
         combinedOutput: 'Warning: title is not descriptive.\n',
       );
-      expect(text, contains('universal_foo'));
-      expect(text, contains('exit 65'));
+      expect(
+        text,
+        contains(
+          '::error title=universal_foo::pub publish --dry-run failed: warnings (exit 65)',
+        ),
+      );
       expect(text, contains('Warning: title is not descriptive'));
     });
 

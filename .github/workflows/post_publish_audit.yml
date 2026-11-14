@@ -9,8 +9,8 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    # Weekly strict audit for manual/off-train publishes (Mondays 06:00 UTC).
-    - cron: '0 6 * * 1'
+    # Daily strict audit for manual/off-train publishes (06:00 UTC).
+    - cron: '0 6 * * *'
 
 permissions:
   contents: read
