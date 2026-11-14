@@ -39,6 +39,21 @@ const allowedBuildJobEnvSecretKeys = <String>{
   'HAS_CERT_PASSWORD',
 };
 
+const requiredBuildMatrixTriples = <String>[
+  'darwin-arm64',
+  'darwin-x64',
+  'linux-x64',
+  'windows-x64',
+];
+
+const requiredGhReleaseAssetSuffixes = <String>[
+  '_darwin-arm64.tar.gz',
+  '_darwin-x64.tar.gz',
+  '_linux-x64.tar.gz',
+  '_windows-x64.zip',
+  'checksums.txt',
+];
+
 /// Structural validation for `.github/workflows/release_binaries.yml`.
 List<String> validateReleaseBinariesWorkflowYaml(
   String yamlText, {
@@ -64,22 +79,28 @@ List<String> validateReleaseBinariesWorkflowYaml(
     if (!onMap.containsKey('workflow_dispatch')) {
       errors.add('$label: on.workflow_dispatch is required');
     }
+    if (!onMap.containsKey('workflow_call')) {
+      errors.add('$label: on.workflow_call is required');
+    }
+    const allowedOnKeys = {'workflow_dispatch', 'workflow_call'};
     for (final key in onMap.keys) {
-      if (key == 'workflow_dispatch') {
+      if (!allowedOnKeys.contains(key.toString())) {
+        errors.add(
+          '$label: forbidden on.$key trigger (workflow_dispatch + workflow_call only)',
+        );
+      }
+    }
+    for (final trigger in ['workflow_dispatch', 'workflow_call']) {
+      final block = onMap[trigger];
+      if (block is! Map) {
         continue;
       }
-      errors.add('$label: forbidden on.$key trigger (dispatch only)');
-    }
-    final wd = onMap['workflow_dispatch'];
-    if (wd is Map) {
-      final inputs = Map<dynamic, dynamic>.from(
-        (wd['inputs'] as Map?) ?? {},
-      );
+      final inputs = Map<dynamic, dynamic>.from((block['inputs'] as Map?) ?? {});
       if (!inputs.containsKey('release_tag')) {
-        errors.add('$label: workflow_dispatch.inputs.release_tag required');
+        errors.add('$label: on.$trigger.inputs.release_tag required');
       }
       if (!inputs.containsKey('dry_run')) {
-        errors.add('$label: workflow_dispatch.inputs.dry_run required');
+        errors.add('$label: on.$trigger.inputs.dry_run required');
       }
     }
   }
@@ -162,7 +183,276 @@ List<String> validateReleaseBinariesWorkflowYaml(
   }
 
   errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, yamlText, label));
+  errors.addAll(_validateBuildMatrix(jobsMap, label));
+  errors.addAll(_validatePublishNeeds(jobsMap, label));
+  errors.addAll(_validateGhReleaseAssets(jobsMap, label));
+  errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
 
+  return errors;
+}
+
+/// Structural validation for `.github/workflows/release_binaries_pr.yml`.
+List<String> validateReleaseBinariesPrWorkflowYaml(
+  String yamlText, {
+  String label = 'release_binaries_pr.yml',
+}) {
+  final errors = <String>[];
+  final dynamic doc;
+  try {
+    doc = loadYaml(yamlText);
+  } catch (e) {
+    return ['$label: invalid YAML: $e'];
+  }
+  if (doc is! Map) {
+    return ['$label: root must be a mapping'];
+  }
+  final root = Map<dynamic, dynamic>.from(doc);
+
+  final on = root['on'];
+  if (on is! Map) {
+    errors.add('$label: on must be a mapping');
+  } else {
+    final onMap = Map<dynamic, dynamic>.from(on);
+    const allowed = {'pull_request', 'push'};
+    for (final key in onMap.keys) {
+      if (!allowed.contains(key.toString())) {
+        errors.add('$label: forbidden on.$key (pull_request + push only)');
+      }
+    }
+    if (!onMap.containsKey('pull_request')) {
+      errors.add('$label: on.pull_request required');
+    }
+    if (!onMap.containsKey('push')) {
+      errors.add('$label: on.push required');
+    }
+  }
+
+  final workflowPerms = root['permissions'];
+  if (workflowPerms is! Map ||
+      workflowPerms['contents']?.toString() != 'read') {
+    errors.add('$label: workflow permissions must set contents: read');
+  }
+
+  final jobs = root['jobs'];
+  if (jobs is! Map || jobs.isEmpty) {
+    errors.add('$label: must define a reusable-workflow caller job');
+    return errors;
+  }
+  final jobsMap = Map<dynamic, dynamic>.from(jobs);
+  if (jobsMap.length != 1) {
+    errors.add('$label: exactly one caller job expected');
+  }
+  for (final entry in jobsMap.entries) {
+    final job = entry.value;
+    if (job is! Map) {
+      continue;
+    }
+    final uses = job['uses']?.toString() ?? '';
+    if (!uses.contains('release_binaries.yml')) {
+      errors.add('$label: job ${entry.key} must use release_binaries.yml');
+    }
+    final withMap = job['with'];
+    if (withMap is! Map) {
+      errors.add('$label: job ${entry.key} must pass with:');
+      continue;
+    }
+    final dryRun = withMap['dry_run'];
+    if (dryRun != true && dryRun?.toString() != 'true') {
+      errors.add(
+        '$label: job ${entry.key} must pass dry_run: true literally',
+      );
+    }
+    final perms = job['permissions'];
+    if (perms is Map && perms['contents']?.toString() != 'read') {
+      errors.add('$label: caller job permissions.contents must be read');
+    }
+  }
+
+  return errors;
+}
+
+/// Caller job in release-please.yml must invoke release_binaries with dry_run false.
+List<String> validateReleasePleaseBinariesCaller(String yamlText) {
+  final errors = <String>[];
+  final dynamic doc;
+  try {
+    doc = loadYaml(yamlText);
+  } catch (e) {
+    return ['release-please.yml: invalid YAML: $e'];
+  }
+  if (doc is! Map) {
+    return ['release-please.yml: root must be a mapping'];
+  }
+  final jobs = doc['jobs'];
+  if (jobs is! Map) {
+    return ['release-please.yml: jobs missing'];
+  }
+  final jobsMap = Map<dynamic, dynamic>.from(jobs);
+  final caller = jobsMap['release-binaries'];
+  if (caller is! Map) {
+    return ['release-please.yml: missing release-binaries reusable-workflow job'];
+  }
+  final uses = caller['uses']?.toString() ?? '';
+  if (!uses.contains('release_binaries.yml')) {
+    errors.add('release-please.yml: release-binaries must use release_binaries.yml');
+  }
+  final withMap = caller['with'];
+  if (withMap is! Map) {
+    errors.add('release-please.yml: release-binaries must pass with:');
+  } else {
+    final dryRun = withMap['dry_run'];
+    if (dryRun != false && dryRun?.toString() != 'false') {
+      errors.add('release-please.yml: release-binaries must pass dry_run: false');
+    }
+  }
+  final perms = caller['permissions'];
+  if (perms is Map && perms['contents']?.toString() != 'write') {
+    errors.add('release-please.yml: release-binaries job needs contents: write');
+  }
+  return errors;
+}
+
+List<String> _validateBuildMatrix(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final build = jobsMap['build'];
+  if (build is! Map) {
+    return errors;
+  }
+  final strategy = build['strategy'];
+  if (strategy is! Map) {
+    errors.add('$label: build must define strategy.matrix');
+    return errors;
+  }
+  final matrix = strategy['matrix'];
+  if (matrix is! Map) {
+    errors.add('$label: build must define strategy.matrix');
+    return errors;
+  }
+  final include = matrix['include'];
+  if (include is! List) {
+    errors.add('$label: build matrix must use include list');
+    return errors;
+  }
+  final triples = <String>[];
+  for (final row in include) {
+    if (row is Map && row['triple'] != null) {
+      triples.add(row['triple'].toString());
+    }
+  }
+  triples.sort();
+  final expected = [...requiredBuildMatrixTriples]..sort();
+  if (triples.length != 4 || !triples.every(expected.contains)) {
+    errors.add(
+      '$label: build matrix must include exactly ${requiredBuildMatrixTriples.join(", ")} '
+      '(got ${triples.join(", ")})',
+    );
+  }
+  return errors;
+}
+
+List<String> _validatePublishNeeds(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final publish = jobsMap['publish'];
+  if (publish is! Map) {
+    return errors;
+  }
+  final needs = publish['needs'];
+  final needsList = needs is List
+      ? needs.map((e) => e.toString()).toList()
+      : needs != null
+          ? [needs.toString()]
+          : <String>[];
+  needsList.sort();
+  final expected = ['build', 'prepare']..sort();
+  final sorted = [...needsList]..sort();
+  if (sorted.length != 2 || !sorted.every(expected.contains)) {
+    errors.add(
+      '$label: publish needs must be exactly [prepare, build] (got $needsList)',
+    );
+  }
+  return errors;
+}
+
+List<String> _validateGhReleaseAssets(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final publish = jobsMap['publish'];
+  if (publish is! Map) {
+    return errors;
+  }
+  final steps = publish['steps'];
+  if (steps is! List) {
+    return errors;
+  }
+  for (final step in steps) {
+    if (step is! Map) {
+      continue;
+    }
+    final uses = step['uses']?.toString() ?? '';
+    if (!uses.contains('action-gh-release')) {
+      continue;
+    }
+    final withMap = step['with'];
+    if (withMap is! Map) {
+      errors.add('$label: action-gh-release step missing with:');
+      return errors;
+    }
+    if (withMap['fail_on_unmatched_files'] != true) {
+      errors.add('$label: action-gh-release must set fail_on_unmatched_files: true');
+    }
+    final files = withMap['files']?.toString() ?? '';
+    for (final suffix in requiredGhReleaseAssetSuffixes) {
+      if (!files.contains(suffix)) {
+        errors.add(
+          '$label: action-gh-release files must include *$suffix',
+        );
+      }
+    }
+  }
+  return errors;
+}
+
+List<String> _validateContentsWriteScope(
+  Map<dynamic, dynamic> jobsMap,
+  Map<dynamic, dynamic> root,
+  String label,
+) {
+  final errors = <String>[];
+  final workflowPerms = root['permissions'];
+  if (workflowPerms is Map && workflowPerms['contents']?.toString() == 'write') {
+    errors.add('$label: workflow-level permissions must not set contents: write');
+  }
+  for (final entry in jobsMap.entries) {
+    final jobId = entry.key.toString();
+    final job = entry.value;
+    if (job is! Map) {
+      continue;
+    }
+    final perms = job['permissions'];
+    if (perms is! Map) {
+      continue;
+    }
+    if (perms['contents']?.toString() == 'write' && jobId != 'publish') {
+      errors.add(
+        '$label: only publish job may set contents: write (got $jobId)',
+      );
+    }
+  }
+  final publish = jobsMap['publish'];
+  if (publish is Map) {
+    final perms = publish['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add('$label: publish job must set permissions.contents: write');
+    }
+  }
   return errors;
 }
 

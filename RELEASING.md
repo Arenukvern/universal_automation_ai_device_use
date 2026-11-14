@@ -82,42 +82,45 @@ See [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) for pu
 
 ## Toolkit GitHub Release binaries (no Dart install)
 
-Tags: `universal_automation_toolkit-v<version>` (Release Please). GitHub Releases
-are created by Release Please with `GITHUB_TOKEN`; **tag/release events do not
-trigger other workflows**, so binary builds are started only via explicit
-`workflow_dispatch`:
+Tags: `universal_automation_toolkit-v<version>` (Release Please). When the
+toolkit ships on a release train, **`release-please.yml` calls**
+**`.github/workflows/release_binaries.yml`** as a reusable workflow (no
+`workflow_dispatch` — integration tokens do not reliably trigger sibling
+workflows). Zero manual steps:
 
-1. **`dispatch-release-binaries`** in `release-please.yml` runs
-   `dart run tool/dispatch_release_binaries.dart` when the toolkit is in
-   `paths_released` (same train as pub.dev publish).
-2. **`.github/workflows/release_binaries.yml`** checks out **trusted tooling on
-   `main`** plus **immutable tag source**, builds `dart build cli` per matrix
-   (darwin-arm64 on `macos-15`, darwin-x64 on `macos-15-intel` — GitHub retired
-   `macos-13` on 2025-12-04; Intel runners sunset **Aug 2027**, linux-x64,
-   windows-x64 zip), verifies architectures (CLI **and**
-   bundled `.dylib`/`.so`/`.dll`), uploads assets to the **existing** toolkit
-   release, writes `checksums.txt`, and **postflight**
-   `assert_release_assets_complete.sh` asserts every expected asset is present.
-3. **`wait-package-publish`** waits for `release_binaries.yml` when the toolkit
-   shipped this train (before the strict post-publish audit).
+1. **`release-binaries`** job in `release-please.yml` runs when
+   `pkgs/universal_automation_toolkit--release_created` is true, passing the
+   toolkit tag and `dry_run: false`. `wait-package-publish` **`needs`**
+   that job (success or skipped) before the strict post-publish audit.
+2. **`release_binaries.yml`** checks out **trusted tooling on `main`** plus
+   **immutable tag source**, builds `dart build cli` per matrix (darwin-arm64 on
+   `macos-15`, darwin-x64 on `macos-15-intel` — GitHub retired `macos-13` on
+   2025-12-04; Intel runners sunset **Aug 2027**, linux-x64, windows-x64 zip),
+   verifies architectures (CLI **and** bundled `.dylib`/`.so`/`.dll`), uploads
+   assets to the **existing** toolkit release, writes `checksums.txt`, and
+   **postflight** `assert_release_assets_complete.sh` asserts every expected
+   asset is present.
 
-Manual recovery (re-attach assets for an old tag):
+### PR / main path smoke (all four legs, artifacts only)
+
+**`.github/workflows/release_binaries_pr.yml`** runs on pull requests and pushes
+to `main` when release-related paths change. It calls `release_binaries.yml` with
+`dry_run: true` and `release_tag` set to the PR head SHA (or `github.sha` on
+`main`). Fork PRs get no signing secrets (unsigned macOS is fine). **`publish` /
+`postflight` never run** when `dry_run` is true.
+
+### Manual escape hatch (`workflow_dispatch`)
+
+Re-attach assets for an old tag, or dry-run from an arbitrary ref without opening
+a PR:
 
 ```bash
 gh workflow run release_binaries.yml \
   --repo Arenukvern/universal_automation_ai_device_use \
   --ref main \
   -f release_tag=universal_automation_toolkit-vX.Y.Z
-```
 
-### Dry-run binary build (pre-release smoke)
-
-`workflow_dispatch` loads the workflow definition from the **default branch**
-(`main`), not from a release PR branch. After merging the release-binary workflow
-to `main` and **before** the first real toolkit release, run a dry build from an
-arbitrary commit:
-
-```bash
+# artifact-only (no GitHub Release upload):
 gh workflow run release_binaries.yml \
   --repo Arenukvern/universal_automation_ai_device_use \
   --ref main \
@@ -127,8 +130,7 @@ gh workflow run release_binaries.yml \
 
 With `dry_run: true`, `release_tag` is a **git ref or full SHA** (not a Release
 Please tag). The workflow builds all four platform legs, runs architecture checks,
-writes `checksums.txt`, and uploads a single **workflow artifact** bundle. It does
-**not** upload to the GitHub Release, and `publish` / `postflight` are skipped.
+writes `checksums.txt`, and uploads a single **workflow artifact** bundle.
 
 Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
 From-source path remains [`plugin/install.sh`](plugin/install.sh).

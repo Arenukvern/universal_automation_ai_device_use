@@ -1,8 +1,8 @@
 name: Release binaries (toolkit)
 run-name: release-binaries ${{ inputs.release_tag }}
 
-# Release Please creates tags/releases with GITHUB_TOKEN; those events do not
-# trigger other workflows. Dispatch explicitly from release-please.yml / train.
+# Callable from release-please.yml (real releases) and release_binaries_pr.yml (dry runs).
+# workflow_dispatch remains a manual escape hatch.
 on:
   workflow_dispatch:
     inputs:
@@ -16,6 +16,17 @@ on:
         description: >-
           When true, build all platform artifacts and upload workflow artifacts only
           (no GitHub Release upload). release_tag is interpreted as a git ref or SHA.
+        required: false
+        type: boolean
+        default: false
+  workflow_call:
+    inputs:
+      release_tag:
+        description: Toolkit release tag or dry-run git ref/SHA.
+        required: true
+        type: string
+      dry_run:
+        description: Artifact-only build; never upload to a GitHub Release.
         required: false
         type: boolean
         default: false

@@ -138,32 +138,21 @@ jobs:
           gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
             -f expected_sha="${SYNC_SHA}"
 
-  dispatch-release-binaries:
+  release-binaries:
     needs: release-please
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == true ||
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
+      )
     permissions:
-      actions: write
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - name: Setup Dart SDK
-        uses: dart-lang/setup-dart@v1
-        with:
-          sdk: stable
-
-      - name: Resolve workspace (tooling)
-        run: dart pub get
-
-      - name: Dispatch toolkit binary release (main tooling + tag source)
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
-        run: dart run tool/dispatch_release_binaries.dart
+      contents: write
+    secrets: inherit
+    uses: ./.github/workflows/release_binaries.yml
+    with:
+      release_tag: ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--tag_name'] }}
+      dry_run: false
 
   dispatch-package-publish:
     needs: release-please
@@ -194,8 +183,14 @@ jobs:
         run: dart run tool/dispatch_pub_dev_publish.dart
 
   wait-package-publish:
-    needs: [release-please, dispatch-package-publish, dispatch-release-binaries]
-    if: github.ref == 'refs/heads/main'
+    needs: [release-please, dispatch-package-publish, release-binaries]
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      needs.release-please.result == 'success' &&
+      needs.dispatch-package-publish.result == 'success' &&
+      (needs.release-binaries.result == 'success' || needs.release-binaries.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:

@@ -17,4 +17,14 @@ for negative in "$fixtures_dir"/negative_*.yml; do
   ok "negative fixture rejected: $name"
 done
 
+pr_fixtures_dir="$ROOT_DIR/tool/contracts/fixtures/release_workflow_pr"
+shopt -s nullglob
+for negative in "$pr_fixtures_dir"/negative_*.yml; do
+  name="$(basename "$negative")"
+  if dart run "$ROOT_DIR/tool/check_release_workflow.dart" --pr-smoke-workflow "$negative"; then
+    fail "PR negative fixture must fail but passed: $name"
+  fi
+  ok "PR negative fixture rejected: $name"
+done
+
 ok "release_binaries workflow structure OK"

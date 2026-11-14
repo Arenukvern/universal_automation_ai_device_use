@@ -103,79 +103,9 @@ Future<void> main() async {
     exit(1);
   }
 
-  final toolkitTag = toolkitReleaseTag(outputs: outputs);
-  if (toolkitTag != null) {
-    stdout.writeln('Waiting for release_binaries.yml on $toolkitTag …');
-    final binaryOk = await _waitForReleaseBinariesWorkflow(
-      repo: repo,
-      releaseTag: toolkitTag,
-      env: env,
-    );
-    if (!binaryOk) {
-      stderr.writeln(
-        '::error::release_binaries workflow failed or timed out for $toolkitTag',
-      );
-      exit(1);
-    }
-  }
-
+  // Toolkit binaries: release-please.yml `release-binaries` reusable workflow job
+  // is a hard `needs` dependency of wait-package-publish (no separate dispatch run).
   exit(await _runStrictPostPublishAudit());
-}
-
-Future<bool> _waitForReleaseBinariesWorkflow({
-  required String repo,
-  required String releaseTag,
-  required Map<String, String> env,
-}) async {
-  final deadline = DateTime.now().add(defaultDispatchRunDiscoveryTimeout);
-  while (DateTime.now().isBefore(deadline)) {
-    final list = await Process.run(
-      'gh',
-      [
-        'run',
-        'list',
-        '--repo',
-        repo,
-        '--workflow',
-        releaseBinariesWorkflowFile,
-        '--branch',
-        'main',
-        '--event',
-        'workflow_dispatch',
-        '--json',
-        releaseBinariesRunListJsonFields,
-        '--limit',
-        '25',
-      ],
-      environment: env,
-    );
-    if (list.exitCode != 0) {
-      stderr.write(list.stderr);
-      return false;
-    }
-    final runs = parseGhWorkflowRunList(list.stdout as String);
-    for (final run in runs) {
-      final tagFromList = releaseTagFromDisplayTitle(run.displayTitle);
-      if (tagFromList != releaseTag) {
-        continue;
-      }
-      final watch = await Process.run(
-        'gh',
-        [
-          'run',
-          'watch',
-          '${run.databaseId}',
-          '--repo',
-          repo,
-          '--exit-status',
-        ],
-        environment: env,
-      );
-      return watch.exitCode == 0;
-    }
-    await Future<void>.delayed(const Duration(seconds: 20));
-  }
-  return false;
 }
 
 Future<int> _runStrictPostPublishAudit() async {
