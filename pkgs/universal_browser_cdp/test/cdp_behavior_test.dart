@@ -179,17 +179,18 @@ void main() {
         () async {
       final driver = await attachDriver();
       await driver.snapshot();
+      final monotonic = driver.page.observationMonotonic;
+      expect(monotonic, isNotNull);
       final profile = BehaviorProfile.agentImmediate.copyWith(
         reaction: const ReactionDelay(floorUs: 150_000),
       );
-      final watch = Stopwatch()..start();
       await driver.performWith(
         const ClickAction(css: '#go'),
         profile,
         seed: 2,
       );
       expect(
-        watch.elapsed,
+        monotonic!.elapsed,
         greaterThanOrEqualTo(const Duration(milliseconds: 150)),
       );
       await driver.close();

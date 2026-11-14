@@ -89,9 +89,9 @@ class BehavioralCdpDriver extends CdpDriver implements BehavioralDriver {
 
   Future<void> _enforceReactionFloor(int floorUs) async {
     if (floorUs <= 0) return;
-    final observedAt = page.lastObservationAt;
-    if (observedAt == null) return;
-    final elapsedUs = DateTime.now().difference(observedAt).inMicroseconds;
+    final clock = page.observationMonotonic;
+    if (clock == null) return;
+    final elapsedUs = clock.elapsedMicroseconds;
     final remainingUs = floorUs - elapsedUs;
     if (remainingUs > 0) {
       await Future<void>.delayed(Duration(microseconds: remainingUs));
