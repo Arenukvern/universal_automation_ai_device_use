@@ -177,8 +177,9 @@ try {
   }
 
   New-Item -ItemType Directory -Path $VersionsDir -Force | Out-Null
-  $staging = Join-Path $VersionsDir "$Version.staging.$PID"
-  $installRoot = Join-Path $VersionsDir "$Version-$(Get-Date -Format 'yyyyMMddHHmmss')-$PID"
+  $unique = [guid]::NewGuid().ToString("N").Substring(0, 12)
+  $staging = Join-Path $VersionsDir "$Version.staging.$PID.$unique"
+  $installRoot = Join-Path $VersionsDir "$Version-$(Get-Date -Format 'yyyyMMddHHmmss')-$PID-$unique"
   if (Test-Path $staging) { Remove-Item -Recurse -Force $staging }
   Copy-Item -Recurse -Force $packageDir $staging
   Move-Item -Force $staging $installRoot
