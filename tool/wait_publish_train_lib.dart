@@ -40,9 +40,6 @@ const releaseBinariesRunNamePrefix = 'release-binaries ';
 const releaseBinariesRunListJsonFields =
     'databaseId,createdAt,status,conclusion,event,displayTitle';
 
-/// `gh run view --json` field names when watching a release-binaries run.
-const releaseBinariesRunViewJsonFields = 'event,conclusion,status,displayTitle';
-
 /// Parses toolkit tag from workflow run display title (`run-name`).
 String? releaseTagFromDisplayTitle(String? displayTitle) {
   if (displayTitle == null || displayTitle.isEmpty) {

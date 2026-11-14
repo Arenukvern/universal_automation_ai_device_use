@@ -46,6 +46,38 @@ function Publish-MockRelease([string]$Dir, [string]$Version, [string]$Label, [sw
   Set-Content -Path (Join-Path $Dir "checksums.txt") -Value "$hash  $(Split-Path -Leaf $zip)" -Encoding ascii
 }
 
+function Get-McpSnippetJsonText([string]$Output) {
+  $marker = 'MCP client snippet:'
+  $idx = $Output.IndexOf($marker)
+  if ($idx -lt 0) { throw 'missing MCP client snippet header' }
+  $rest = $Output.Substring($idx + $marker.Length)
+  if ($rest -notmatch '(?s)\s*(\{.*\})') { throw 'missing JSON object in MCP snippet' }
+  return $Matches[1].Trim()
+}
+
+function Assert-McpSnippetOutput([string]$Output) {
+  if ($Output -match 'System\.Collections\.Hashtable') {
+    throw 'MCP snippet output must not contain System.Collections.Hashtable'
+  }
+  $jsonText = Get-McpSnippetJsonText $Output
+  $obj = $jsonText | ConvertFrom-Json
+  $server = $obj.mcpServers.'universal-automation'
+  if (-not $server) {
+    throw 'mcpServers.universal-automation missing'
+  }
+  $cmd = [string]$server.command
+  if ($cmd -notmatch '\\current\\bin\\(universal_automation|universal-automation)\.exe$') {
+    throw "command must end with current\bin\universal_automation.exe (got $cmd)"
+  }
+  if ($cmd -match '\\versions\\') {
+    throw 'command must not contain \versions\'
+  }
+  $argsList = @($server.args)
+  if ($argsList.Count -ne 2 -or $argsList[0] -ne 'serve' -or $argsList[1] -ne '--os') {
+    throw "args must be serve and --os (got $($argsList -join ', '))"
+  }
+}
+
 $tmp = Join-Path $env:TEMP "ua-install-test-$PID"
 $share = Join-Path $tmp "share"
 $rel = Join-Path $tmp "release"
@@ -63,12 +95,7 @@ $base = "http://127.0.0.1:8765"
 try {
   $env:UNIVERSAL_AUTOMATION_SHARE = $share
   $installOutput = & $InstallScript -Version "1.0.0" -BaseUrl $base *>&1 | Out-String
-  if ($installOutput -notmatch '(?s)MCP client snippet:.*\\current\\bin\\') {
-    throw "MCP snippet must use \\current\\bin\\ path"
-  }
-  if ($installOutput -match '(?s)MCP client snippet:.*\\versions\\') {
-    throw "MCP snippet must not expose \\versions\\ physical path"
-  }
+  Assert-McpSnippetOutput $installOutput
   $currentExe = Join-Path $share "current\bin\universal_automation.exe"
   if (-not (Test-Path $currentExe)) { throw "missing current exe after first install" }
   $v1 = & $currentExe --version

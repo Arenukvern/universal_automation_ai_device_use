@@ -97,6 +97,20 @@ function Normalize-PathKey([string]$Path) {
   return [System.IO.Path]::GetFullPath($Path).TrimEnd('\').ToLowerInvariant()
 }
 
+function Sweep-TrashDirs {
+  if (-not (Test-Path -LiteralPath $VersionsDir)) { return }
+  Get-ChildItem -Path $VersionsDir -Directory -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -like '.trash-*' } |
+    ForEach-Object {
+      $trashPath = $_.FullName
+      try {
+        Remove-Item -LiteralPath $trashPath -Recurse -Force -ErrorAction Stop
+      } catch {
+        Write-Warning "Could not remove leftover trash: $trashPath ($($_.Exception.Message))"
+      }
+    }
+}
+
 function Prune-VersionDirs([string]$Ver, [string]$KeepCurrent, [string]$KeepPrevious) {
   if (-not (Test-Path $VersionsDir)) { return }
   $keepCurrentKey = Normalize-PathKey $KeepCurrent
@@ -107,13 +121,14 @@ function Prune-VersionDirs([string]$Ver, [string]$KeepCurrent, [string]$KeepPrev
     $fullKey = Normalize-PathKey $_.FullName
     if ($fullKey -eq $keepCurrentKey) { return }
     if ($keepPreviousKey -and $fullKey -eq $keepPreviousKey) { return }
+    $dirPath = $_.FullName
     $trashName = ".trash-$PID-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
     $trashPath = Join-Path $VersionsDir $trashName
     try {
-      Rename-Item -LiteralPath $_.FullName -NewName $trashName -ErrorAction Stop
+      Rename-Item -LiteralPath $dirPath -NewName $trashName -ErrorAction Stop
       Remove-Item -LiteralPath $trashPath -Recurse -Force -ErrorAction Stop
     } catch {
-      Write-Warning "Skipped pruning in-use directory: $($_.FullName)"
+      Write-Warning "Skipped pruning in-use directory: $dirPath ($($_.Exception.Message))"
     }
   }
 }
@@ -173,6 +188,7 @@ try {
   }
 
   New-Item -ItemType Directory -Path $VersionsDir -Force | Out-Null
+  Sweep-TrashDirs
   $unique = [guid]::NewGuid().ToString("N").Substring(0, 12)
   $staging = Join-Path $VersionsDir "$Version.staging.$PID.$unique"
   $installRoot = Join-Path $VersionsDir "$Version-$(Get-Date -Format 'yyyyMMddHHmmss')-$PID-$unique"
@@ -221,18 +237,17 @@ try {
   Write-Host "Install root: $installRoot"
   Write-Host "Current junction: $CurrentLink"
   Write-Host "Add to PATH (optional): $ProgramsBin"
-  Write-Host @"
-
-MCP client snippet:
-{
-  "mcpServers": {
-    "universal-automation": {
-      "command": "$cliForSnippet",
-      "args": ["serve", "--os"]
+  $mcpSnippet = @{
+    mcpServers = @{
+      'universal-automation' = @{
+        command = $cliForSnippet
+        args    = @('serve', '--os')
+      }
     }
   }
-}
-"@
+  Write-Host ""
+  Write-Host "MCP client snippet:"
+  $mcpSnippet | ConvertTo-Json -Depth 5
 }
 finally {
   Remove-Item -Recurse -Force $temp -ErrorAction SilentlyContinue

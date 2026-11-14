@@ -81,6 +81,47 @@ run_install() {
   bash "$INSTALL" --version "$ver"
 }
 
+run_install_capture() {
+  local ver="$1"
+  local base="$2"
+  UNIVERSAL_AUTOMATION_SHARE="$share" \
+  UNIVERSAL_AUTOMATION_BIN="$bin_dir/universal-automation" \
+  UNIVERSAL_AUTOMATION_BASE_URL="$base" \
+  bash "$INSTALL" --version "$ver" 2>&1
+}
+
+assert_mcp_snippet_json() {
+  local out="$1"
+  if [[ "$out" == *'System.Collections.Hashtable'* ]]; then
+    fail 'MCP snippet must not contain System.Collections.Hashtable'
+  fi
+  if ! printf '%s' "$out" | python3 -c '
+import json
+import re
+import sys
+
+text = sys.stdin.read()
+m = re.search(r"MCP client snippet[^\n]*\n(\{.*\})", text, flags=re.DOTALL)
+if not m:
+    raise SystemExit("missing MCP JSON block")
+try:
+    obj = json.loads(m.group(1))
+except json.JSONDecodeError as exc:
+    raise SystemExit(f"invalid MCP JSON: {exc}") from exc
+srv = obj.get("mcpServers", {}).get("universal-automation")
+if not srv:
+    raise SystemExit("mcpServers.universal-automation missing")
+cmd = srv.get("command")
+if cmd != "universal-automation":
+    raise SystemExit(f"unexpected command: {cmd!r}")
+args = srv.get("args")
+if args != ["serve", "--os"]:
+    raise SystemExit(f"unexpected args: {args!r}")
+'; then
+    fail "MCP snippet JSON assertion failed"
+  fi
+}
+
 triple="linux-x64"
 ver="9.8.7"
 rel_root="$tmpdir/release"
@@ -96,7 +137,8 @@ tar -C "$tmpdir" -czf "$rel_root/universal_automation_${ver}_${triple}.tar.gz" "
 http_server "$rel_root"
 base="http://127.0.0.1:${HTTP_PORT}"
 
-run_install "$ver" "$base"
+first_install_out="$(run_install_capture "$ver" "$base")"
+assert_mcp_snippet_json "$first_install_out"
 first_root="$(readlink "$bin_dir/universal-automation")"
 first_dir="$(dirname "$(dirname "$first_root")")"
 [[ -d "$first_dir" ]] || fail "first install root missing"
