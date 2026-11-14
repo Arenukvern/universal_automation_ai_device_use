@@ -8,6 +8,12 @@ like `universal_storage_conformance`.
 (interface 0.4 `AutomationDriver` / frame types in the suite APIs) and
 `universal_screencast` `^0.3.0`.
 
+Intra-workspace `universal_screencast` constraints are synced on each
+release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
+conformance releases that adopt a new screencast line ship in the same
+release PR after `universal_screencast`.
+
 ```dart
 void main() {
   automationDriverConformanceTests(
