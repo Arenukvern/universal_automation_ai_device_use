@@ -11,6 +11,7 @@ ok() { echo "check_negative_actionlint: $*"; }
 
 RUN_ACTIONLINT_SH="${RUN_ACTIONLINT_SH:-$ROOT_DIR/tool/contracts/run_actionlint.sh}"
 bash "$RUN_ACTIONLINT_SH" >/dev/null || fail "run_actionlint failed"
+[[ -n "${CHECK_NEGATIVE_ACTIONLINT_HOOK_ONLY:-}" ]] && { ok "hook-only"; exit 0; }
 
 ACTIONLINT_VERSION="1.7.7"
 os="$(uname -s)"
@@ -141,7 +142,7 @@ if [[ ! -f "$META_STUB" ]]; then
   fail "missing actionlint meta fixture: run_actionlint_stub_fail.sh"
 fi
 chmod +x "$META_STUB" 2>/dev/null || true
-hook_out="$(RUN_ACTIONLINT_SH="$META_STUB" bash "$0" 2>&1)"
+hook_out="$(RUN_ACTIONLINT_SH="$META_STUB" CHECK_NEGATIVE_ACTIONLINT_HOOK_ONLY=1 bash "$0" 2>&1)"
 hook_rc=$?
 if [[ "$hook_rc" -eq 0 ]]; then
   fail "meta: failing run_actionlint stub must make guard exit non-zero"

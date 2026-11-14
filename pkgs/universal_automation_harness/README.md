@@ -9,10 +9,10 @@ agent interchange.
 
 One vocabulary, no parallel Darts: this package depends on the toolkit
 and the interface, never redefines them. Intra-workspace `universal_automation_toolkit`
-constraints are synced on each release-please train (see [RELEASING.md](../../RELEASING.md));
+constraints are synced on each release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 harness releases that adopt a new toolkit version ship in the same release PR after toolkit.
-The relation to oka's
-`resource_composition` is recorded in ADR 0004 — components here are
+The relation to oka's `resource_composition` is recorded in ADR 0004 — components here are
 structurally compatible with its `Component` values; the hosted
 dependency flips when that package publishes (the assembly/validation
 vocabulary in this package is automation-specific, so nothing forks).
