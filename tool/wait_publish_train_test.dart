@@ -3,6 +3,13 @@ import 'package:test/test.dart';
 import 'wait_publish_train_lib.dart';
 
 void main() {
+  group('strictPostPublishAuditArgs', () {
+    test('uses main-mode audit without --release-pr', () {
+      expect(strictPostPublishAuditArgs, contains('--audit-published'));
+      expect(strictPostPublishAuditArgs, isNot(contains('--release-pr')));
+    });
+  });
+
   group('releasePleasePublishTags', () {
     test('reads paths_released', () {
       final tags = releasePleasePublishTags(
