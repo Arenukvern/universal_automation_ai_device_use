@@ -7,6 +7,7 @@
 import 'dart:io';
 
 import 'release_workflow_contract_lib.dart';
+import 'wait_publish_train_lib.dart';
 
 Future<void> main(List<String> args) async {
   final root = Directory.current;
@@ -29,10 +30,16 @@ Future<void> main(List<String> args) async {
   }
 
   final text = await file.readAsString();
-  final errors = validateReleaseBinariesWorkflowYaml(
+  var errors = validateReleaseBinariesWorkflowYaml(
     text,
     label: file.uri.pathSegments.last,
   );
+  if (workflowPath.endsWith('release_binaries.yml')) {
+    errors = [
+      ...errors,
+      ...validateGhRunListJsonFieldAllowlist(releaseBinariesRunListJsonFields),
+    ];
+  }
 
   if (errors.isNotEmpty) {
     stderr.writeln('check_release_workflow failures:');

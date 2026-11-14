@@ -1,5 +1,32 @@
 import 'package:yaml/yaml.dart';
 
+/// gh 2.103.0 `gh run list --json` fields (from `gh help run list`, JSON FIELDS).
+const ghRunListJsonFieldsGh21030 = <String>[
+  'attempt',
+  'conclusion',
+  'createdAt',
+  'databaseId',
+  'displayTitle',
+  'event',
+  'headBranch',
+  'headSha',
+  'name',
+  'number',
+  'startedAt',
+  'status',
+  'updatedAt',
+  'url',
+  'workflowDatabaseId',
+  'workflowName',
+];
+
+const exactReleaseBinariesRunName = 'release-binaries \${{ inputs.release_tag }}';
+const exactPublishIf = 'inputs.dry_run != true';
+const exactPostflightIf = 'inputs.dry_run != true';
+const exactDryRunBundleIf = 'inputs.dry_run == true';
+
+const signStepName = 'Sign macOS bundle';
+
 /// Structural validation for `.github/workflows/release_binaries.yml`.
 List<String> validateReleaseBinariesWorkflowYaml(
   String yamlText, {
@@ -59,37 +86,44 @@ List<String> validateReleaseBinariesWorkflowYaml(
     }
   }
 
-  void requireJobIf(String jobId, String substr) {
+  void requireExactJobIf(String jobId, String exact) {
     final job = jobsMap[jobId];
     if (job is! Map) {
       return;
     }
-    final raw = job['if'];
-    if (raw == null) {
-      errors.add('$label: job $jobId must declare `if: $substr`');
-      return;
-    }
-    final cond = raw.toString();
-    if (!cond.contains('dry_run') || !cond.contains('!= true')) {
-      errors.add('$label: job $jobId if must gate on inputs.dry_run != true');
+    final raw = job['if']?.toString().trim() ?? '';
+    if (raw != exact) {
+      errors.add('$label: job $jobId if must be exactly `$exact` (got `$raw`)');
     }
   }
 
-  requireJobIf('publish', 'inputs.dry_run != true');
-  requireJobIf('postflight', 'inputs.dry_run != true');
+  requireExactJobIf('publish', exactPublishIf);
+  requireExactJobIf('postflight', exactPostflightIf);
+  requireExactJobIf('dry-run-bundle', exactDryRunBundleIf);
 
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
     final needs = postflight['needs'];
-    final needsList = needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
+    final needsList =
+        needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
     if (!needsList.contains('prepare') || !needsList.contains('publish')) {
       errors.add('$label: postflight must need prepare and publish');
     }
-    if (!_stepRunsScript(postflight, 'assert_release_assets_complete.sh')) {
+    if (!_stepRunsScriptAtCommandStart(
+      postflight,
+      'assert_release_assets_complete.sh',
+    )) {
       errors.add(
-        '$label: postflight must run assert_release_assets_complete.sh in a step `run`',
+        '$label: postflight must invoke assert_release_assets_complete.sh as a command',
       );
     }
+    errors.addAll(
+      _requiredRunStepViolations(
+        postflight,
+        label,
+        stepNameHint: 'Assert release',
+      ),
+    );
   }
 
   final build = jobsMap['build'];
@@ -98,26 +132,26 @@ List<String> validateReleaseBinariesWorkflowYaml(
     if (needs?.toString() != 'prepare') {
       errors.add('$label: build must need prepare');
     }
+    errors.addAll(_validateSigningSecretsScope(build, label));
+    errors.addAll(
+      _requiredRunStepViolations(
+        build,
+        label,
+        scriptName: 'verify_release_tarball_architecture.sh',
+        stepNameHint: 'Verify archive architecture',
+      ),
+    );
   }
 
-  if (jobsMap.containsKey('dry-run-bundle')) {
-    final dr = jobsMap['dry-run-bundle'];
-    if (dr is Map) {
-      final rawIf = dr['if']?.toString() ?? '';
-      if (!rawIf.contains('dry_run == true')) {
-        errors.add('$label: dry-run-bundle must run when dry_run == true');
-      }
-    }
-  } else {
+  if (!jobsMap.containsKey('dry-run-bundle')) {
     errors.add('$label: missing dry-run-bundle job for artifact-only dry runs');
   }
 
-  final runName = root['run-name']?.toString() ?? '';
-  if (!runName.contains('release-binaries')) {
-    errors.add('$label: run-name must include release-binaries prefix');
-  }
-  if (!runName.contains('inputs.release_tag')) {
-    errors.add('$label: run-name must reference inputs.release_tag');
+  final runName = root['run-name']?.toString().trim() ?? '';
+  if (runName != exactReleaseBinariesRunName) {
+    errors.add(
+      '$label: run-name must be exactly `$exactReleaseBinariesRunName`',
+    );
   }
 
   if (!_allCheckoutsPersistFalse(jobsMap)) {
@@ -128,6 +162,138 @@ List<String> validateReleaseBinariesWorkflowYaml(
     errors.add('$label: publish job must set append_body: true on action-gh-release');
   }
 
+  errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, label));
+
+  return errors;
+}
+
+List<String> _workflowSecretsOutsideAllowlist(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+
+  for (final entry in jobsMap.entries) {
+    final jobId = entry.key.toString();
+    final job = entry.value;
+    if (job is! Map) {
+      continue;
+    }
+    final jobEnv = job['env'];
+    if (jobEnv is Map) {
+      if (jobId == 'build') {
+        for (final key in jobEnv.keys) {
+          if (key == 'HAS_SIGNING') {
+            continue;
+          }
+          if (jobEnv[key].toString().contains('secrets.')) {
+            errors.add(
+              '$label: build job env may only reference secrets in HAS_SIGNING',
+            );
+          }
+        }
+      } else {
+        for (final v in jobEnv.values) {
+          if (v.toString().contains('secrets.')) {
+            errors.add('$label: job $jobId must not set secrets in job-level env');
+          }
+        }
+      }
+    }
+
+    final steps = job['steps'];
+    if (steps is! List) {
+      continue;
+    }
+    for (final step in steps) {
+      if (step is! Map) {
+        continue;
+      }
+      final stepName = step['name']?.toString() ?? '';
+      final stepEnv = step['env'];
+      if (stepEnv is! Map) {
+        continue;
+      }
+      final referencesSecrets =
+          stepEnv.values.any((v) => v.toString().contains('secrets.'));
+      if (!referencesSecrets) {
+        continue;
+      }
+      final allowed =
+          jobId == 'build' && stepName == signStepName;
+      if (!allowed) {
+        errors.add(
+          '$label: secrets in step env only allowed on build/$signStepName (got $jobId/$stepName)',
+        );
+      }
+    }
+  }
+
+  return errors;
+}
+
+List<String> _validateSigningSecretsScope(
+  Map<dynamic, dynamic> buildJob,
+  String label,
+) {
+  final errors = <String>[];
+  final env = buildJob['env'];
+  if (env is! Map) {
+    return errors;
+  }
+  for (final key in env.keys) {
+    if (key == 'HAS_SIGNING') {
+      continue;
+    }
+    final val = env[key].toString();
+    if (val.contains('secrets.')) {
+      errors.add('$label: build job env may only reference secrets in HAS_SIGNING');
+    }
+  }
+  return errors;
+}
+
+List<String> _requiredRunStepViolations(
+  Map<dynamic, dynamic> job,
+  String label, {
+  String? scriptName,
+  String? stepNameHint,
+}) {
+  final errors = <String>[];
+  final steps = job['steps'];
+  if (steps is! List) {
+    return errors;
+  }
+  for (final step in steps) {
+    if (step is! Map) {
+      continue;
+    }
+    final name = step['name']?.toString() ?? '';
+    if (stepNameHint != null && !name.contains(stepNameHint)) {
+      if (scriptName != null && !_stepRunsScriptAtCommandStart(step, scriptName)) {
+        continue;
+      }
+    }
+    if (scriptName != null) {
+      final run = step['run'];
+      if (run is! String || !run.contains(scriptName)) {
+        continue;
+      }
+    } else if (stepNameHint != null && !name.contains(stepNameHint)) {
+      continue;
+    }
+
+    if (step.containsKey('if')) {
+      errors.add('$label: step `$name` must not use `if:`');
+    }
+    if (step['continue-on-error'] == true) {
+      errors.add('$label: step `$name` must not set continue-on-error');
+    }
+    final run = step['run']?.toString() ?? '';
+    if (run.contains('|| true') || run.contains('|| :')) {
+      errors.add('$label: step `$name` must not use `|| true` or `|| :`');
+    }
+  }
   return errors;
 }
 
@@ -183,11 +349,16 @@ bool _allCheckoutsPersistFalse(Map<dynamic, dynamic> jobsMap) {
   return sawCheckout;
 }
 
-bool _stepRunsScript(Map<dynamic, dynamic> job, String scriptName) {
-  final steps = job['steps'];
+/// True when [scriptName] is invoked via `bash …/scriptName` on a real command line.
+bool _stepRunsScriptAtCommandStart(dynamic jobOrStep, String scriptName) {
+  final steps = jobOrStep is Map && jobOrStep.containsKey('steps')
+      ? jobOrStep['steps']
+      : [jobOrStep];
   if (steps is! List) {
     return false;
   }
+  final escaped = RegExp.escape(scriptName);
+  final invokePattern = RegExp(r'^(bash|sh)\s+.*' + escaped);
   for (final step in steps) {
     if (step is! Map) {
       continue;
@@ -196,15 +367,60 @@ bool _stepRunsScript(Map<dynamic, dynamic> job, String scriptName) {
     if (run is! String) {
       continue;
     }
-  for (final line in run.split('\n')) {
-      final trimmed = line.trimLeft();
-      if (trimmed.isEmpty || trimmed.startsWith('#')) {
+    for (final line in run.split('\n')) {
+      final command = _stripInlineComment(line).trim();
+      if (command.isEmpty || command.startsWith('#')) {
         continue;
       }
-      if (line.contains(scriptName)) {
+      if (RegExp(r'^true\b').hasMatch(command)) {
+        continue;
+      }
+      if (invokePattern.hasMatch(command)) {
         return true;
       }
     }
   }
   return false;
+}
+
+String _stripInlineComment(String line) {
+  var inSingle = false;
+  var inDouble = false;
+  for (var i = 0; i < line.length; i++) {
+    final c = line[i];
+    if (c == "'" && !inDouble) {
+      inSingle = !inSingle;
+      continue;
+    }
+    if (c == '"' && !inSingle) {
+      inDouble = !inDouble;
+      continue;
+    }
+    if (c == '#' && !inSingle && !inDouble) {
+      return line.substring(0, i);
+    }
+  }
+  return line;
+}
+
+/// Validates [releaseBinariesRunListJsonFields] ⊆ gh documented fields.
+List<String> validateGhRunListJsonFieldAllowlist(
+  String commaSeparatedFields, {
+  List<String> allowlist = ghRunListJsonFieldsGh21030,
+}) {
+  final errors = <String>[];
+  final requested = commaSeparatedFields
+      .split(',')
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty)
+      .toList();
+  final allow = allowlist.toSet();
+  for (final field in requested) {
+    if (!allow.contains(field)) {
+      errors.add(
+        'gh run list --json field "$field" is not in gh 2.103.0 allowlist',
+      );
+    }
+  }
+  return errors;
 }

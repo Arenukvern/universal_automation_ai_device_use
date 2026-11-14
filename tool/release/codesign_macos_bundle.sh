@@ -51,6 +51,7 @@ fi
 
 while IFS= read -r -d '' f; do
   codesign --force --options runtime --sign "$sign_identity" --timestamp "$f"
+  codesign --verify --strict --verbose=2 "$f"
 done < <(find "$BUNDLE_DIR" -type f \( -perm -111 -o -name '*.dylib' \) -print0)
 
 if [[ -n "${APPLE_ID:-}" && -n "${APPLE_TEAM_ID:-}" && ( -n "${APPLE_APP_PASSWORD:-}" || -n "${APPLE_NOTARIZE_KEY_ID:-}" ) ]]; then

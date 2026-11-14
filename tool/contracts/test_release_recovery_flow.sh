@@ -22,7 +22,7 @@ git -C "$release" init -q
 git -C "$release" add pkgs
 git -C "$release" -c user.email=t -c user.name=t commit -q -m "toolkit 0.9.0"
 git -C "$release" tag universal_automation_toolkit-v0.9.0
-sha="$(git -C "$release" rev-parse HEAD^{commit})"
+sha="$(git -C "$release" rev-parse 'HEAD^{commit}')"
 
 bash "$tooling/tool/release/verify_release_source_checkout.sh" \
   "$release" universal_automation_toolkit-v0.9.0 "$sha" \

@@ -16,6 +16,8 @@ SCRIPTS=(
   tool/release/resolve_release_tag.sh
   tool/release/assert_release_assets_complete.sh
   tool/release/codesign_macos_bundle.sh
+  tool/release/setup_signing_keychain.sh
+  tool/release/cleanup_signing_keychain.sh
   install.sh
 )
 

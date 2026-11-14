@@ -12,9 +12,8 @@ $ErrorActionPreference = "Stop"
 $ShareRoot = if ($env:UNIVERSAL_AUTOMATION_SHARE) { $env:UNIVERSAL_AUTOMATION_SHARE } else { Join-Path $env:LOCALAPPDATA "universal-automation" }
 $VersionsDir = Join-Path $ShareRoot "versions"
 $PreviousFile = Join-Path $ShareRoot "previous"
-$BinDir = if ($env:UNIVERSAL_AUTOMATION_BIN_DIR) { $env:UNIVERSAL_AUTOMATION_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\universal-automation\bin" }
-$BinLink = Join-Path $BinDir "universal-automation.exe"
-$PointerFile = Join-Path $ShareRoot "current-install.txt"
+$CurrentLink = Join-Path $ShareRoot "current"
+$ProgramsBin = if ($env:UNIVERSAL_AUTOMATION_BIN_DIR) { $env:UNIVERSAL_AUTOMATION_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\universal-automation\bin" }
 
 function Resolve-LatestVersion {
   $uri = "https://api.github.com/repos/$Repo/releases?per_page=30"
@@ -35,28 +34,67 @@ function Resolve-CliInTree([string]$Root) {
   return $null
 }
 
-function Switch-BinShim([string]$Exe) {
-  New-Item -ItemType Directory -Path $BinDir -Force | Out-Null
-  $tmp = "$BinLink.$PID.new"
-  Copy-Item -Force $Exe $tmp
-  if (Test-Path $BinLink) { Remove-Item -Force $BinLink }
-  Move-Item -Force $tmp $BinLink
+function Get-JunctionTarget([string]$Path) {
+  if (-not (Test-Path $Path)) { return $null }
+  try {
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+      return $item.Target
+    }
+  } catch {
+    return $null
+  }
+  return $null
+}
+
+function Invoke-CliSmoke([string]$Exe) {
+  & $Exe --version | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "CLI smoke failed (--version exit $LASTEXITCODE): $Exe"
+  }
+}
+
+function Remove-DirectoryJunction([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { return }
+  cmd /c "rmdir `"$Path`"" | Out-Null
+  if ($LASTEXITCODE -ne 0) {
+    throw "failed to remove junction: $Path"
+  }
+}
+
+function Switch-CurrentJunction([string]$InstallRoot) {
+  $parent = $ShareRoot
+  $tmpName = ".current-$PID"
+  $tmpPath = Join-Path $parent $tmpName
+  Remove-DirectoryJunction $tmpPath
+  New-Item -ItemType Junction -Path $tmpPath -Target $InstallRoot -Force | Out-Null
+  Remove-DirectoryJunction $CurrentLink
+  Rename-Item -LiteralPath $tmpPath -NewName "current"
 }
 
 function Record-PreviousInstall {
-  if (-not (Test-Path $PointerFile)) { return }
-  $current = Get-Content -Raw $PointerFile
-  if ($current) { Set-Content -Path $PreviousFile -Value $current.Trim() -NoNewline }
+  $target = Get-JunctionTarget $CurrentLink
+  if (-not $target) { return }
+  if ($target -is [System.Array]) {
+    $target = $target[0]
+  }
+  if ($target) {
+    Set-Content -Path $PreviousFile -Value $target.Trim() -NoNewline
+  }
 }
 
 function Prune-VersionDirs([string]$Ver, [string]$KeepCurrent, [string]$KeepPrevious) {
   if (-not (Test-Path $VersionsDir)) { return }
-  Get-ChildItem -Path $VersionsDir -Directory | ForEach-Object {
+  Get-ChildItem -Path $VersionsDir -Directory -ErrorAction SilentlyContinue | ForEach-Object {
     $name = $_.Name
-    if ($name -notlike "$Ver-*") { return }
+    if ($name -notlike "$Ver-*" -and $name -notlike "$Ver.staging.*") { return }
     if ($_.FullName -eq $KeepCurrent) { return }
     if ($KeepPrevious -and $_.FullName -eq $KeepPrevious) { return }
-    Remove-Item -Recurse -Force $_.FullName
+    try {
+      Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+    } catch {
+      Write-Warning "Skipped pruning in-use directory: $($_.FullName)"
+    }
   }
 }
 
@@ -66,12 +104,13 @@ if ($Rollback) {
   if (-not (Test-Path $prevRoot)) { throw "Previous install dir missing: $prevRoot" }
   $cli = Resolve-CliInTree $prevRoot
   if (-not $cli) { throw "CLI missing under $prevRoot" }
-  if (Test-Path $PointerFile) {
-    $current = (Get-Content -Raw $PointerFile).Trim()
-    if ($current) { Set-Content -Path $PreviousFile -Value $current -NoNewline }
+  $currentTarget = Get-JunctionTarget $CurrentLink
+  if ($currentTarget -is [System.Array]) { $currentTarget = $currentTarget[0] }
+  if ($currentTarget) {
+    Set-Content -Path $PreviousFile -Value $currentTarget.Trim() -NoNewline
   }
-  Switch-BinShim $cli
-  Set-Content -Path $PointerFile -Value $prevRoot -NoNewline
+  Switch-CurrentJunction $prevRoot
+  Invoke-CliSmoke (Resolve-CliInTree $CurrentLink)
   Write-Host "Rolled back to $(Split-Path -Leaf $prevRoot)"
   exit 0
 }
@@ -126,15 +165,14 @@ try {
   }
 
   try {
-    & $exe --version | Out-Null
+    Invoke-CliSmoke $exe
   } catch {
     Remove-Item -Recurse -Force $installRoot
     throw "Staged binary failed --version smoke test; not switching active install"
   }
 
   Record-PreviousInstall
-  Switch-BinShim $exe
-  Set-Content -Path $PointerFile -Value $installRoot -NoNewline
+  Switch-CurrentJunction $installRoot
 
   $keepPrevious = $null
   if (Test-Path $PreviousFile) {
@@ -142,18 +180,29 @@ try {
   }
   Prune-VersionDirs -Ver $Version -KeepCurrent $installRoot -KeepPrevious $keepPrevious
 
-  & $BinLink --help | Out-Null
-  $ver = & $BinLink --version
+  $activeExe = Resolve-CliInTree $CurrentLink
+  if (-not $activeExe) { throw "Active CLI missing under $CurrentLink" }
+  & $activeExe --help | Out-Null
+  if ($LASTEXITCODE -ne 0) { throw "Active CLI --help failed" }
+  $ver = & $activeExe --version
+  if ($LASTEXITCODE -ne 0) { throw "Active CLI --version failed" }
+
+  $cliForSnippet = Join-Path $CurrentLink "bin\universal_automation.exe"
+  if (-not (Test-Path $cliForSnippet)) {
+    $cliForSnippet = Join-Path $CurrentLink "bin\universal-automation.exe"
+  }
+
   Write-Host "Installed universal-automation $ver"
   Write-Host "Install root: $installRoot"
-  Write-Host "Add to PATH: $BinDir"
+  Write-Host "Current junction: $CurrentLink"
+  Write-Host "Add to PATH (optional): $ProgramsBin"
   Write-Host @"
 
 MCP client snippet:
 {
   "mcpServers": {
     "universal-automation": {
-      "command": "$BinLink",
+      "command": "$cliForSnippet",
       "args": ["serve", "--os"]
     }
   }

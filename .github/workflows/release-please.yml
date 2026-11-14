@@ -194,7 +194,7 @@ jobs:
         run: dart run tool/dispatch_pub_dev_publish.dart
 
   wait-package-publish:
-    needs: [release-please, dispatch-package-publish]
+    needs: [release-please, dispatch-package-publish, dispatch-release-binaries]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 180

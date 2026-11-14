@@ -156,42 +156,7 @@ Future<bool> _waitForReleaseBinariesWorkflow({
     final runs = parseGhWorkflowRunList(list.stdout as String);
     for (final run in runs) {
       final tagFromList = releaseTagFromDisplayTitle(run.displayTitle);
-      if (tagFromList == releaseTag) {
-        final watch = await Process.run(
-          'gh',
-          [
-            'run',
-            'watch',
-            '${run.databaseId}',
-            '--repo',
-            repo,
-            '--exit-status',
-          ],
-          environment: env,
-        );
-        return watch.exitCode == 0;
-      }
-
-      final view = await Process.run(
-        'gh',
-        [
-          'run',
-          'view',
-          '${run.databaseId}',
-          '--repo',
-          repo,
-          '--json',
-          releaseBinariesRunViewJsonFields,
-        ],
-        environment: env,
-      );
-      if (view.exitCode != 0) {
-        continue;
-      }
-      final decoded = jsonDecode(view.stdout as String) as Map<String, dynamic>;
-      final tagFromView =
-          releaseTagFromDisplayTitle(decoded['displayTitle'] as String?);
-      if (tagFromView != releaseTag) {
+      if (tagFromList != releaseTag) {
         continue;
       }
       final watch = await Process.run(

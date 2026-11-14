@@ -1,5 +1,6 @@
 import 'package:test/test.dart';
 
+import 'release_workflow_contract_lib.dart';
 import 'wait_publish_train_lib.dart';
 
 void main() {
@@ -7,6 +8,13 @@ void main() {
     test('releaseBinariesRunListJsonFields omits inputs', () {
       expect(releaseBinariesRunListJsonFields, isNot(contains('inputs')));
       expect(releaseBinariesRunListJsonFields, contains('displayTitle'));
+    });
+
+    test('fields are subset of gh 2.103.0 allowlist', () {
+      final errors = validateGhRunListJsonFieldAllowlist(
+        releaseBinariesRunListJsonFields,
+      );
+      expect(errors, isEmpty, reason: errors.join('; '));
     });
 
     test('releaseTagFromDisplayTitle parses run-name', () {

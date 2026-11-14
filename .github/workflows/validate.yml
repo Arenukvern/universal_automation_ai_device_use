@@ -54,6 +54,20 @@ jobs:
           bash tool/contracts/test_install.sh
           shellcheck -x tool/release/*.sh install.sh
 
+  install-ps1-windows:
+    name: install.ps1 (Windows junction)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: install.ps1 contract test
+        shell: pwsh
+        run: ./tool/contracts/test_install.ps1
+
   analyze:
     name: dart analyze (steward gate)
     runs-on: ubuntu-latest
