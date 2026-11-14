@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:pub_semver/pub_semver.dart';
+
 /// Toolkit package key in `release-please-config.json`.
 const toolkitReleasePleasePackage = 'pkgs/universal_automation_toolkit';
 
@@ -97,25 +99,48 @@ Iterable<File> _jsonFilesUnder(Directory root) sync* {
   }
 }
 
-bool _jsonTopLevelVersionMatches(File file, String version) {
+bool isToolkitVersionSemver(String value) {
   try {
-    final doc = jsonDecode(file.readAsStringSync());
-    if (doc is! Map) return false;
-    final v = doc['version'];
-    return v is String && v == version;
+    Version.parse(value);
+    return true;
   } on FormatException {
     return false;
   }
 }
 
-final _dartConstString = RegExp(
-  r"const\s+\w+\s*=\s*'([^']+)'\s*;",
+bool jsonHasTopLevelSemverVersion(File file) {
+  try {
+    final doc = jsonDecode(file.readAsStringSync());
+    if (doc is! Map) return false;
+    final v = doc['version'];
+    return v is String && isToolkitVersionSemver(v);
+  } on FormatException {
+    return false;
+  }
+}
+
+/// Top-level or static `const` whose identifier contains `version` and value is semver.
+final dartVersionConstPattern = RegExp(
+  r"""(?:^|\n)\s*(?:static\s+)?const\s+(?:[A-Za-z_]\w*\s+)?([A-Za-z_]\w*)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*;""",
   multiLine: true,
 );
 
+bool dartFileDeclaresVersionConstSurface(String source) {
+  for (final match in dartVersionConstPattern.allMatches(source)) {
+    final name = match.group(1)!;
+    if (!name.toLowerCase().contains('version')) {
+      continue;
+    }
+    final value = match.group(2) ?? match.group(3);
+    if (value != null && isToolkitVersionSemver(value)) {
+      return true;
+    }
+  }
+  return false;
+}
+
 List<ToolkitVersionSurface> discoverToolkitVersionSurfaces(String repoRoot) {
-  final version = readToolkitPubspecVersion(repoRoot);
-  if (version == null) {
+  if (readToolkitPubspecVersion(repoRoot) == null) {
     throw StateError('could not read toolkit pubspec version');
   }
   final surfaces = <ToolkitVersionSurface>[];
@@ -128,7 +153,7 @@ List<ToolkitVersionSurface> discoverToolkitVersionSurfaces(String repoRoot) {
   }
 
   for (final file in _jsonFilesUnder(Directory(toolkitPackageDir(repoRoot)))) {
-    if (!_jsonTopLevelVersionMatches(file, version)) continue;
+    if (!jsonHasTopLevelSemverVersion(file)) continue;
     addSurface((
       configPath: absoluteToExtraFileConfigPath(file.path, repoRoot),
       kind: 'json',
@@ -137,7 +162,7 @@ List<ToolkitVersionSurface> discoverToolkitVersionSurfaces(String repoRoot) {
   }
 
   for (final file in _jsonFilesUnder(Directory(pluginDir(repoRoot)))) {
-    if (!_jsonTopLevelVersionMatches(file, version)) continue;
+    if (!jsonHasTopLevelSemverVersion(file)) continue;
     addSurface((
       configPath: absoluteToExtraFileConfigPath(file.path, repoRoot),
       kind: 'json',
@@ -154,15 +179,12 @@ List<ToolkitVersionSurface> discoverToolkitVersionSurfaces(String repoRoot) {
           .replaceAll(r'\', '/');
       if (_segmentExcluded(rel)) continue;
       final text = entity.readAsStringSync();
-      for (final match in _dartConstString.allMatches(text)) {
-        if (match.group(1) == version) {
-          addSurface((
-            configPath: absoluteToExtraFileConfigPath(entity.path, repoRoot),
-            kind: 'generic',
-            jsonpath: null,
-          ));
-          break;
-        }
+      if (dartFileDeclaresVersionConstSurface(text)) {
+        addSurface((
+          configPath: absoluteToExtraFileConfigPath(entity.path, repoRoot),
+          kind: 'generic',
+          jsonpath: null,
+        ));
       }
     }
   }

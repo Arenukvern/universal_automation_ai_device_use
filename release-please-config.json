@@ -47,6 +47,16 @@
           "jsonpath": "$.version"
         },
         {
+          "type": "json",
+          "path": "/plugin/.codex-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "/plugin/.zcode-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
           "type": "generic",
           "path": "lib/src/package_version.dart"
         },
