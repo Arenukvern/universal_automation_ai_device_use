@@ -63,8 +63,12 @@ $base = "http://127.0.0.1:8765"
 try {
   $env:UNIVERSAL_AUTOMATION_SHARE = $share
   $installOutput = & $InstallScript -Version "1.0.0" -BaseUrl $base *>&1 | Out-String
-  if ($installOutput -notmatch '\\current\\bin\\') { throw "MCP snippet must use \\current\\bin\\ path" }
-  if ($installOutput -match '\\versions\\') { throw "MCP snippet must not expose \\versions\\ physical path" }
+  if ($installOutput -notmatch '(?s)MCP client snippet:.*\\current\\bin\\') {
+    throw "MCP snippet must use \\current\\bin\\ path"
+  }
+  if ($installOutput -match '(?s)MCP client snippet:.*\\versions\\') {
+    throw "MCP snippet must not expose \\versions\\ physical path"
+  }
   $currentExe = Join-Path $share "current\bin\universal_automation.exe"
   if (-not (Test-Path $currentExe)) { throw "missing current exe after first install" }
   $v1 = & $currentExe --version
