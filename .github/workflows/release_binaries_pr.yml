@@ -36,6 +36,7 @@ jobs:
     uses: ./.github/workflows/release_binaries.yml
     permissions:
       contents: read
+    secrets: inherit
     with:
       release_tag: ${{ github.event.pull_request.head.sha || github.sha }}
       dry_run: true
