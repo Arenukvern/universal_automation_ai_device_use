@@ -2,7 +2,11 @@
 
 High-level WebRTC for pure Dart: signaling contracts, a peer factory over
 the webrtc-rs sidecar, and a `FrameSink` that pumps screencast frames
-through the WebRTC data channel. Cross-platform wherever cargo runs;
+through the WebRTC data channel. Intra-workspace `universal_screencast`
+constraints are synced on each release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
+WebRTC releases that adopt a new screencast line ship in the same release
+PR after `universal_screencast`. Cross-platform wherever cargo runs;
 WebRTC from day one with the media plane separated from signaling
 (media-plane discipline).
 
