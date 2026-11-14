@@ -8,9 +8,10 @@ in-app agent execute. Dart is the source of truth; snapshots are the
 agent interchange.
 
 One vocabulary, no parallel Darts: this package depends on the toolkit
-and the interface, never redefines them. The next harness release will
-require **`universal_automation_toolkit` ^0.5.0**, which re-exports
-**`universal_automation_semantics` 0.5** via `compose.dart`. The relation to oka's
+and the interface, never redefines them. Intra-workspace `universal_automation_toolkit`
+constraints are synced on each release-please train (see [RELEASING.md](../../RELEASING.md));
+harness releases that adopt a new toolkit version ship in the same release PR after toolkit.
+The relation to oka's
 `resource_composition` is recorded in ADR 0004 — components here are
 structurally compatible with its `Component` values; the hosted
 dependency flips when that package publishes (the assembly/validation
