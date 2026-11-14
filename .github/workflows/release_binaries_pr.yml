@@ -33,7 +33,8 @@ concurrency:
 
 jobs:
   smoke:
-    uses: ./.github/workflows/release_binaries.yml
+    # Relative ./ resolves workflow_call from default branch until merged; pin branch on PRs.
+    uses: Arenukvern/universal_automation_ai_device_use/.github/workflows/release_binaries.yml@cursor/release-binaries-auto-99f0
     permissions:
       contents: read
     secrets: inherit
