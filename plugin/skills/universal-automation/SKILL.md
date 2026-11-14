@@ -268,12 +268,20 @@ Semantic `automation_observe` / `automation_act` remain preferred when roles and
 2. Add conformance coverage in `universal_automation_conformance` for the tier’s honest verbs.
 3. Register a `DriverFactory` on the composition root / registry; expose routing via existing
    `automation_*` tools (shared observe / act / capture first).
-4. Put truly platform-only verbs in a **named tool group** on the same server (e.g. Flutter
-   hot reload), backed by upstream packages when appropriate (`flutter_mcp_toolkit_core` ^7.1.1
-   via mcp_flutter); do not fork a second MCP product.
-5. Document install-time optional dependencies; default lean install stays core + desktop OS +
+4. **Declared target only** — attach, never create: Flutter takes the VM service URI from
+   **oka's dev-session manifest** (typed field), never from `flutter run` output; Android/iOS
+   take a declared serial or simulator id via **`oka_devices`** types; browser/OS use declared
+   endpoints or oka handle artifacts. Boot, discovery, teardown stay in **oka**; UA uses
+   **`oka_process`** for process contract.
+5. Put truly platform-only verbs in a **named tool group** (namespace prefix) on the same
+   server; list the group in `tools/list` **only** when the adapter package is installed **and**
+   its declared target is attached or reachable; emit
+   `notifications/tools/list_changed` when the group appears or disappears (keep the agent
+   catalog lean — agents pick worse from 100+ tools).
+6. Flutter tier: thin over **mcp_flutter's published attach-only driver** (today `VmClient` plus
+   `ToolkitDriver` in `flutter_mcp_harness`, planned to split into its own attach-only package);
+   fix gaps upstream in mcp_flutter — do not fork a second MCP product.
+7. Document install-time optional dependencies; default lean install stays core + desktop OS +
    browser.
-6. Flutter / mobile: accept VM service URI or oka device handle; **never** launch apps from the
-   adapter (oka owns devices, emulators, processes).
-7. Update [ADR 0009](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs/decisions/0009_one_mcp_server_with_adapters.mdx)
+8. Update [ADR 0009](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs/decisions/0009_one_mcp_server_with_adapters.mdx)
    only if the decision itself changes — otherwise extend README and this skill.

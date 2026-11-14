@@ -69,10 +69,16 @@ config, let implementations drift, and force agents to learn which server to cal
 opt-in dependencies — still the **same** MCP entry in the client. Shared tools
 (screenshot, semantics tree, tap) cover common work; truly platform-specific
 behavior (e.g. Flutter hot reload) lives in named tool groups on that server, not a
-forked product. The Flutter adapter stays thin over
-[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) (`flutter_mcp_toolkit_core`
-^7.1.1), takes a VM service URI or device handle, and never launches apps — **oka**
-owns devices, emulators, and processes.
+forked product. **Every adapter attaches to a declared target and never creates one**
+(Flutter: VM service URI from oka's dev-session manifest; Android/iOS: `oka_devices`
+serial or simulator id; browser/OS: declared endpoints or handles). Boot, discovery, and
+teardown stay in **oka**; UA core uses **`oka_process`** for process semantics. The Flutter
+adapter stays thin over
+[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only driver
+(today `VmClient` plus `ToolkitDriver` in `flutter_mcp_harness`, planned as its own
+attach-only package). Optional adapter tool groups appear in `tools/list` only when the
+package is installed **and** the target is reachable, with `tools/list_changed` on
+appear/disappear — so agents are not drowned in 100+ tools by default.
 
 Durable rule: [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx).
 

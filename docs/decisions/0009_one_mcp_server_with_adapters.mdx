@@ -28,9 +28,10 @@ see ADR 0004). Adapter packages (`universal_driver_*`, `universal_browser_*`,
 future mobile tiers) are selected when the operator or embedder wires the
 composition root. The MCP **face** stays stable.
 
-**oka** owns devices, emulators, and processes. Universal Automation **attaches**
-to endpoints oka (or the human) exposes — it does not launch apps or start emulators
-on the MCP path.
+**oka** owns boot, discovery, and teardown. Universal Automation **attaches** to
+targets oka (or the operator) **declares** — it never creates a session, device, or
+process on the MCP path. The core process contract comes from **`oka_process`**;
+device identifiers use **`oka_devices`** types where mobile tiers apply.
 
 ## Decision
 
@@ -51,14 +52,30 @@ on the MCP path.
    consent requests are the common vocabulary. Only capabilities with no honest cross-tier
    mapping (e.g. Flutter hot reload) appear in a **named tool group**, not a separate server.
 
-5. **Flutter adapter boundary.** The Flutter tier is a thin adapter over
-   [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) published packages
-   (`flutter_mcp_toolkit_core` ^7.1.1). Inputs are a declared VM service URI or device
-   handle; the adapter **never** launches applications. Gaps in Flutter-specific
-   capabilities are fixed **upstream in mcp_flutter**, not by forking a second MCP product.
+5. **Declared targets (every adapter).** Each adapter **attaches** to a target that was
+   **declared** upstream; it **never** creates one.
+   - **Browser / desktop OS:** declared endpoint URI, handle artifact, or session binding
+     (existing `serve --cdp`, `--os`, oka handle files).
+   - **Flutter:** VM service URI from **oka's dev-session manifest** as a typed field — never
+     scraped from `flutter run` output or build logs.
+   - **Android / iOS:** declared physical serial or simulator identifier using
+     **`oka_devices`** types.
+   Booting, discovery, and teardown stay in **oka**. This repo consumes
+   **`oka_process`** for process semantics and remains attach-only on the MCP path.
 
-6. **Process ownership.** Device lifecycle, emulators, and supervised processes remain
-   **oka** (or operator) responsibilities. This repo’s MCP server remains attach-only.
+6. **Flutter adapter boundary.** The Flutter tier is a thin adapter over
+   [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only
+   driver (today `VmClient` plus `ToolkitDriver` in `flutter_mcp_harness`, planned to split
+   out into its own attach-only package). Value-type packages alone cannot drive an app.
+   Gaps in Flutter-specific capabilities are fixed **upstream in mcp_flutter**, not by
+   forking a second MCP product.
+
+7. **Tool visibility.** An adapter's optional tool group appears in `tools/list` **only**
+   when its package is **installed** and its declared target is **attached or reachable**.
+   Each group keeps its own **namespace prefix**. The server sends
+   `notifications/tools/list_changed` when a group appears or disappears. Rationale:
+   agents choose worse from oversized catalogs; the lean default must stay small in what
+   an agent **sees**, not only in what the install graph contains.
 
 ## Consequences
 
@@ -70,6 +87,8 @@ on the MCP path.
   already belong — instead of duplicated MCP tool catalogs.
 - Flutter-specific tools may grow in a grouped namespace on the **same** server; they must
   not justify a standalone “Flutter MCP server” in this family.
+- Agent-facing tool catalogs stay bounded: optional groups materialize only when wired and
+  reachable, with `tools/list_changed` keeping MCP clients honest.
 
 ## Rejected alternatives
 

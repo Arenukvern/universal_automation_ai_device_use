@@ -82,8 +82,13 @@ For more information on the project charter and decisions:
   separate MCP server product.
 - Lean default wiring: interface + desktop OS adapter + browser; mobile, Flutter, harness,
   and oka runners are opt-in on the same server config.
-- Flutter adapter: thin over `mcp_flutter` (`flutter_mcp_toolkit_core` ^7.1.1); VM service
-  URI or device in; **never** launch apps (oka owns processes).
+- **Declared targets:** every adapter attaches only; never boots or scrapes discovery output.
+  Flutter → VM URI from oka dev-session manifest; Android/iOS → `oka_devices` ids; lifecycle
+  via **oka** / **`oka_process`**.
+- Flutter seam: `mcp_flutter`'s published attach-only driver (`VmClient` + `ToolkitDriver` in
+  `flutter_mcp_harness` today; planned attach-only package split) — not value-type-only crates.
+- **Tool visibility:** optional adapter groups in `tools/list` only when installed **and**
+  target reachable; namespace prefix per group; `notifications/tools/list_changed` on change.
 
 <!-- codemap-index:start -->
 # Codemap — navigate this repo
