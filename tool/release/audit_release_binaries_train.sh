@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Fail the release train when toolkit shipped but binary reusable did not succeed.
-# Env: TOOLKIT_RELEASE_CREATED, RELEASE_BINARIES_BUILD_RESULT
+# Fail the release train when toolkit shipped but binary reusable jobs did not succeed.
+# Env: TOOLKIT_RELEASE_CREATED, RELEASE_BINARIES_BUILD_RESULT, RELEASE_BINARIES_PUBLISH_RESULT
 set -euo pipefail
 
 fail() { echo "audit_release_binaries_train: $*" >&2; exit 1; }
@@ -21,4 +21,8 @@ if [[ "${RELEASE_BINARIES_BUILD_RESULT:-}" != "success" ]]; then
   fail "release-binaries-build result=${RELEASE_BINARIES_BUILD_RESULT:-unknown} (required for toolkit release)"
 fi
 
-echo "audit_release_binaries_train: toolkit binary build reusable succeeded"
+if [[ "${RELEASE_BINARIES_PUBLISH_RESULT:-}" != "success" ]]; then
+  fail "release-binaries-publish result=${RELEASE_BINARIES_PUBLISH_RESULT:-unknown} (required for toolkit release)"
+fi
+
+echo "audit_release_binaries_train: toolkit binary build and publish succeeded"

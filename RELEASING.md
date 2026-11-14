@@ -93,12 +93,17 @@ sibling workflows). Zero manual steps:
    passing the toolkit tag and `dry_run: false`. It checks out **caller tooling
    ref on the default branch** plus **immutable tag source**, builds four
    matrix legs, and (for production) signs macOS when secrets are present.
-2. **Publish + postflight** run inside the same `release_binaries_build.yml`
-   reusable (same-workflow artifact download; `contents: write` only on the
-   publish job). Release-please calls that reusable once (`dry_run: false`).
+2. **`release-binaries-publish`** (`release_binaries_publish.yml`, caller grants
+   `contents: write` only on that reusable job). It downloads build artifacts with
+   a plain `actions/download-artifact@v4` step (same top-level workflow run—no
+   `run-id` / `github-token`; see [Store and share data with workflow
+   artifacts](https://docs.github.com/en/actions/using-workflows/storing-workflow-data-as-artifacts#downloading-artifacts-during-a-workflow-run)
+   and [download-artifact](https://github.com/actions/download-artifact)—by
+   default the action downloads from the **current workflow run**, which includes
+   artifacts from other reusable-workflow jobs in the same caller run).
 3. `wait-package-publish` waits on **pub.dev only**. `audit-release-train`
    runs when pub wait succeeds or fails and **fails the workflow** if the
-   toolkit released but `release-binaries-build` did not succeed.
+   toolkit released but binary build/publish did not succeed.
 
 ### PR / main path smoke (all four legs, artifacts only)
 

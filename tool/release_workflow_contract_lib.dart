@@ -26,9 +26,9 @@ const exactReleaseBinariesDispatchRunName =
     r'release-binaries ${{ inputs.release_tag }}';
 const releaseBinariesBuildWorkflowPath =
     './.github/workflows/release_binaries_build.yml';
-const exactPublishIf = 'inputs.dry_run != true';
-const exactPostflightIf = 'inputs.dry_run != true';
 const exactDryRunBundleIf = 'inputs.dry_run == true';
+const releaseBinariesPublishWorkflowPath =
+    './.github/workflows/release_binaries_publish.yml';
 
 const signStepName = 'Sign macOS bundle';
 
@@ -132,10 +132,18 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
 
-  const requiredJobs = ['prepare', 'build', 'dry-run-bundle', 'publish', 'postflight'];
+  const requiredJobs = ['prepare', 'build', 'dry-run-bundle'];
   for (final id in requiredJobs) {
     if (!jobsMap.containsKey(id)) {
       errors.add('$label: missing job $id');
+    }
+  }
+
+  for (final forbidden in ['publish', 'postflight']) {
+    if (jobsMap.containsKey(forbidden)) {
+      errors.add(
+        '$label: must not define $forbidden (use release_binaries_publish.yml reusable)',
+      );
     }
   }
 
@@ -151,8 +159,6 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   }
 
   requireExactJobIf('dry-run-bundle', exactDryRunBundleIf);
-  requireExactJobIf('publish', exactPublishIf);
-  requireExactJobIf('postflight', exactPostflightIf);
 
   for (final entry in jobsMap.entries) {
     final job = entry.value;
@@ -167,30 +173,6 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   errors.addAll(
     _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsBuild),
   );
-  errors.addAll(
-    _validateRequiredScriptSteps(jobsMap, label, requiredScriptStepsPublish),
-  );
-  errors.addAll(
-    _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsPublish),
-  );
-
-  final publish = jobsMap['publish'];
-  if (publish is Map) {
-    final publishNeeds = publish['needs'];
-    final publishNeedsList = publishNeeds is List
-        ? (publishNeeds.map((e) => e.toString()).toList()..sort())
-        : publishNeeds != null
-            ? [publishNeeds.toString()]
-            : <String>[];
-    final expectedPublishNeeds = ['build', 'prepare']..sort();
-    if (publishNeedsList.length != 2 ||
-        !publishNeedsList.every(expectedPublishNeeds.contains)) {
-      errors.add(
-        '$label: publish needs must be exactly [prepare, build] (got $publishNeedsList)',
-      );
-    }
-  }
-
   final build = jobsMap['build'];
   if (build is Map) {
     final needs = build['needs'];
@@ -213,23 +195,9 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
 
   errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, yamlText, label));
   errors.addAll(_validateBuildMatrix(jobsMap, label));
-  errors.addAll(_validateGhReleaseAssets(jobsMap, label));
-  errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
-  errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
-  errors.addAll(_validateSameRunArtifactDownload(jobsMap, label));
+  errors.addAll(_validateReadOnlyPermissions(jobsMap, root, label));
+  errors.addAll(_validateBuildHasNoReleasePublishSteps(yamlText, label));
   errors.addAll(_validateNoInlineWorkflowExprsInRun(jobsMap, label));
-  if (!_publishUsesAppendBody(jobsMap['publish'])) {
-    errors.add('$label: publish job must set append_body: true on action-gh-release');
-  }
-  final postflight = jobsMap['postflight'];
-  if (postflight is Map) {
-    final needs = postflight['needs'];
-    final needsList =
-        needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
-    if (!needsList.contains('publish') || !needsList.contains('prepare')) {
-      errors.add('$label: postflight must need prepare and publish');
-    }
-  }
 
   return errors;
 }
@@ -332,24 +300,46 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
     return errors;
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-  final release = jobsMap['release'];
-  if (release is! Map ||
-      !release['uses'].toString().contains('release_binaries_build.yml')) {
-    errors.add('$label: release job must use release_binaries_build.yml');
+  final build = jobsMap['build'];
+  if (build is! Map ||
+      !build['uses'].toString().contains('release_binaries_build.yml')) {
+    errors.add('$label: build job must use release_binaries_build.yml');
   }
-  if (release is Map) {
-    errors.addAll(_validateExplicitSigningSecretsMap(release['secrets'], label));
-    final withMap = release['with'];
+  if (build is Map) {
+    errors.addAll(_validateExplicitSigningSecretsMap(build['secrets'], label));
+    final withMap = build['with'];
     if (withMap is! Map) {
-      errors.add('$label: release job must pass with:');
+      errors.add('$label: build job must pass with:');
     }
-    final perms = release['permissions'];
-    if (perms is! Map || perms['contents']?.toString() != 'write') {
-      errors.add('$label: release job must set permissions.contents: write');
+    final perms = build['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'read') {
+      errors.add('$label: build job must set permissions.contents: read');
     }
   }
-  if (jobsMap.length != 1) {
-    errors.add('$label: exactly one release reusable-workflow caller job expected');
+  final publish = jobsMap['publish'];
+  if (publish is! Map ||
+      !publish['uses'].toString().contains('release_binaries_publish.yml')) {
+    errors.add('$label: publish job must use release_binaries_publish.yml');
+  }
+  if (publish is Map) {
+    if (publish.containsKey('secrets')) {
+      errors.add('$label: publish reusable call must not pass secrets');
+    }
+    final perms = publish['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add('$label: publish job must set permissions.contents: write');
+    }
+    final needs = _jobNeedsList(publish);
+    if (!needs.contains('build')) {
+      errors.add('$label: publish job must need build');
+    }
+    final pubIf = publish['if']?.toString().trim() ?? '';
+    if (pubIf != 'inputs.dry_run != true') {
+      errors.add('$label: publish job if must be exactly `inputs.dry_run != true`');
+    }
+  }
+  if (jobsMap.length != 2) {
+    errors.add('$label: exactly build and publish reusable-workflow caller jobs expected');
   }
   return errors;
 }
@@ -516,8 +506,8 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
       errors.add('release-please.yml: release-binaries-build must pass dry_run: false');
     }
     final perms = build['permissions'];
-    if (perms is Map && perms['contents']?.toString() != 'write') {
-      errors.add('release-please.yml: release-binaries-build needs contents: write');
+    if (perms is Map && perms['contents']?.toString() != 'read') {
+      errors.add('release-please.yml: release-binaries-build needs contents: read');
     }
     errors.addAll(
       _validateExplicitSigningSecretsMap(
@@ -527,10 +517,32 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     );
   }
 
-  if (jobsMap.containsKey('release-binaries-publish')) {
-    errors.add(
-      'release-please.yml: must not define release-binaries-publish (publish runs inside release_binaries_build.yml)',
-    );
+  final publish = jobsMap[releasePleaseBinariesPublishJob];
+  if (publish is! Map) {
+    errors.add('release-please.yml: missing $releasePleaseBinariesPublishJob job');
+  } else {
+    if (publish['uses']?.toString() != releaseBinariesPublishWorkflowPath) {
+      errors.add(
+        'release-please.yml: $releasePleaseBinariesPublishJob must use $releaseBinariesPublishWorkflowPath',
+      );
+    }
+    final perms = publish['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add(
+        'release-please.yml: $releasePleaseBinariesPublishJob needs contents: write',
+      );
+    }
+    if (publish.containsKey('secrets')) {
+      errors.add(
+        'release-please.yml: $releasePleaseBinariesPublishJob must not pass secrets',
+      );
+    }
+    final needs = _jobNeedsList(publish);
+    if (!needs.contains(releasePleaseBinariesBuildJob)) {
+      errors.add(
+        'release-please.yml: $releasePleaseBinariesPublishJob must need $releasePleaseBinariesBuildJob',
+      );
+    }
   }
 
   errors.addAll(_validateReleasePleasePubTrainIndependence(jobsMap));
@@ -610,6 +622,7 @@ List<String> _validateReleasePleaseFinalBinaryAudit(
     releasePleaseDispatchPublishJob,
     releasePleaseWaitPublishJob,
     releasePleaseBinariesBuildJob,
+    releasePleaseBinariesPublishJob,
   ]) {
     if (!needs.contains(required)) {
       errors.add(
@@ -650,6 +663,7 @@ List<String> _validateReleasePleaseFinalBinaryAudit(
         for (final key in [
           'TOOLKIT_RELEASE_CREATED',
           'RELEASE_BINARIES_BUILD_RESULT',
+          'RELEASE_BINARIES_PUBLISH_RESULT',
         ]) {
           if (!env.containsKey(key)) {
             errors.add(
@@ -927,19 +941,24 @@ List<String> _validateContentsWriteScope(
     }
   }
   final publish = jobsMap['publish'];
-  final isBuildReusable = jobsMap.containsKey('build');
   if (publish is Map) {
-  final perms = publish['permissions'];
-  if (isBuildReusable) {
-    if (perms is Map && perms['contents']?.toString() == 'write') {
-      errors.add(
-        '$label: publish job must inherit GITHUB_TOKEN from workflow_call caller '
-        '(do not set job permissions.contents: write)',
-      );
+    final perms = publish['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add('$label: publish job must set permissions.contents: write');
     }
-  } else if (perms is! Map || perms['contents']?.toString() != 'write') {
-    errors.add('$label: publish job must set permissions.contents: write');
   }
+  return errors;
+}
+
+List<String> _validateBuildHasNoReleasePublishSteps(String yamlText, String label) {
+  final errors = <String>[];
+  if (yamlText.contains('action-gh-release')) {
+    errors.add('$label: must not use action-gh-release (publish is a separate reusable)');
+  }
+  if (RegExp(r'assert_release_assets_complete\.sh').hasMatch(yamlText)) {
+    errors.add(
+      '$label: must not run assert_release_assets_complete.sh (postflight is publish reusable)',
+    );
   }
   return errors;
 }
@@ -1275,6 +1294,26 @@ String _stripInlineComment(String line) {
     }
   }
   return line;
+}
+
+/// Effective `contents` for a job in a called reusable workflow (caller ceiling ∩ job/workflow grants).
+///
+/// See [Workflow syntax — permissions](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions)
+/// and [Reuse workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows).
+String effectiveContentsPermission({
+  required String? callerContents,
+  required String? workflowContents,
+  required String? jobContents,
+}) {
+  String rank(String? value) =>
+      value?.toString() == 'write' ? 'write' : 'read';
+  String intersect(String a, String b) => a == 'read' || b == 'read' ? 'read' : 'write';
+  var effective = rank(callerContents);
+  final scoped = jobContents ?? workflowContents;
+  if (scoped != null) {
+    effective = intersect(effective, rank(scoped));
+  }
+  return effective;
 }
 
 /// Validates [releaseBinariesRunListJsonFields] ⊆ gh documented fields.

@@ -1,1 +1,1 @@
-negative_dispatch_extra_publish_job.yml: exactly one release reusable-workflow caller job expected
+negative_dispatch_extra_publish_job.yml: exactly build and publish reusable-workflow caller jobs expected

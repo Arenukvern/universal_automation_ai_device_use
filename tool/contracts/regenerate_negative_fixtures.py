@@ -208,6 +208,11 @@ def main() -> None:
 
   specs.append((
       "build",
+      "negative_build_contains_publish",
+      t + "\n  publish:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bad\n",
+  ))
+  specs.append((
+      "build",
       "negative_workflow_contents_write",
       t.replace("permissions:\n  contents: read", "permissions:\n  contents: write", 1),
   ))
@@ -276,8 +281,8 @@ def main() -> None:
       "publish",
       "negative_publish_cross_run_download",
       t.replace(
-          "      - name: Download release artifacts from build run\n        uses: actions/download-artifact@v4\n        with:\n          path: dist/release",
-          "      - name: Download release artifacts from build run\n        uses: actions/download-artifact@v4\n        with:\n          github-token: ${{ github.token }}\n          run-id: '99999'\n          path: dist/release",
+          "      - name: Download release artifacts from this workflow run\n        uses: actions/download-artifact@v4\n        with:\n          path: dist/release",
+          "      - name: Download release artifacts from this workflow run\n        uses: actions/download-artifact@v4\n        with:\n          github-token: ${{ github.token }}\n          run-id: '99999'\n          path: dist/release",
           1,
       ),
   ))
@@ -294,7 +299,7 @@ def main() -> None:
       "publish",
       "negative_publish_no_download",
       re.sub(
-          r"      - name: Download release artifacts from build run\n.*?\n\n",
+          r"      - name: Download release artifacts from this workflow run\n.*?\n\n",
           "",
           t,
           count=1,
@@ -308,8 +313,8 @@ def main() -> None:
       "dispatch",
       "negative_dispatch_extra_publish_job",
       t.replace(
-          "jobs:\n  release:",
-          "jobs:\n  publish:\n    uses: ./.github/workflows/release_binaries_publish.yml\n  release:",
+          "jobs:\n  build:",
+          "jobs:\n  extra-publish:\n    uses: ./.github/workflows/release_binaries_publish.yml\n  build:",
           1,
       ),
   ))
@@ -380,11 +385,12 @@ def main() -> None:
   ))
   specs.append((
       "please",
-      "negative_please_extra_publish_reusable",
-      t.replace(
-          "  dispatch-package-publish:",
-          "  release-binaries-publish:\n    needs: [release-please, release-binaries-build]\n    uses: ./.github/workflows/release_binaries_publish.yml\n\n  dispatch-package-publish:",
-          1,
+      "negative_please_build_contents_write",
+      re.sub(
+          r'(release-binaries-build:[\s\S]*?permissions:\n      )contents: read',
+          r'\1contents: write',
+          t,
+          count=1,
       ),
   ))
   specs.append((

@@ -147,7 +147,7 @@ jobs:
         fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
       )
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/release_binaries_build.yml
     secrets:
       MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
@@ -159,6 +159,22 @@ jobs:
     with:
       release_tag: ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--tag_name'] }}
       dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [release-please, release-binaries-build]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == true ||
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
+      )
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
+      version: ${{ needs.release-binaries-build.outputs.version }}
       tooling_ref: ${{ github.sha }}
 
   dispatch-package-publish:
@@ -236,6 +252,7 @@ jobs:
       - dispatch-package-publish
       - wait-package-publish
       - release-binaries-build
+      - release-binaries-publish
     if: >-
       always() &&
       github.ref == 'refs/heads/main' &&
@@ -259,4 +276,5 @@ jobs:
           TOOLKIT_RELEASE_CREATED: >-
             ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] }}
           RELEASE_BINARIES_BUILD_RESULT: ${{ needs.release-binaries-build.result }}
+          RELEASE_BINARIES_PUBLISH_RESULT: ${{ needs.release-binaries-publish.result }}
         run: bash tool/release/audit_release_binaries_train.sh

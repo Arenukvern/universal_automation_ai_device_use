@@ -1,1 +1,1 @@
-negative_workflow_contents_write.yml: workflow-level permissions must not set contents: write
+negative_workflow_contents_write.yml: workflow permissions must not include write scopes

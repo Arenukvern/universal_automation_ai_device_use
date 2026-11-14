@@ -5,11 +5,22 @@ import 'package:test/test.dart';
 import 'release_workflow_contract_lib.dart';
 
 void main() {
-  test('release_binaries_build publish uses same-run artifact download', () {
+  test('release_binaries_build has no publish/postflight jobs', () {
     final path =
         '${Directory.current.path}/.github/workflows/release_binaries_build.yml';
     final text = File(path).readAsStringSync();
     final errors = validateReleaseBinariesBuildWorkflowYaml(text);
+    expect(errors, isEmpty, reason: errors.join('; '));
+    expect(text, isNot(contains('run-id:')));
+    expect(text, isNot(contains('github-token:')));
+    expect(text, isNot(contains('action-gh-release')));
+  });
+
+  test('release_binaries_publish uses same-run artifact download', () {
+    final path =
+        '${Directory.current.path}/.github/workflows/release_binaries_publish.yml';
+    final text = File(path).readAsStringSync();
+    final errors = validateReleaseBinariesPublishWorkflowYaml(text);
     expect(errors, isEmpty, reason: errors.join('; '));
     expect(text, isNot(contains('run-id:')));
     expect(text, isNot(contains('github-token:')));

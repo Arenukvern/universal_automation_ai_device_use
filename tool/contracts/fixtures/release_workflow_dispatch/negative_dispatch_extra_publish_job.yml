@@ -1,7 +1,7 @@
 name: Release binaries (toolkit)
 run-name: release-binaries ${{ inputs.release_tag }}
 
-# Manual escape hatch: build (+ publish when dry_run is false) via one reusable workflow.
+# Manual escape hatch: build reusable (read) then publish reusable (write) when not dry_run.
 on:
   workflow_dispatch:
     inputs:
@@ -23,11 +23,11 @@ permissions:
   contents: read
 
 jobs:
-  publish:
+  extra-publish:
     uses: ./.github/workflows/release_binaries_publish.yml
-  release:
+  build:
     permissions:
-      contents: write
+      contents: read
     uses: ./.github/workflows/release_binaries_build.yml
     with:
       release_tag: ${{ inputs.release_tag }}
@@ -40,3 +40,14 @@ jobs:
       APPLE_ID: ${{ secrets.APPLE_ID }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+  publish:
+    needs: build
+    if: inputs.dry_run != true
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.build.outputs.release_tag }}
+      version: ${{ needs.build.outputs.version }}
+      tooling_ref: ${{ github.sha }}

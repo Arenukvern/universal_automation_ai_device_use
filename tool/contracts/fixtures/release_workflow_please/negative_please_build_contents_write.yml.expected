@@ -1,0 +1,1 @@
+release-please.yml: release-binaries-build needs contents: read

@@ -1,7 +1,6 @@
 name: Release binaries publish
 run-name: release-binaries-publish ${{ inputs.release_tag }}
 
-# Fixture/contract surface only — production publish runs inside release_binaries_build.yml.
 on:
   workflow_call:
     inputs:
@@ -38,7 +37,7 @@ jobs:
           path: ${{ env.TOOLING_CHECKOUT_PATH }}
           persist-credentials: false
 
-      - name: Download release artifacts from build run
+      - name: Download release artifacts from this workflow run
         uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
