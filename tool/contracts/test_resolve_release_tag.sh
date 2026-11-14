@@ -37,7 +37,7 @@ if GITHUB_EVENT_NAME=workflow_dispatch DISPATCH_RELEASE_TAG=bad-tag DRY_RUN=fals
   fail "invalid tag must fail"
 fi
 
-sha="0123456789abcdef0123456789abcdef0123456789"
+sha="0123456789abcdef0123456789abcdef01234567"
 : >"$out"
 GITHUB_EVENT_NAME=workflow_dispatch \
   DISPATCH_RELEASE_TAG="$sha" \
@@ -46,6 +46,11 @@ GITHUB_EVENT_NAME=workflow_dispatch \
   bash "$SCRIPT" || fail "dry_run sha"
 
 grep -q "release_ref=$sha" "$out" || fail "dry_run release_ref"
-grep -q 'release_tag=$' "$out" || grep -q '^release_tag=$' "$out" || true
+grep -q '^release_tag=$' "$out" || fail "dry_run empty release_tag"
+
+partial="0123456789abcdef"
+if GITHUB_EVENT_NAME=workflow_dispatch DISPATCH_RELEASE_TAG="$partial" DRY_RUN=true GITHUB_OUTPUT="$out" bash "$SCRIPT" 2>/dev/null; then
+  fail "partial SHA must fail"
+fi
 
 ok "resolve_release_tag smoke OK"

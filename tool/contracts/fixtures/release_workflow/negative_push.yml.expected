@@ -1,1 +1,1 @@
-negative_push.yml: forbidden on.push trigger (workflow_dispatch + workflow_call only)
+negative_push.yml: forbidden on.push trigger (workflow_call only)

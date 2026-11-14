@@ -11,13 +11,13 @@ ok() { echo "test_audit_release_binaries_train: $*"; }
 [[ -f "$SCRIPT" ]] || fail "missing audit script"
 chmod +x "$SCRIPT"
 
-TOOLKIT_RELEASE_CREATED=false RELEASE_BINARIES_BUILD_RESULT=skipped RELEASE_BINARIES_PUBLISH_RESULT=skipped \
+TOOLKIT_RELEASE_CREATED=false RELEASE_BINARIES_BUILD_RESULT=skipped \
   bash "$SCRIPT" || fail "no toolkit release should pass"
 
-TOOLKIT_RELEASE_CREATED=true RELEASE_BINARIES_BUILD_RESULT=success RELEASE_BINARIES_PUBLISH_RESULT=success \
+TOOLKIT_RELEASE_CREATED=true RELEASE_BINARIES_BUILD_RESULT=success \
   bash "$SCRIPT" || fail "success path"
 
-if TOOLKIT_RELEASE_CREATED=true RELEASE_BINARIES_BUILD_RESULT=failure RELEASE_BINARIES_PUBLISH_RESULT=skipped \
+if TOOLKIT_RELEASE_CREATED=true RELEASE_BINARIES_BUILD_RESULT=failure \
   bash "$SCRIPT" 2>/dev/null; then
   fail "build failure must fail"
 fi

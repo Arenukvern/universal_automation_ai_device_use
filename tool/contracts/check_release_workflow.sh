@@ -21,6 +21,14 @@ run_negative_dir() {
   shopt -s nullglob
   for negative in "$dir"/negative_*.yml; do
     name="$(basename "$negative")"
+    exp="${negative}.expected"
+    if [[ ! -f "$exp" ]]; then
+      fail "negative fixture missing .expected file: $name"
+    fi
+    want="$(tr -d '\n' <"$exp")"
+    if printf '%s' "$want" | grep -qi 'invalid YAML'; then
+      fail "negative $name: .expected must not pin invalid YAML (fix the fixture)"
+    fi
     set +e
     out="$(dart run "$ROOT_DIR/tool/check_release_workflow.dart" "$flag" "$negative" 2>&1)"
     st=$?
@@ -28,12 +36,8 @@ run_negative_dir() {
     if [[ "$st" -eq 0 ]]; then
       fail "negative fixture must fail but passed: $name"
     fi
-    exp="${negative}.expected"
-    if [[ -f "$exp" ]]; then
-      want="$(tr -d '\n' <"$exp")"
-      if ! printf '%s\n' "$out" | grep -qF "$want"; then
-        fail "negative $name: output must contain: $want (got: $out)"
-      fi
+    if ! printf '%s\n' "$out" | grep -qF "$want"; then
+      fail "negative $name: output must contain: $want (got: $out)"
     fi
     ok "negative fixture rejected: $name"
   done

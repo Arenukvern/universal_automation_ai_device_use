@@ -93,21 +93,21 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
     errors.add('$label: on must be a mapping');
   } else {
     final onMap = Map<dynamic, dynamic>.from(on);
-    if (!onMap.containsKey('workflow_dispatch')) {
-      errors.add('$label: on.workflow_dispatch is required');
-    }
     if (!onMap.containsKey('workflow_call')) {
       errors.add('$label: on.workflow_call is required');
     }
-    const allowedOnKeys = {'workflow_dispatch', 'workflow_call'};
+    if (onMap.containsKey('workflow_dispatch')) {
+      errors.add('$label: on.workflow_dispatch is forbidden (manual dispatch uses release_binaries.yml)');
+    }
+    const allowedOnKeys = {'workflow_call'};
     for (final key in onMap.keys) {
       if (!allowedOnKeys.contains(key.toString())) {
         errors.add(
-          '$label: forbidden on.$key trigger (workflow_dispatch + workflow_call only)',
+          '$label: forbidden on.$key trigger (workflow_call only)',
         );
       }
     }
-    for (final trigger in ['workflow_dispatch', 'workflow_call']) {
+    for (final trigger in ['workflow_call']) {
       final block = onMap[trigger];
       if (block is! Map) {
         continue;
@@ -132,15 +132,10 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
 
-  const requiredJobs = ['prepare', 'build', 'dry-run-bundle'];
+  const requiredJobs = ['prepare', 'build', 'dry-run-bundle', 'publish', 'postflight'];
   for (final id in requiredJobs) {
     if (!jobsMap.containsKey(id)) {
       errors.add('$label: missing job $id');
-    }
-  }
-  for (final forbidden in ['publish', 'postflight']) {
-    if (jobsMap.containsKey(forbidden)) {
-      errors.add('$label: must not define job $forbidden (publish is separate)');
     }
   }
 
@@ -156,6 +151,8 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   }
 
   requireExactJobIf('dry-run-bundle', exactDryRunBundleIf);
+  requireExactJobIf('publish', exactPublishIf);
+  requireExactJobIf('postflight', exactPostflightIf);
 
   for (final entry in jobsMap.entries) {
     final job = entry.value;
@@ -170,6 +167,29 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   errors.addAll(
     _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsBuild),
   );
+  errors.addAll(
+    _validateRequiredScriptSteps(jobsMap, label, requiredScriptStepsPublish),
+  );
+  errors.addAll(
+    _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsPublish),
+  );
+
+  final publish = jobsMap['publish'];
+  if (publish is Map) {
+    final publishNeeds = publish['needs'];
+    final publishNeedsList = publishNeeds is List
+        ? (publishNeeds.map((e) => e.toString()).toList()..sort())
+        : publishNeeds != null
+            ? [publishNeeds.toString()]
+            : <String>[];
+    final expectedPublishNeeds = ['build', 'prepare']..sort();
+    if (publishNeedsList.length != 2 ||
+        !publishNeedsList.every(expectedPublishNeeds.contains)) {
+      errors.add(
+        '$label: publish needs must be exactly [prepare, build] (got $publishNeedsList)',
+      );
+    }
+  }
 
   final build = jobsMap['build'];
   if (build is Map) {
@@ -193,7 +213,23 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
 
   errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, yamlText, label));
   errors.addAll(_validateBuildMatrix(jobsMap, label));
-  errors.addAll(_validateReadOnlyPermissions(jobsMap, root, label));
+  errors.addAll(_validateGhReleaseAssets(jobsMap, label));
+  errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
+  errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
+  errors.addAll(_validateSameRunArtifactDownload(jobsMap, label));
+  errors.addAll(_validateNoInlineWorkflowExprsInRun(jobsMap, label));
+  if (!_publishUsesAppendBody(jobsMap['publish'])) {
+    errors.add('$label: publish job must set append_body: true on action-gh-release');
+  }
+  final postflight = jobsMap['postflight'];
+  if (postflight is Map) {
+    final needs = postflight['needs'];
+    final needsList =
+        needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
+    if (!needsList.contains('publish') || !needsList.contains('prepare')) {
+      errors.add('$label: postflight must need prepare and publish');
+    }
+  }
 
   return errors;
 }
@@ -243,15 +279,10 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
   errors.addAll(_validateGhReleaseAssets(jobsMap, label));
   errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
   errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
-  errors.addAll(_validatePublishArtifactDownload(jobsMap, label));
+  errors.addAll(_validateSameRunArtifactDownload(jobsMap, label));
+  errors.addAll(_validateNoInlineWorkflowExprsInRun(jobsMap, label));
   if (!_publishUsesAppendBody(jobsMap['publish'])) {
     errors.add('$label: publish job must set append_body: true on action-gh-release');
-  }
-  for (final id in ['publish', 'postflight']) {
-    final job = jobsMap[id];
-    if (job is Map && job.containsKey('if')) {
-      errors.add('$label: job $id must not set job-level if:');
-    }
   }
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
@@ -265,7 +296,7 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
   return errors;
 }
 
-/// Manual `release_binaries.yml` dispatcher (workflow_dispatch → build + publish).
+/// Manual `release_binaries.yml` dispatcher (workflow_dispatch → build reusable).
 List<String> validateReleaseBinariesDispatchWorkflowYaml(
   String yamlText, {
   String label = 'release_binaries.yml',
@@ -301,37 +332,20 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
     return errors;
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-  final build = jobsMap['build'];
-  final publish = jobsMap['publish'];
-  if (build is! Map ||
-      !build['uses'].toString().contains('release_binaries_build.yml')) {
-    errors.add('$label: build job must use release_binaries_build.yml');
+  final release = jobsMap['release'];
+  if (release is! Map ||
+      !release['uses'].toString().contains('release_binaries_build.yml')) {
+    errors.add('$label: release job must use release_binaries_build.yml');
   }
-  if (publish is! Map ||
-      !publish['uses'].toString().contains('release_binaries_publish.yml')) {
-    errors.add('$label: publish job must use release_binaries_publish.yml');
-  }
-  if (build is Map) {
-    errors.addAll(_validateExplicitSigningSecretsMap(build['secrets'], label));
-    final perms = build['permissions'];
-    if (perms is Map) {
-      for (final v in perms.values) {
-        if (v?.toString() == 'write') {
-          errors.add('$label: workflow permissions must not include write scopes');
-        }
-      }
+  if (release is Map) {
+    errors.addAll(_validateExplicitSigningSecretsMap(release['secrets'], label));
+    final withMap = release['with'];
+    if (withMap is! Map) {
+      errors.add('$label: release job must pass with:');
     }
   }
-  final publishJob = jobsMap['publish'];
-  if (publishJob is Map) {
-    final needs = publishJob['needs'];
-    if (needs?.toString() != 'build') {
-      errors.add('$label: publish job must need build');
-    }
-    final pubIf = publishJob['if']?.toString().trim() ?? '';
-    if (pubIf != exactPublishIf) {
-      errors.add('$label: job publish if must be exactly `$exactPublishIf` (got `$pubIf`)');
-    }
+  if (jobsMap.length != 1) {
+    errors.add('$label: exactly one release reusable-workflow caller job expected');
   }
   return errors;
 }
@@ -509,28 +523,10 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     );
   }
 
-  final publish = jobsMap['release-binaries-publish'];
-  if (publish is! Map) {
-    errors.add('release-please.yml: missing release-binaries-publish job');
-  } else {
-    if (!publish['uses'].toString().contains('release_binaries_publish.yml')) {
-      errors.add('release-please.yml: release-binaries-publish must use release_binaries_publish.yml');
-    }
-    final perms = publish['permissions'];
-    if (perms is Map && perms['contents']?.toString() != 'write') {
-      errors.add('release-please.yml: release-binaries-publish needs contents: write');
-    }
-    final needs = publish['needs'];
-    final needsList = needs is List
-        ? needs.map((e) => e.toString()).toList()
-        : needs != null
-            ? [needs.toString()]
-            : <String>[];
-    if (!needsList.contains('release-binaries-build')) {
-      errors.add(
-        'release-please.yml: release-binaries-publish must need release-binaries-build',
-      );
-    }
+  if (jobsMap.containsKey('release-binaries-publish')) {
+    errors.add(
+      'release-please.yml: must not define release-binaries-publish (publish runs inside release_binaries_build.yml)',
+    );
   }
 
   errors.addAll(_validateReleasePleasePubTrainIndependence(jobsMap));
@@ -546,7 +542,7 @@ List<String> _validateReleasePleasePubTrainIndependence(
   final dispatch = jobsMap[releasePleaseDispatchPublishJob];
   if (dispatch is Map) {
     final needs = _jobNeedsList(dispatch);
-    const forbidden = {'release-binaries-build', 'release-binaries-publish'};
+    const forbidden = {'release-binaries-build'};
     for (final n in needs) {
       if (forbidden.contains(n)) {
         errors.add(
@@ -568,8 +564,7 @@ List<String> _validateReleasePleasePubTrainIndependence(
   }
   final waitNeeds = _jobNeedsList(wait);
   for (final n in waitNeeds) {
-    if (n == releasePleaseBinariesBuildJob ||
-        n == releasePleaseBinariesPublishJob) {
+    if (n == releasePleaseBinariesBuildJob) {
       errors.add(
         'release-please.yml: $releasePleaseWaitPublishJob must not need $n (pub.dev train is independent)',
       );
@@ -611,7 +606,6 @@ List<String> _validateReleasePleaseFinalBinaryAudit(
     releasePleaseDispatchPublishJob,
     releasePleaseWaitPublishJob,
     releasePleaseBinariesBuildJob,
-    releasePleaseBinariesPublishJob,
   ]) {
     if (!needs.contains(required)) {
       errors.add(
@@ -652,7 +646,6 @@ List<String> _validateReleasePleaseFinalBinaryAudit(
         for (final key in [
           'TOOLKIT_RELEASE_CREATED',
           'RELEASE_BINARIES_BUILD_RESULT',
-          'RELEASE_BINARIES_PUBLISH_RESULT',
         ]) {
           if (!env.containsKey(key)) {
             errors.add(
@@ -726,7 +719,7 @@ List<String> _validateSplitPublishNeeds(
   return errors;
 }
 
-List<String> _validatePublishArtifactDownload(
+List<String> _validateSameRunArtifactDownload(
   Map<dynamic, dynamic> jobsMap,
   String label,
 ) {
@@ -737,7 +730,7 @@ List<String> _validatePublishArtifactDownload(
   }
   final steps = publish['steps'];
   if (steps is! List) {
-    errors.add('$label: publish job must download artifacts from build run');
+    errors.add('$label: publish job must download artifacts from this workflow run');
     return errors;
   }
   var sawDownload = false;
@@ -749,13 +742,48 @@ List<String> _validatePublishArtifactDownload(
     if (!uses.contains('download-artifact')) {
       continue;
     }
+    sawDownload = true;
     final withMap = step['with'];
-    if (withMap is Map && withMap['run-id'] != null) {
-      sawDownload = true;
+    if (withMap is Map) {
+      if (withMap['run-id'] != null || withMap['github-token'] != null) {
+        errors.add(
+          '$label: publish download-artifact must not set run-id or github-token (same-run download only)',
+        );
+      }
     }
   }
   if (!sawDownload) {
-    errors.add('$label: publish job must download artifacts from build run');
+    errors.add('$label: publish job must download artifacts from this workflow run');
+  }
+  return errors;
+}
+
+List<String> _validateNoInlineWorkflowExprsInRun(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final pattern = RegExp(r'\$\{\{\s*(inputs\.|needs\.)');
+  for (final job in jobsMap.values) {
+    if (job is! Map) {
+      continue;
+    }
+    final steps = job['steps'];
+    if (steps is! List) {
+      continue;
+    }
+    for (final step in steps) {
+      if (step is! Map) {
+        continue;
+      }
+      final run = step['run']?.toString() ?? '';
+      if (pattern.hasMatch(run)) {
+        final name = step['name']?.toString() ?? '';
+        errors.add(
+          '$label: step `$name` must pass inputs/needs via env, not inline in run:',
+        );
+      }
+    }
   }
   return errors;
 }

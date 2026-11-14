@@ -1,6 +1,7 @@
 name: Release binaries publish
 run-name: release-binaries-publish ${{ inputs.release_tag }}
 
+# Fixture/contract surface only — production publish runs inside release_binaries_build.yml.
 on:
   workflow_call:
     inputs:
@@ -8,9 +9,6 @@ on:
         required: true
         type: string
       version:
-        required: true
-        type: string
-      artifact_run_id:
         required: true
         type: string
       tooling_ref:
@@ -29,6 +27,9 @@ jobs:
       contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      RELEASE_TAG: ${{ inputs.release_tag }}
+      VERSION: ${{ inputs.version }}
     steps:
       - name: Checkout workflow tooling at caller commit
         uses: actions/checkout@v7
@@ -40,28 +41,30 @@ jobs:
       - name: Download release artifacts from build run
         uses: actions/download-artifact@v4
         with:
-          github-token: ${{ github.token }}
-          run-id: ${{ inputs.artifact_run_id }}
           path: dist/release
           pattern: release-*
           merge-multiple: true
 
       - name: Generate checksums
+        env:
+          VERSION: ${{ inputs.version }}
         run: |
           set -euo pipefail
           cd dist/release
           shopt -s nullglob
-          files=(universal_automation_${{ inputs.version }}_*.tar.gz universal_automation_${{ inputs.version }}_*.zip)
+          files=(universal_automation_"${VERSION}"_*.tar.gz universal_automation_"${VERSION}"_*.zip)
           sha256sum "${files[@]}" > checksums.txt
 
       - name: Guard against conflicting GitHub release assets
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/check_release_assets_conflict.sh" \
-            "${{ inputs.release_tag }}" \
-            "${{ inputs.version }}"
+            "$RELEASE_TAG" \
+            "$VERSION"
 
       - name: Publish GitHub release assets
         uses: softprops/action-gh-release@v2
@@ -111,7 +114,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete.sh" \
-            "${{ inputs.release_tag }}" \
-            "${{ inputs.version }}"
+            "$RELEASE_TAG" \
+            "$VERSION"

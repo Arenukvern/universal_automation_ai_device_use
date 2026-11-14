@@ -1,1 +1,1 @@
-negative_no_workflow_call.yml: on.workflow_call is required
+negative_no_workflow_call.yml: on must be a mapping

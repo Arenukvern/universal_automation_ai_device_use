@@ -1,1 +1,1 @@
-negative_assert_reference.yml: job postflight must have exactly one unconditional step running assert_release_assets_complete.sh
+negative_assert_reference.yml: job postflight must have exactly one unconditional step running assert_release_assets_complete.sh (found 0)

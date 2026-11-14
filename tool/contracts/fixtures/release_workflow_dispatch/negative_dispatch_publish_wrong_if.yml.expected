@@ -1,1 +1,0 @@
-negative_dispatch_publish_wrong_if.yml: job publish if must be exactly `inputs.dry_run != true`

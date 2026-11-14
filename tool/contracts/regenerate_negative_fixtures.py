@@ -65,7 +65,7 @@ def pick_error_substring(output: str) -> str:
     for line in output.splitlines():
         line = line.strip()
         if line.startswith("- "):
-            return line[2:].split(" (got ")[0].split(" (found ")[0]
+            return line[2:].split(" (got ")[0]
     if "failures:" in output:
         return output.split("failures:")[-1].strip().splitlines()[-1].strip()
     return output.splitlines()[-1] if output else "must fail"
@@ -112,8 +112,8 @@ def main() -> None:
       "build",
       "negative_push",
       re.sub(
-          r"^on:\n  workflow_dispatch:",
-          "on:\n  push:\n    branches: [main]\n  workflow_dispatch:",
+          r"^on:\n  workflow_call:",
+          "on:\n  push:\n    branches: [main]\n  workflow_call:",
           t,
           count=1,
           flags=re.M,
@@ -262,9 +262,22 @@ def main() -> None:
   specs.append((
       "publish",
       "negative_true_comment_assert",
+      re.sub(
+          r'        run: \|\n'
+          r'          bash "\$\{\{ env\.TOOLING_CHECKOUT_PATH \}\}/tool/release/assert_release_assets_complete\.sh" \\\n'
+          r'            "\$RELEASE_TAG" \\\n'
+          r'            "\$VERSION"',
+          '        run: echo postflight skipped',
+          t,
+          count=1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_cross_run_download",
       t.replace(
-          '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete.sh"',
-          "          true # assert_release_assets_complete.sh\n",
+          "      - name: Download release artifacts from build run\n        uses: actions/download-artifact@v4\n        with:\n          path: dist/release",
+          "      - name: Download release artifacts from build run\n        uses: actions/download-artifact@v4\n        with:\n          github-token: ${{ github.token }}\n          run-id: '99999'\n          path: dist/release",
           1,
       ),
   ))
@@ -293,23 +306,27 @@ def main() -> None:
   t = d()
   specs.append((
       "dispatch",
-      "negative_dispatch_publish_wrong_needs",
-      t.replace("  publish:\n    needs: build", "  publish:\n    needs: release-please", 1),
-  ))
-  specs.append((
-      "dispatch",
-      "negative_dispatch_publish_wrong_if",
-      t.replace("    if: inputs.dry_run != true", "    if: always()", 1),
+      "negative_dispatch_extra_publish_job",
+      t.replace(
+          "jobs:\n  release:",
+          "jobs:\n  publish:\n    uses: ./.github/workflows/release_binaries_publish.yml\n  release:",
+          1,
+      ),
   ))
 
   specs.append((
       "dispatch",
       "negative_secrets_inherit",
-      re.sub(
-          r"    secrets:\n(?:      \w+:.*\n){6}",
-          "    secrets: inherit\n",
-          t,
-          count=1,
+      t.replace(
+          "    secrets:\n"
+          "      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}\n"
+          "      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}\n"
+          "      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}\n"
+          "      APPLE_ID: ${{ secrets.APPLE_ID }}\n"
+          "      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}\n"
+          "      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}",
+          "    secrets: inherit",
+          1,
       ),
   ))
 
@@ -363,8 +380,12 @@ def main() -> None:
   ))
   specs.append((
       "please",
-      "negative_please_publish_without_build",
-      t.replace("needs: [release-please, release-binaries-build]", "needs: [release-please]", 1),
+      "negative_please_extra_publish_reusable",
+      t.replace(
+          "  dispatch-package-publish:",
+          "  release-binaries-publish:\n    needs: [release-please, release-binaries-build]\n    uses: ./.github/workflows/release_binaries_publish.yml\n\n  dispatch-package-publish:",
+          1,
+      ),
   ))
   specs.append((
       "publish",
@@ -399,7 +420,7 @@ def main() -> None:
       ).replace(
           "    needs:\n      - release-please\n      - dispatch-package-publish",
           "    needs:\n      - release-please\n      - dispatch-package-publish\n"
-          "      - release-binaries-build\n      - release-binaries-publish",
+          "      - release-binaries-build",
           1,
       ),
   ))

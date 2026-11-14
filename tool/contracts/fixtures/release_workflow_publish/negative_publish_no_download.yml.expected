@@ -1,1 +1,1 @@
-negative_publish_no_download.yml: publish job must download artifacts from build run
+negative_publish_no_download.yml: publish job must download artifacts from this workflow run

@@ -93,14 +93,12 @@ sibling workflows). Zero manual steps:
    passing the toolkit tag and `dry_run: false`. It checks out **caller tooling
    ref on the default branch** plus **immutable tag source**, builds four
    matrix legs, and (for production) signs macOS when secrets are present.
-2. **`release-binaries-publish`** (`release_binaries_publish.yml`, `contents:
-   write` on publish only) downloads artifacts from the build run id, uploads to
-   the **existing** toolkit release, writes `checksums.txt`, and **postflight**
-   `assert_release_assets_complete.sh`.
-3. `wait-package-publish` waits on **pub.dev only** (`needs` release-please +
-   dispatch-package-publish; not binary jobs). `audit-release-train` runs after
-   a successful pub wait and **fails the workflow** if the toolkit released but
-   binary build/publish did not succeed.
+2. **Publish + postflight** run inside the same `release_binaries_build.yml`
+   reusable (same-workflow artifact download; `contents: write` only on the
+   publish job). Release-please calls that reusable once (`dry_run: false`).
+3. `wait-package-publish` waits on **pub.dev only**. `audit-release-train`
+   runs when pub wait succeeds or fails and **fails the workflow** if the
+   toolkit released but `release-binaries-build` did not succeed.
 
 ### PR / main path smoke (all four legs, artifacts only)
 

@@ -1,0 +1,1 @@
+negative_publish_cross_run_download.yml: publish download-artifact must not set run-id or github-token (same-run download only)
