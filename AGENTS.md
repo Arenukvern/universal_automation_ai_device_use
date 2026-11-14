@@ -80,11 +80,13 @@ For more information on the project charter and decisions:
 - New macOS / Windows / Linux / Android / iOS / Flutter / browser support → **adapter**
   (`universal_driver_*`, `universal_browser_*`, …) + factory registration, **not** a
   separate MCP server product.
-- Lean default wiring: interface + desktop OS adapter + browser; mobile, Flutter, harness,
-  and oka runners are opt-in on the same server config.
-- **Declared targets:** every adapter attaches only; never boots or scrapes discovery output.
-  Flutter → VM URI from oka dev-session manifest; Android/iOS → `oka_devices` ids; lifecycle
-  via **oka** / **`oka_process`**.
+- Lean default wiring: interface + desktop OS adapter + browser; mobile, Flutter, harness/SDK
+  are opt-in adapter deps on the same server config. **oka hosts UA** when supervised — UA
+  does not embed or launch oka runners.
+- **Declared targets:** oka creates apps/emulators/simulators and hands `oka_devices` id +
+  typed `vmServiceUri` before attach; UA never scrapes output; **never owns target lifecycle**.
+- **Bounded subprocesses:** `adb` / `xcrun` / similar tool calls via **`oka_process`**;
+  **`universal_tooling_runtime`** thins over it — not a parallel spawn policy.
 - Flutter seam: `mcp_flutter`'s published attach-only driver (`VmClient` + `ToolkitDriver` in
   `flutter_mcp_harness` today; planned attach-only package split) — not value-type-only crates.
 - **Tool visibility:** optional adapter groups in `tools/list` only when installed **and**

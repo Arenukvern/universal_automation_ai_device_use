@@ -16,8 +16,9 @@ desktop, mobile, browser, and tiers this family adds over time.
 ## MCP shape
 
 **One server, many adapters** ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)):
-configure a single Universal Automation MCP entry; add platforms by adapter
-packages on the registry, not by spawning separate per-OS MCP servers.
+one MCP entry; add platforms as adapter packages. UA never owns target lifecycle — oka
+declares `oka_devices` id and `vmServiceUri` before attach. **oka hosts UA** when
+supervised; UA does not embed oka runners.
 
 ## Packages (monorepo)
 

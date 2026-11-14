@@ -19,9 +19,10 @@ Add a `universal_driver_*` / `universal_browser_*` adapter and register its
 factory on the toolkit registry; keep a single client `mcp.json` entry.
 
 One vocabulary for the observe/act/verify loop across browser and OS
-tiers (ADR 0046). Attach-only: it never spawns or stops processes —
-launch targets yourself (or point at oka-published session handles) and
-aim the toolkit at the debug endpoint.
+tiers (ADR 0046). **Never owns target lifecycle** (apps, emulators, simulators):
+oka creates targets and declares `oka_devices` id + typed `vmServiceUri` before
+attach — never scrape `flutter run` or tool output. UA still runs **bounded tool
+calls** (`adb`, `xcrun`, …) through **`oka_process`** / **`universal_tooling_runtime`**.
 
 **Dart is the source of truth; YAML/JSON documents are snapshots** (the
 agent interchange). Code steps make plans first-class code: terminal
@@ -268,11 +269,12 @@ Semantic `automation_observe` / `automation_act` remain preferred when roles and
 2. Add conformance coverage in `universal_automation_conformance` for the tier’s honest verbs.
 3. Register a `DriverFactory` on the composition root / registry; expose routing via existing
    `automation_*` tools (shared observe / act / capture first).
-4. **Declared target only** — attach, never create: Flutter takes the VM service URI from
-   **oka's dev-session manifest** (typed field), never from `flutter run` output; Android/iOS
-   take a declared serial or simulator id via **`oka_devices`** types; browser/OS use declared
-   endpoints or oka handle artifacts. Boot, discovery, teardown stay in **oka**; UA uses
-   **`oka_process`** for process contract.
+4. **Declared target only** — oka creates apps/emulators/simulators and hands inputs before
+   the run: **`oka_devices`** id + typed **`vmServiceUri`** from oka's session manifest (never
+   scraped output). UA never owns target lifecycle. Subprocesses for action/capture (`adb`,
+   `xcrun`, …) are bounded **`oka_process`** calls; wire through **`universal_tooling_runtime`**,
+   not ad-hoc spawn policy. **oka hosts UA** under supervision when deployed that way — do not
+   embed oka runners in the MCP server.
 5. Put truly platform-only verbs in a **named tool group** (namespace prefix) on the same
    server; list the group in `tools/list` **only** when the adapter package is installed **and**
    its declared target is attached or reachable; emit

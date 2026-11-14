@@ -28,10 +28,13 @@ see ADR 0004). Adapter packages (`universal_driver_*`, `universal_browser_*`,
 future mobile tiers) are selected when the operator or embedder wires the
 composition root. The MCP **face** stays stable.
 
-**oka** owns boot, discovery, and teardown. Universal Automation **attaches** to
-targets oka (or the operator) **declares** — it never creates a session, device, or
-process on the MCP path. The core process contract comes from **`oka_process`**;
-device identifiers use **`oka_devices`** types where mobile tiers apply.
+**oka** owns boot, discovery, and teardown of apps, emulators, and simulators.
+Universal Automation **attaches** to targets oka **declares** before a run — an
+**`oka_devices`** device id and a typed **`vmServiceUri`** from oka's session manifest —
+and **never** discovers them by scraping command output. UA **never owns target
+lifecycle**. Bounded helper subprocesses for actions and capture (`adb`, `xcrun`, …)
+run through **`oka_process`**'s contract; **`universal_tooling_runtime`** thins over
+that contract (see ADR 0006).
 
 ## Decision
 
@@ -44,24 +47,28 @@ device identifiers use **`oka_devices`** types where mobile tiers apply.
    runtime registry. Routing picks the adapter; the MCP schema does not fork per OS.
 
 3. **Lean default install.** Default wiring is **core + one desktop OS adapter + browser**
-   (as today’s `serve --os` + optional `--cdp`). Flutter VM, Android, iOS, harness/SDK, and
-   oka-supervised runners are **opt-in** dependencies and factories — still the **same**
-   MCP server binary and client config entry.
+   (as today’s `serve --os` + optional `--cdp`). Flutter VM, Android, iOS, and harness/SDK
+   packages are **opt-in adapter dependencies** on the **same** MCP server binary and client
+   config entry. When operators run automations under the oka supervisor, **oka hosts UA**
+   (budgets, restart policy) — Universal Automation does **not** embed, host, or launch oka
+   runners.
 
 4. **Shared tools first.** Screenshot, semantics tree, tap/click, navigate, verify, and
    consent requests are the common vocabulary. Only capabilities with no honest cross-tier
    mapping (e.g. Flutter hot reload) appear in a **named tool group**, not a separate server.
 
-5. **Declared targets (every adapter).** Each adapter **attaches** to a target that was
-   **declared** upstream; it **never** creates one.
+5. **Declared targets (every adapter).** UA never creates targets (apps, emulators,
+   simulators). **oka** creates them and hands **declared inputs** before the run:
+   **`oka_devices`** device id and typed **`vmServiceUri`** from oka's session manifest.
+   UA never discovers targets by scraping output. Each adapter **attaches** only:
    - **Browser / desktop OS:** declared endpoint URI, handle artifact, or session binding
      (existing `serve --cdp`, `--os`, oka handle files).
-   - **Flutter:** VM service URI from **oka's dev-session manifest** as a typed field — never
-     scraped from `flutter run` output or build logs.
-   - **Android / iOS:** declared physical serial or simulator identifier using
-     **`oka_devices`** types.
-   Booting, discovery, and teardown stay in **oka**. This repo consumes
-   **`oka_process`** for process semantics and remains attach-only on the MCP path.
+   - **Flutter:** manifest **`vmServiceUri`** — never from `flutter run` logs.
+   - **Android / iOS:** declared serial or simulator id via **`oka_devices`** types.
+   Booting, discovery, and teardown stay in **oka**. Action/capture subprocesses
+   (`adb`, `xcrun`, …) are **bounded tool calls** through **`oka_process`**; UA does
+   not invent a parallel spawn policy — **`universal_tooling_runtime`** thins over
+   **`oka_process`**.
 
 6. **Flutter adapter boundary.** The Flutter tier is a thin adapter over
    [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only
@@ -109,4 +116,5 @@ Per-platform **packages** remain; per-platform **MCP servers** do not.
 - This ADR does not require every adapter tier to be production-ready today; it governs
   product shape only.
 - This ADR does not merge `mcp_flutter` into this repository; it defines the seam.
-- Replacing oka supervision or embedding the full harness in every client is out of scope.
+- UA does not embed oka's supervisor or own app/emulator/simulator lifecycle; oka-hosted
+  UA is an operator deployment choice, not something `serve` bundles or launches.

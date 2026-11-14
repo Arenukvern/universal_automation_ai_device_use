@@ -65,14 +65,16 @@ config, let implementations drift, and force agents to learn which server to cal
 | `universal_automation_toolkit` | Plans, runner, MCP face, registry |
 
 **Lean default:** core + desktop OS adapter + optional browser tier (`serve --os`,
-`--cdp`). Flutter, mobile adapters, harness/SDK, and oka-supervised runners are
-opt-in dependencies — still the **same** MCP entry in the client. Shared tools
+`--cdp`). Flutter, mobile adapters, and harness/SDK are opt-in adapter dependencies on
+the **same** MCP entry. **oka may host UA** under its supervisor; UA does not embed or
+launch oka runners. Shared tools
 (screenshot, semantics tree, tap) cover common work; truly platform-specific
 behavior (e.g. Flutter hot reload) lives in named tool groups on that server, not a
-forked product. **Every adapter attaches to a declared target and never creates one**
-(Flutter: VM service URI from oka's dev-session manifest; Android/iOS: `oka_devices`
-serial or simulator id; browser/OS: declared endpoints or handles). Boot, discovery, and
-teardown stay in **oka**; UA core uses **`oka_process`** for process semantics. The Flutter
+forked product. UA **never owns target lifecycle** (apps, emulators, simulators): **oka**
+creates targets and hands declared **`oka_devices`** id and typed **`vmServiceUri`** from
+its session manifest — UA never scrapes discovery output. Bounded subprocesses for tools
+like `adb` / `xcrun` go through **`oka_process`**; **`universal_tooling_runtime`** thins
+over that contract. The Flutter
 adapter stays thin over
 [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter)'s published attach-only driver
 (today `VmClient` plus `ToolkitDriver` in `flutter_mcp_harness`, planned as its own
