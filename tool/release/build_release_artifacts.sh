@@ -15,10 +15,13 @@ fi
 declare -a TRIPLES=()
 CLEAN=0
 SKIP_SIGN=0
+DEFER_ARCHIVE=0
+PACKAGE_ONLY=0
 
 usage() {
   cat <<USAGE
 Usage: tool/release/build_release_artifacts.sh [--version <semver>] [--triple <triple>] [--clean]
+       [--skip-sign] [--defer-archive] [--package-only]
 
 Builds release archives for universal-automation (dart build cli bundle layout).
 Generates checksum fragments under dist/release/ when building all triples locally.
@@ -43,6 +46,14 @@ while [[ $# -gt 0 ]]; do
       SKIP_SIGN=1
       shift
       ;;
+    --defer-archive)
+      DEFER_ARCHIVE=1
+      shift
+      ;;
+    --package-only)
+      PACKAGE_ONLY=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
@@ -57,6 +68,61 @@ done
 
 if [[ ${#TRIPLES[@]} -eq 0 ]]; then
   TRIPLES=(darwin-arm64 darwin-x64 linux-x64 windows-x64)
+fi
+
+need_cmd() {
+  command -v "$1" >/dev/null 2>&1 || {
+    echo "Required command not found: $1" >&2
+    exit 1
+  }
+}
+
+assert_packaging_tools() {
+  need_cmd tar
+  need_cmd dart
+  if [[ "$(uname -s)" == MINGW* ]] || [[ "$(uname -s)" == MSYS* ]] || [[ "${OS:-}" == Windows_NT ]]; then
+    if ! command -v zip >/dev/null 2>&1 && ! command -v 7z >/dev/null 2>&1; then
+      echo "Windows packaging requires zip or 7z on PATH" >&2
+      exit 1
+    fi
+  fi
+}
+
+package_archive() {
+  local triple="$1"
+  local package_name="$2"
+  local stage_dir="$3"
+  local archive_path=""
+
+  case "$triple" in
+    windows-x64)
+      archive_path="$DIST_DIR/${package_name}.zip"
+      rm -f "$archive_path"
+      (
+        cd "$DIST_DIR"
+        if command -v zip >/dev/null 2>&1; then
+          zip -qr "$archive_path" "$package_name"
+        elif command -v 7z >/dev/null 2>&1; then
+          7z a -tzip "$archive_path" "$package_name" >/dev/null
+        else
+          echo "zip or 7z required on Windows" >&2
+          exit 1
+        fi
+      )
+      ;;
+    *)
+      archive_path="$DIST_DIR/${package_name}.tar.gz"
+      rm -f "$archive_path"
+      tar -C "$DIST_DIR" -czf "$archive_path" "$package_name"
+      ;;
+  esac
+
+  rm -rf "$stage_dir"
+  echo "Built $archive_path"
+}
+
+if [[ "$PACKAGE_ONLY" -eq 0 ]]; then
+  assert_packaging_tools
 fi
 
 if [[ "$CLEAN" -eq 1 ]]; then
@@ -161,11 +227,23 @@ maybe_sign_macos() {
     script="$(dirname "${BASH_SOURCE[0]}")/codesign_macos_bundle.sh"
   fi
   if [[ -x "$script" ]]; then
-    bash "$script" "$bundle" || echo "codesign step skipped or failed (unsigned preview build)" >&2
+    bash "$script" "$bundle"
   fi
 }
 
 for triple in "${TRIPLES[@]}"; do
+  package_name="universal_automation_${VERSION}_${triple}"
+  stage_dir="$DIST_DIR/$package_name"
+
+  if [[ "$PACKAGE_ONLY" -eq 1 ]]; then
+    [[ -d "$stage_dir" ]] || {
+      echo "package-only: missing staged bundle $stage_dir" >&2
+      exit 1
+    }
+    package_archive "$triple" "$package_name" "$stage_dir"
+    continue
+  fi
+
   assert_host_can_build "$triple"
   read -r target_os target_arch <<<"$(resolve_dart_target "$triple")"
 
@@ -180,8 +258,6 @@ for triple in "${TRIPLES[@]}"; do
   bundle_dir="$(find_bundle_dir)"
   maybe_sign_macos "$bundle_dir" "$triple"
 
-  package_name="universal_automation_${VERSION}_${triple}"
-  stage_dir="$DIST_DIR/$package_name"
   rm -rf "$stage_dir"
   mkdir -p "$stage_dir"
   cp -a "$bundle_dir/." "$stage_dir/"
@@ -192,32 +268,17 @@ for triple in "${TRIPLES[@]}"; do
   cli_bin="$(resolve_cli_binary "$stage_dir" "$triple")"
   smoke_cli "$cli_bin"
 
-  archive_path=""
-  case "$triple" in
-    windows-x64)
-      archive_path="$DIST_DIR/${package_name}.zip"
-      rm -f "$archive_path"
-      (
-        cd "$DIST_DIR"
-        if command -v zip >/dev/null 2>&1; then
-          zip -qr "$archive_path" "$package_name"
-        else
-          fail_zip="zip not found"
-          echo "$fail_zip" >&2
-          exit 1
-        fi
-      )
-      ;;
-    *)
-      archive_path="$DIST_DIR/${package_name}.tar.gz"
-      rm -f "$archive_path"
-      tar -C "$DIST_DIR" -czf "$archive_path" "$package_name"
-      ;;
-  esac
+  if [[ "$DEFER_ARCHIVE" -eq 1 ]]; then
+    echo "Staged (defer-archive): $stage_dir"
+    continue
+  fi
 
-  rm -rf "$stage_dir"
-  echo "Built $archive_path"
+  package_archive "$triple" "$package_name" "$stage_dir"
 done
+
+if [[ "$PACKAGE_ONLY" -eq 1 || "$DEFER_ARCHIVE" -eq 1 ]]; then
+  exit 0
+fi
 
 if [[ ${#TRIPLES[@]} -gt 1 ]]; then
   (

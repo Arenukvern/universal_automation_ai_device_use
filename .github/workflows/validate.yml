@@ -33,6 +33,14 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
 
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (contract checker)
+        run: dart pub get
+
       - name: Release tooling contract tests
         run: |
           set -euo pipefail
@@ -43,6 +51,7 @@ jobs:
           bash tool/contracts/test_resolve_release_tag.sh
           bash tool/contracts/test_verify_release_tarball_architecture.sh
           bash tool/contracts/test_release_recovery_flow.sh
+          bash tool/contracts/test_install.sh
           shellcheck -x tool/release/*.sh install.sh
 
   analyze:

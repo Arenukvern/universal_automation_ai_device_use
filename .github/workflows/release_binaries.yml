@@ -1,4 +1,5 @@
 name: Release binaries (toolkit)
+run-name: release-binaries ${{ inputs.release_tag }}
 
 # Release Please creates tags/releases with GITHUB_TOKEN; those events do not
 # trigger other workflows. Dispatch explicitly from release-please.yml / train.
@@ -7,16 +8,23 @@ on:
     inputs:
       release_tag:
         description: >-
-          Toolkit release tag (e.g. universal_automation_toolkit-v0.5.1).
-          Attach assets to the existing GitHub Release for that tag.
+          Toolkit release tag (e.g. universal_automation_toolkit-v0.5.1), or when
+          dry_run is true a branch name or 40-character commit SHA.
         required: true
         type: string
+      dry_run:
+        description: >-
+          When true, build all platform artifacts and upload workflow artifacts only
+          (no GitHub Release upload). release_tag is interpreted as a git ref or SHA.
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-binaries-${{ inputs.release_tag }}
+  group: release-binaries-${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}
   cancel-in-progress: false
 
 env:
@@ -28,8 +36,10 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       release_tag: ${{ steps.resolve.outputs.release_tag }}
-      version: ${{ steps.resolve.outputs.version }}
+      version: ${{ steps.toolkit_version.outputs.version }}
       release_sha: ${{ steps.release_sha.outputs.sha }}
+      release_ref: ${{ steps.resolve.outputs.release_ref }}
+      dry_run: ${{ steps.resolve.outputs.dry_run }}
     steps:
       - name: Checkout workflow tooling (trusted SHA on main)
         uses: actions/checkout@v7
@@ -43,14 +53,16 @@ jobs:
         env:
           GITHUB_EVENT_NAME: ${{ github.event_name }}
           DISPATCH_RELEASE_TAG: ${{ inputs.release_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/resolve_release_tag.sh"
 
-      - name: Checkout release source (immutable tag)
+      - name: Checkout release source
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ steps.resolve.outputs.release_tag }}
+          ref: ${{ steps.resolve.outputs.release_ref }}
           path: ${{ env.RELEASE_SRC_PATH }}
           fetch-depth: 1
+          persist-credentials: false
 
       - id: release_sha
         name: Record and verify release commit SHA
@@ -58,15 +70,25 @@ jobs:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
         run: |
           set -euo pipefail
-          tag_sha="$(git -C "${{ env.RELEASE_SRC_PATH }}" rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
           head_sha="$(git -C "${{ env.RELEASE_SRC_PATH }}" rev-parse "HEAD^{commit}")"
-          if [[ "$tag_sha" != "$head_sha" ]]; then
-            echo "::error::release-src HEAD ($head_sha) != tag^{commit} ($tag_sha)"
-            exit 1
+          if [[ "${{ inputs.dry_run }}" != "true" ]]; then
+            tag_sha="$(git -C "${{ env.RELEASE_SRC_PATH }}" rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
+            if [[ "$tag_sha" != "$head_sha" ]]; then
+              echo "::error::release-src HEAD ($head_sha) != tag^{commit} ($tag_sha)"
+              exit 1
+            fi
           fi
           echo "sha=$head_sha" >> "$GITHUB_OUTPUT"
 
+      - id: toolkit_version
+        name: Read toolkit version from release source
+        env:
+          RELEASE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SRC_PATH }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/read_toolkit_version.sh"
+
       - name: Assert pubspec version at release source matches tag
+        if: inputs.dry_run != true
         env:
           RELEASE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SRC_PATH }}
         run: |
@@ -74,6 +96,7 @@ jobs:
             "${{ steps.resolve.outputs.release_tag }}"
 
       - name: Verify GitHub release exists
+        if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
@@ -98,6 +121,8 @@ jobs:
 
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
+    env:
+      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' }}
 
     steps:
       - name: Checkout workflow tooling (trusted SHA)
@@ -107,32 +132,47 @@ jobs:
           path: ${{ env.TOOLING_CHECKOUT_PATH }}
           persist-credentials: false
 
-      - name: Checkout release source (immutable tag)
+      - name: Checkout release source
         uses: actions/checkout@v7
         with:
-          ref: refs/tags/${{ needs.prepare.outputs.release_tag }}
+          ref: ${{ needs.prepare.outputs.release_ref }}
           path: ${{ env.RELEASE_SRC_PATH }}
           fetch-depth: 1
+          persist-credentials: false
 
       - name: Verify release source SHA
         shell: bash
+        env:
+          DRY_RUN: ${{ needs.prepare.outputs.dry_run }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/verify_release_source_checkout.sh" \
             "${{ env.RELEASE_SRC_PATH }}" \
             "${{ needs.prepare.outputs.release_tag }}" \
-            "${{ needs.prepare.outputs.release_sha }}"
+            "${{ needs.prepare.outputs.release_sha }}" \
+            "$DRY_RUN"
 
       - name: Setup Dart SDK
         uses: dart-lang/setup-dart@v1
         with:
           sdk: stable
 
-      - name: Build release artifacts
+      - name: Build staged release bundle
         shell: bash
         env:
           RELEASE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SRC_PATH }}
           VERSION: ${{ needs.prepare.outputs.version }}
           RELEASE_TOOLING_DIR: ${{ github.workspace }}/${{ env.TOOLING_CHECKOUT_PATH }}/tool/release
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/build_release_artifacts.sh" \
+            --version "$VERSION" \
+            --triple "${{ matrix.triple }}" \
+            --skip-sign \
+            --defer-archive
+
+      - name: Sign macOS bundle
+        if: env.HAS_SIGNING == 'true' && (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64')
+        shell: bash
+        env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
           MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
           MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
@@ -140,9 +180,29 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
+          set -euo pipefail
+          sign_env="$(mktemp)"
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/setup_signing_keychain.sh" "$sign_env"
+          # shellcheck source=/dev/null
+          source "$sign_env"
+          export MACOS_CERT_FILE MACOS_SIGNING_KEYCHAIN MACOS_SIGNING_KEYCHAIN_PATH
+          trap 'bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/cleanup_signing_keychain.sh"' EXIT
+          dist="${{ env.RELEASE_SRC_PATH }}/dist/release"
+          stage="${dist}/universal_automation_${{ needs.prepare.outputs.version }}_${{ matrix.triple }}"
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/codesign_macos_bundle.sh" "$stage"
+
+      - name: Package release archive
+        shell: bash
+        env:
+          RELEASE_ROOT: ${{ github.workspace }}/${{ env.RELEASE_SRC_PATH }}
+          VERSION: ${{ needs.prepare.outputs.version }}
+          RELEASE_TOOLING_DIR: ${{ github.workspace }}/${{ env.TOOLING_CHECKOUT_PATH }}/tool/release
+        run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/build_release_artifacts.sh" \
             --version "$VERSION" \
-            --triple "${{ matrix.triple }}"
+            --triple "${{ matrix.triple }}" \
+            --skip-sign \
+            --package-only
 
       - name: Verify archive architecture (trusted tooling script)
         shell: bash
@@ -168,9 +228,36 @@ jobs:
           name: release-${{ matrix.triple }}
           path: |
             ${{ env.RELEASE_SRC_PATH }}/dist/release/universal_automation_${{ needs.prepare.outputs.version }}_${{ matrix.triple }}.*
+
+  dry-run-bundle:
+    if: inputs.dry_run == true
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist/release
+          merge-multiple: true
+
+      - name: Generate checksums
+        run: |
+          set -euo pipefail
+          cd dist/release
+          shopt -s nullglob
+          files=(universal_automation_${{ needs.prepare.outputs.version }}_*.tar.gz universal_automation_${{ needs.prepare.outputs.version }}_*.zip)
+          sha256sum "${files[@]}" > checksums.txt
+
+      - name: Upload dry-run bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-dry-run-${{ needs.prepare.outputs.version }}
+          path: dist/release/*
           if-no-files-found: error
 
   publish:
+    if: inputs.dry_run != true
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -212,6 +299,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ needs.prepare.outputs.release_tag }}
+          append_body: true
           body: |
             ## Prebuilt `universal-automation` binaries
 
@@ -236,6 +324,7 @@ jobs:
           fail_on_unmatched_files: true
 
   postflight:
+    if: inputs.dry_run != true
     permissions:
       contents: read
     runs-on: ubuntu-latest

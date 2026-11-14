@@ -4,27 +4,41 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PUBSPEC="$ROOT_DIR/pkgs/universal_automation_toolkit/pubspec.yaml"
+CONFIG="$ROOT_DIR/release-please-config.json"
+TOOLKIT_PKG="pkgs/universal_automation_toolkit"
 
 fail() { echo "check_plugin_version_sync: $*" >&2; exit 1; }
 ok() { echo "check_plugin_version_sync: $*"; }
 
 command -v jq >/dev/null 2>&1 || fail "jq required"
+[[ -f "$CONFIG" ]] || fail "missing $CONFIG"
 
 VERSION="$(sed -nE "s/^version:[[:space:]]*([^[:space:]]+).*$/\1/p" "$PUBSPEC" | head -n1)"
 [[ -n "$VERSION" ]] || fail "could not read toolkit version"
 
-for manifest in \
-  "$ROOT_DIR/plugin/.cursor-plugin/plugin.json" \
-  "$ROOT_DIR/plugin/.claude-plugin/plugin.json"
-do
-  [[ -f "$manifest" ]] || fail "missing $manifest"
+resolve_extra_file_path() {
+  local rel="$1"
+  if [[ "$rel" == /* ]]; then
+    printf '%s' "$ROOT_DIR$rel"
+    return
+  fi
+  printf '%s' "$ROOT_DIR/$TOOLKIT_PKG/$rel"
+}
+
+count=0
+while IFS= read -r rel; do
+  [[ -n "$rel" ]] || continue
+  count=$((count + 1))
+  manifest="$(resolve_extra_file_path "$rel")"
+  [[ -f "$manifest" ]] || fail "extra-files path missing on disk: $rel → $manifest"
   got="$(jq -r '.version' "$manifest")"
   if [[ "$got" != "$VERSION" ]]; then
     fail "$manifest version $got != toolkit pubspec $VERSION"
   fi
-done
+done < <(jq -r --arg pkg "$TOOLKIT_PKG" '
+    .packages[$pkg]."extra-files"[]? | .path // empty
+  ' "$CONFIG")
 
-grep -q '"extra-files"' "$ROOT_DIR/release-please-config.json" || \
-  fail "release-please-config.json must list toolkit extra-files for plugin manifests"
+[[ "$count" -ge 1 ]] || fail "release-please-config.json must list toolkit extra-files"
 
-ok "plugin manifests at $VERSION"
+ok "plugin manifests at $VERSION ($count extra-files)"

@@ -38,12 +38,12 @@
       "extra-files": [
         {
           "type": "json",
-          "path": "plugin/.cursor-plugin/plugin.json",
+          "path": "/plugin/.cursor-plugin/plugin.json",
           "jsonpath": "$.version"
         },
         {
           "type": "json",
-          "path": "plugin/.claude-plugin/plugin.json",
+          "path": "/plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
         }
       ]

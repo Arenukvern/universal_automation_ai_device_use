@@ -110,6 +110,26 @@ gh workflow run release_binaries.yml \
   -f release_tag=universal_automation_toolkit-vX.Y.Z
 ```
 
+### Dry-run binary build (pre-release smoke)
+
+`workflow_dispatch` loads the workflow definition from the **default branch**
+(`main`), not from a release PR branch. After merging the release-binary workflow
+to `main` and **before** the first real toolkit release, run a dry build from an
+arbitrary commit:
+
+```bash
+gh workflow run release_binaries.yml \
+  --repo Arenukvern/universal_automation_ai_device_use \
+  --ref main \
+  -f dry_run=true \
+  -f release_tag=<40-char-SHA-or-branch-name>
+```
+
+With `dry_run: true`, `release_tag` is a **git ref or full SHA** (not a Release
+Please tag). The workflow builds all four platform legs, runs architecture checks,
+writes `checksums.txt`, and uploads a single **workflow artifact** bundle. It does
+**not** upload to the GitHub Release, and `publish` / `postflight` are skipped.
+
 Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
 From-source path remains [`plugin/install.sh`](plugin/install.sh).
 
@@ -126,8 +146,8 @@ skips signing when they are absent):
 
 | Secret | Purpose |
 | --- | --- |
-| `MACOS_CERT_P12` | Base64 Developer ID Application `.p12` |
-| `MACOS_CERT_PASSWORD` | Import password for the `.p12` |
+| `MACOS_CERT_P12` | Base64-encoded Developer ID Application `.p12` (decoded only in the dedicated macOS **Sign** step — never passed as a filesystem path to build scripts) |
+| `MACOS_CERT_PASSWORD` | Import password for the `.p12` (same isolated step as the cert) |
 | `MACOS_CODESIGN_IDENTITY` | Optional explicit identity name |
 | `APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_PASSWORD` | Notarization (future) |
 | App Store Connect API key vars | Alternative notarization (future) |

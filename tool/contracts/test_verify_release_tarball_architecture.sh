@@ -17,12 +17,16 @@ cleanup() { rm -rf "$tmpdir"; }
 trap cleanup EXIT
 
 stage="$tmpdir/universal_automation_test_linux-x64"
-mkdir -p "$stage/bin"
+mkdir -p "$stage/bin" "$stage/lib"
 cp "$FIXTURE" "$stage/bin/universal_automation"
-cp "$FIXTURE" "$stage/libfoo.so"
+cp "$FIXTURE" "$stage/lib/libfoo.so"
 archive="$tmpdir/universal_automation_test_linux-x64.tar.gz"
 tar -C "$tmpdir" -czf "$archive" "$(basename "$stage")"
 
 bash "$SCRIPT" "$archive" linux-x64 || fail "linux-x64 verification failed"
+
+if bash "$SCRIPT" "$archive" darwin-arm64 2>/dev/null; then
+  fail "wrong triple must fail arch check"
+fi
 
 ok "verify_release_tarball_architecture.sh smoke passed"

@@ -3,6 +3,43 @@ import 'package:test/test.dart';
 import 'wait_publish_train_lib.dart';
 
 void main() {
+  group('releaseBinariesRunDiscovery', () {
+    test('releaseBinariesRunListJsonFields omits inputs', () {
+      expect(releaseBinariesRunListJsonFields, isNot(contains('inputs')));
+      expect(releaseBinariesRunListJsonFields, contains('displayTitle'));
+    });
+
+    test('releaseTagFromDisplayTitle parses run-name', () {
+      expect(
+        releaseTagFromDisplayTitle(
+          'release-binaries universal_automation_toolkit-v0.5.1',
+        ),
+        'universal_automation_toolkit-v0.5.1',
+      );
+      expect(releaseTagFromDisplayTitle('release-binaries '), isNull);
+      expect(releaseTagFromDisplayTitle('other title'), isNull);
+    });
+
+    test('fixture list matches displayTitle filter', () {
+      const json = '''
+[
+  {"databaseId": 10, "createdAt": "2026-01-01T12:00:00Z", "event": "workflow_dispatch", "displayTitle": "release-binaries universal_automation_toolkit-v1.0.0"},
+  {"databaseId": 11, "createdAt": "2026-01-01T12:01:00Z", "event": "workflow_dispatch", "displayTitle": "release-binaries universal_automation_toolkit-v2.0.0"}
+]
+''';
+      final runs = parseGhWorkflowRunList(json);
+      final tag = 'universal_automation_toolkit-v2.0.0';
+      GhWorkflowRun? match;
+      for (final run in runs) {
+        if (releaseTagFromDisplayTitle(run.displayTitle) == tag) {
+          match = run;
+          break;
+        }
+      }
+      expect(match?.databaseId, 11);
+    });
+  });
+
   group('strictPostPublishAuditArgs', () {
     test('uses main-mode audit without --release-pr', () {
       expect(strictPostPublishAuditArgs, contains('--audit-published'));

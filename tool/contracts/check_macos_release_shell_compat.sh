@@ -16,6 +16,7 @@ SCRIPTS=(
   tool/release/resolve_release_tag.sh
   tool/release/assert_release_assets_complete.sh
   tool/release/codesign_macos_bundle.sh
+  install.sh
 )
 
 FORBIDDEN_REGEX='\b(mapfile|readarray)\b|declare -A|\$\{[a-zA-Z_][a-zA-Z0-9_]*(,,|\^\^?|,)\}'
