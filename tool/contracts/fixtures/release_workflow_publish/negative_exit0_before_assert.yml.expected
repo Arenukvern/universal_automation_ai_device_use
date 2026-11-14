@@ -1,0 +1,1 @@
+negative_exit0_before_assert.yml: step `Assert release has all assets and checksums` must not use exit 0/set +e before assert_release_assets_complete.sh

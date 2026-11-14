@@ -1,0 +1,41 @@
+name: Release binaries PR smoke
+
+# PR smoke calls the read-only build reusable workflow only (no contents: write).
+on:
+  pull_request:
+    paths:
+      - pkgs/universal_automation_toolkit/**
+      - tool/release/**
+      - install.sh
+      - install.ps1
+      - .github/workflows/release_binaries*.yml
+      - release-please-config.json
+      - .release-please-manifest.json
+  push:
+    branches:
+      - main
+    paths:
+      - pkgs/universal_automation_toolkit/**
+      - tool/release/**
+      - install.sh
+      - install.ps1
+      - .github/workflows/release_binaries*.yml
+      - release-please-config.json
+      - .release-please-manifest.json
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-binaries-pr-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    uses: ./.github/workflows/release_binaries.yml
+    permissions:
+      contents: read
+    with:
+      release_tag: ${{ github.event.pull_request.head.sha || github.sha }}
+      dry_run: true
+      tooling_ref: ${{ github.event.pull_request.head.sha || github.sha }}

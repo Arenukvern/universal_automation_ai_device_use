@@ -10,8 +10,35 @@ import 'release_workflow_contract_lib.dart';
 
 Future<void> main(List<String> args) async {
   final root = Directory.current;
-  if (!args.contains('--workflow') && !args.contains('--pr-smoke-workflow')) {
+  if (!args.contains('--workflow') &&
+      !args.contains('--pr-smoke-workflow') &&
+      !args.contains('--please-caller-workflow')) {
     await _validateAllReleaseWorkflowContracts(root.path);
+    return;
+  }
+  if (args.contains('--please-caller-workflow')) {
+    final i = args.indexOf('--please-caller-workflow');
+    if (i + 1 >= args.length) {
+      stderr.writeln('--please-caller-workflow requires a path');
+      exit(2);
+    }
+    final workflowPath = args[i + 1];
+    final file = File(workflowPath);
+    if (!file.existsSync()) {
+      stderr.writeln('Missing workflow: $workflowPath');
+      exit(1);
+    }
+    final errors = validateReleasePleaseBinariesCaller(
+      await file.readAsString(),
+    );
+    if (errors.isNotEmpty) {
+      stderr.writeln('check_release_workflow failures:');
+      for (final e in errors) {
+        stderr.writeln('  - $e');
+      }
+      exit(1);
+    }
+    stdout.writeln('check_release_workflow: ${file.path} OK');
     return;
   }
   if (args.contains('--pr-smoke-workflow')) {
@@ -60,10 +87,13 @@ Future<void> main(List<String> args) async {
 
   final text = await file.readAsString();
   final name = file.uri.pathSegments.last;
+  final path = file.path;
   final List<String> errors;
-  if (name == 'release_binaries_publish.yml') {
+  if (path.contains('release_workflow_publish') ||
+      name == 'release_binaries_publish.yml') {
     errors = validateReleaseBinariesPublishWorkflowYaml(text, label: name);
-  } else if (name == 'release_binaries.yml') {
+  } else if (path.contains('release_workflow_dispatch') ||
+      name == 'release_binaries.yml') {
     errors = validateReleaseBinariesDispatchWorkflowYaml(text, label: name);
   } else {
     errors = validateReleaseBinariesBuildWorkflowYaml(text, label: name);

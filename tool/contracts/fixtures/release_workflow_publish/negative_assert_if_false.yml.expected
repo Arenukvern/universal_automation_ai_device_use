@@ -1,0 +1,1 @@
+negative_assert_if_false.yml: job postflight must have exactly one unconditional step running assert_release_assets_complete.sh

@@ -17,6 +17,7 @@ on:
         description: Commit that supplies tool/release scripts.
         required: true
         type: string
+
 permissions:
   contents: read
 

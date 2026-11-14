@@ -2,9 +2,9 @@ name: Release binaries build
 run-name: release-binaries-build ${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}
 
 on:
-  workflow_dispatch:
   push:
     branches: [main]
+  workflow_dispatch:
     inputs:
       release_tag:
         description: Toolkit release tag or dry-run git ref/SHA.
@@ -19,7 +19,7 @@ on:
         description: Commit that supplies tool/release scripts.
         required: true
         type: string
-  workflow_call_DISABLED:
+  workflow_call:
     inputs:
       release_tag:
         required: true

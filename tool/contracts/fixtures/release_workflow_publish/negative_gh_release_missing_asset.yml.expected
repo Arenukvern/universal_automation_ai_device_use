@@ -1,0 +1,1 @@
+negative_gh_release_missing_asset.yml: action-gh-release files must include *_windows-x64.zip

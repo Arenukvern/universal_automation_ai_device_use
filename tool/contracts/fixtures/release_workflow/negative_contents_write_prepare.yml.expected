@@ -1,1 +1,1 @@
-must not request contents: write
+negative_contents_write_prepare.yml: job prepare must not request contents: write

@@ -62,6 +62,15 @@ const requiredGhReleaseAssetSuffixes = <String>[
   'checksums.txt',
 ];
 
+const requiredReleaseBinariesSigningSecretNames = <String>[
+  'MACOS_CERT_P12',
+  'MACOS_CERT_PASSWORD',
+  'MACOS_CODESIGN_IDENTITY',
+  'APPLE_ID',
+  'APPLE_TEAM_ID',
+  'APPLE_APP_PASSWORD',
+];
+
 /// Structural validation for `.github/workflows/release_binaries_build.yml`.
 List<String> validateReleaseBinariesBuildWorkflowYaml(
   String yamlText, {
@@ -233,6 +242,17 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
   );
   errors.addAll(_validateGhReleaseAssets(jobsMap, label));
   errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
+  errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
+  errors.addAll(_validatePublishArtifactDownload(jobsMap, label));
+  if (!_publishUsesAppendBody(jobsMap['publish'])) {
+    errors.add('$label: publish job must set append_body: true on action-gh-release');
+  }
+  for (final id in ['publish', 'postflight']) {
+    final job = jobsMap[id];
+    if (job is Map && job.containsKey('if')) {
+      errors.add('$label: job $id must not set job-level if:');
+    }
+  }
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
     final needs = postflight['needs'];
@@ -292,9 +312,25 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
     errors.add('$label: publish job must use release_binaries_publish.yml');
   }
   if (build is Map) {
-    final secrets = build['secrets'];
-    if (secrets is! Map) {
-      errors.add('$label: build job must pass explicit signing secrets map');
+    errors.addAll(_validateExplicitSigningSecretsMap(build['secrets'], label));
+    final perms = build['permissions'];
+    if (perms is Map) {
+      for (final v in perms.values) {
+        if (v?.toString() == 'write') {
+          errors.add('$label: workflow permissions must not include write scopes');
+        }
+      }
+    }
+  }
+  final publishJob = jobsMap['publish'];
+  if (publishJob is Map) {
+    final needs = publishJob['needs'];
+    if (needs?.toString() != 'build') {
+      errors.add('$label: publish job must need build');
+    }
+    final pubIf = publishJob['if']?.toString().trim() ?? '';
+    if (pubIf != exactPublishIf) {
+      errors.add('$label: job publish if must be exactly `$exactPublishIf` (got `$pubIf`)');
     }
   }
   return errors;
@@ -458,10 +494,12 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     if (perms is Map && perms['contents']?.toString() != 'read') {
       errors.add('release-please.yml: release-binaries-build needs contents: read');
     }
-    final secrets = build['secrets'];
-    if (secrets is! Map) {
-      errors.add('release-please.yml: release-binaries-build must pass explicit secrets map');
-    }
+    errors.addAll(
+      _validateExplicitSigningSecretsMap(
+        build['secrets'],
+        'release-please.yml: release-binaries-build',
+      ),
+    );
   }
 
   final publish = jobsMap['release-binaries-publish'];
@@ -475,6 +513,90 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     if (perms is Map && perms['contents']?.toString() != 'write') {
       errors.add('release-please.yml: release-binaries-publish needs contents: write');
     }
+    final needs = publish['needs'];
+    final needsList = needs is List
+        ? needs.map((e) => e.toString()).toList()
+        : needs != null
+            ? [needs.toString()]
+            : <String>[];
+    if (!needsList.contains('release-binaries-build')) {
+      errors.add(
+        'release-please.yml: release-binaries-publish must need release-binaries-build',
+      );
+    }
+  }
+  return errors;
+}
+
+List<String> _validateExplicitSigningSecretsMap(
+  dynamic secrets,
+  String label,
+) {
+  final errors = <String>[];
+  if (secrets is! Map) {
+    errors.add('$label: build job must pass explicit signing secrets map');
+    return errors;
+  }
+  final keys = secrets.keys.map((e) => e.toString()).toSet();
+  final expected = requiredReleaseBinariesSigningSecretNames.toSet();
+  if (keys.length != expected.length || !keys.containsAll(expected)) {
+    errors.add('$label: build job must pass exactly 6 signing secrets by name');
+  }
+  return errors;
+}
+
+List<String> _validateSplitPublishNeeds(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final publish = jobsMap['publish'];
+  if (publish is! Map) {
+    return errors;
+  }
+  final needs = publish['needs'];
+  if (needs == null) {
+    return errors;
+  }
+  final needsList = needs is List
+      ? needs.map((e) => e.toString()).toList()
+      : [needs.toString()];
+  if (needsList.contains('postflight')) {
+    errors.add('$label: publish must not need postflight');
+  }
+  return errors;
+}
+
+List<String> _validatePublishArtifactDownload(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final publish = jobsMap['publish'];
+  if (publish is! Map) {
+    return errors;
+  }
+  final steps = publish['steps'];
+  if (steps is! List) {
+    errors.add('$label: publish job must download artifacts from build run');
+    return errors;
+  }
+  var sawDownload = false;
+  for (final step in steps) {
+    if (step is! Map) {
+      continue;
+    }
+    final uses = step['uses']?.toString() ?? '';
+    if (!uses.contains('download-artifact')) {
+      continue;
+    }
+    final withMap = step['with'];
+    if (withMap is Map && withMap['run-id'] != null) {
+      sawDownload = true;
+    }
+  }
+  if (!sawDownload) {
+    errors.add('$label: publish job must download artifacts from build run');
   }
   return errors;
 }

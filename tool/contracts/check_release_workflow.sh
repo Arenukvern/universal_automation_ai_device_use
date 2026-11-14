@@ -8,46 +8,42 @@ ok() { echo "check_release_workflow: $*"; }
 
 dart run "$ROOT_DIR/tool/check_release_workflow.dart"
 
-fixtures_dir="$ROOT_DIR/tool/contracts/fixtures/release_workflow"
-shopt -s nullglob
-for negative in "$fixtures_dir"/negative_*.yml; do
-  name="$(basename "$negative")"
-  set +e
-  out="$(dart run "$ROOT_DIR/tool/check_release_workflow.dart" --workflow "$negative" 2>&1)"
-  st=$?
-  set -e
-  if [[ "$st" -eq 0 ]]; then
-    fail "negative fixture must fail but passed: $name"
-  fi
-  exp="${negative}.expected"
-  if [[ -f "$exp" ]]; then
-  want="$(tr -d '\n' <"$exp")"
-    if ! printf '%s\n' "$out" | grep -qF "$want"; then
-      fail "negative $name: output must contain: $want (got: $out)"
+run_negative_dir() {
+  local mode="$1"
+  local dir="$2"
+  local flag=""
+  case "$mode" in
+    build|publish|dispatch) flag="--workflow" ;;
+    pr) flag="--pr-smoke-workflow" ;;
+    please) flag="--please-caller-workflow" ;;
+    *) fail "unknown negative mode: $mode" ;;
+  esac
+  shopt -s nullglob
+  for negative in "$dir"/negative_*.yml; do
+    name="$(basename "$negative")"
+    set +e
+    out="$(dart run "$ROOT_DIR/tool/check_release_workflow.dart" "$flag" "$negative" 2>&1)"
+    st=$?
+    set -e
+    if [[ "$st" -eq 0 ]]; then
+      fail "negative fixture must fail but passed: $name"
     fi
-  fi
-  ok "negative fixture rejected: $name"
-done
+    exp="${negative}.expected"
+    if [[ -f "$exp" ]]; then
+      want="$(tr -d '\n' <"$exp")"
+      if ! printf '%s\n' "$out" | grep -qF "$want"; then
+        fail "negative $name: output must contain: $want (got: $out)"
+      fi
+    fi
+    ok "negative fixture rejected: $name"
+  done
+}
 
-pr_fixtures_dir="$ROOT_DIR/tool/contracts/fixtures/release_workflow_pr"
-shopt -s nullglob
-for negative in "$pr_fixtures_dir"/negative_*.yml; do
-  name="$(basename "$negative")"
-  set +e
-  out="$(dart run "$ROOT_DIR/tool/check_release_workflow.dart" --pr-smoke-workflow "$negative" 2>&1)"
-  st=$?
-  set -e
-  if [[ "$st" -eq 0 ]]; then
-    fail "PR negative fixture must fail but passed: $name"
-  fi
-  exp="${negative}.expected"
-  if [[ -f "$exp" ]]; then
-    want="$(tr -d '\n' <"$exp")"
-    if ! printf '%s\n' "$out" | grep -qF "$want"; then
-      fail "PR negative $name: output must contain: $want (got: $out)"
-    fi
-  fi
-  ok "PR negative fixture rejected: $name"
-done
+FIX="$ROOT_DIR/tool/contracts/fixtures"
+run_negative_dir build "$FIX/release_workflow"
+run_negative_dir publish "$FIX/release_workflow_publish"
+run_negative_dir dispatch "$FIX/release_workflow_dispatch"
+run_negative_dir pr "$FIX/release_workflow_pr"
+run_negative_dir please "$FIX/release_workflow_please"
 
 ok "release_binaries workflow structure OK"
