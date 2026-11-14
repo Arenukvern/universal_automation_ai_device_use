@@ -26,25 +26,39 @@ function Resolve-LatestVersion {
   return $null
 }
 
+function Resolve-PhysicalRoot([string]$Path) {
+  if (-not (Test-Path -LiteralPath $Path)) { return $null }
+  try {
+    $resolved = [System.IO.Directory]::ResolveLinkTarget($Path, $true)
+    if ($null -ne $resolved) {
+      return $resolved.FullName
+    }
+  } catch {
+    # PowerShell 5.1 fallback below.
+  }
+  $item = Get-Item -LiteralPath $Path -Force
+  if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
+    $target = $item.Target
+    if ($target -is [System.Array]) {
+      $target = $target[0]
+    }
+    if ($target) { return $target }
+  }
+  return $item.FullName
+}
+
 function Resolve-CliInTree([string]$Root) {
-  $a = Join-Path $Root "bin\universal_automation.exe"
-  if (Test-Path $a) { return $a }
-  $b = Join-Path $Root "bin\universal-automation.exe"
-  if (Test-Path $b) { return $b }
+  $physical = Resolve-PhysicalRoot $Root
+  if (-not $physical) { return $null }
+  $a = Join-Path $physical "bin\universal_automation.exe"
+  if (Test-Path -LiteralPath $a) { return $a }
+  $b = Join-Path $physical "bin\universal-automation.exe"
+  if (Test-Path -LiteralPath $b) { return $b }
   return $null
 }
 
 function Get-JunctionTarget([string]$Path) {
-  if (-not (Test-Path $Path)) { return $null }
-  try {
-    $item = Get-Item -LiteralPath $Path -Force
-    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-      return $item.Target
-    }
-  } catch {
-    return $null
-  }
-  return $null
+  return Resolve-PhysicalRoot $Path
 }
 
 function Invoke-CliSmoke([string]$Exe) {
@@ -63,12 +77,15 @@ function Remove-DirectoryJunction([string]$Path) {
 }
 
 function Switch-CurrentJunction([string]$InstallRoot) {
+  $abs = (Resolve-Path -LiteralPath $InstallRoot).ProviderPath
   $parent = $ShareRoot
-  $tmpName = ".current-$PID"
-  $tmpPath = Join-Path $parent $tmpName
+  $tmpPath = Join-Path $parent ".current-$PID"
   Remove-DirectoryJunction $tmpPath
-  New-Item -ItemType Junction -Path $tmpPath -Target $InstallRoot -Force | Out-Null
   Remove-DirectoryJunction $CurrentLink
+  $out = cmd /c "mklink /J `"$tmpPath`" `"$abs`""
+  if ($LASTEXITCODE -ne 0) {
+    throw "mklink /J failed ($LASTEXITCODE): $out"
+  }
   Rename-Item -LiteralPath $tmpPath -NewName "current"
 }
 
@@ -181,15 +198,19 @@ try {
   Prune-VersionDirs -Ver $Version -KeepCurrent $installRoot -KeepPrevious $keepPrevious
 
   $activeExe = Resolve-CliInTree $CurrentLink
-  if (-not $activeExe) { throw "Active CLI missing under $CurrentLink" }
+  if (-not $activeExe) {
+    $phys = Resolve-PhysicalRoot $CurrentLink
+    throw "Active CLI missing under $CurrentLink (resolved: $phys)"
+  }
   & $activeExe --help | Out-Null
   if ($LASTEXITCODE -ne 0) { throw "Active CLI --help failed" }
   $ver = & $activeExe --version
   if ($LASTEXITCODE -ne 0) { throw "Active CLI --version failed" }
 
-  $cliForSnippet = Join-Path $CurrentLink "bin\universal_automation.exe"
-  if (-not (Test-Path $cliForSnippet)) {
-    $cliForSnippet = Join-Path $CurrentLink "bin\universal-automation.exe"
+  $physCurrent = Resolve-PhysicalRoot $CurrentLink
+  $cliForSnippet = Join-Path $physCurrent "bin\universal_automation.exe"
+  if (-not (Test-Path -LiteralPath $cliForSnippet)) {
+    $cliForSnippet = Join-Path $physCurrent "bin\universal-automation.exe"
   }
 
   Write-Host "Installed universal-automation $ver"
