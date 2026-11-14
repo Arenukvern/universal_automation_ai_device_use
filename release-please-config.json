@@ -34,7 +34,19 @@
       "pull-request-title-pattern": "chore(${component}): release ${version}",
       "package-name": "universal_automation_toolkit",
       "include-component-in-tag": true,
-      "bump-minor-pre-major": true
+      "bump-minor-pre-major": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/plugin/.cursor-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "/plugin/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        }
+      ]
     },
     "pkgs/universal_browser_cdp": {
       "release-type": "dart",

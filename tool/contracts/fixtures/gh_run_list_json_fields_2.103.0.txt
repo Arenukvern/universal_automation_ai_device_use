@@ -1,0 +1,17 @@
+# gh run list --json fields (gh 2.103.0 — `gh help run list`, JSON FIELDS section)
+attempt
+conclusion
+createdAt
+databaseId
+displayTitle
+event
+headBranch
+headSha
+name
+number
+startedAt
+status
+updatedAt
+url
+workflowDatabaseId
+workflowName

@@ -103,14 +103,24 @@ Publish order and migration notes: [ADR 0001](docs/decisions/0001_drivers_into_u
 
 ## Quick start (toolkit + MCP)
 
-From a clone of this repository:
+Install the prebuilt MCP/CLI binary (no Dart required on macOS arm64 / Linux x64 / Windows x64):
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/Arenukvern/universal_automation_ai_device_use/main/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/Arenukvern/universal_automation_ai_device_use/main/install.ps1 | iex
+```
+
+macOS downloads are **preview (unsigned)** until release signing is enabled
+([RELEASING.md](RELEASING.md)). To build from source instead:
 
 ```sh
 ./plugin/install.sh
 ```
 
-That builds the AOT `universal-automation` binary and links it into
-`~/.local/bin`. Point your MCP client at the bundled config in
+That runs `dart build cli` and links the binary into `~/.local/bin`. Point your MCP client at the bundled config in
 [`plugin/mcp.json`](plugin/mcp.json) (stdio `serve --os` by default), or run
 commands directly:
 

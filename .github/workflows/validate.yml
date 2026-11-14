@@ -20,6 +20,59 @@ env:
     ${{ github.head_ref == 'release-please--branches--main' || github.ref_name == 'release-please--branches--main' }}
 
 jobs:
+  release-binary-contracts:
+    name: Release binary contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (contract checker)
+        run: dart pub get
+
+      - name: Release tooling contract tests
+        run: |
+          set -euo pipefail
+          chmod +x tool/release/*.sh tool/contracts/*.sh install.sh
+          bash tool/contracts/run_actionlint.sh
+          bash tool/contracts/check_release_workflow.sh
+          bash tool/contracts/check_macos_release_shell_compat.sh
+          bash tool/contracts/check_plugin_version_sync.sh
+          bash tool/contracts/test_resolve_release_tag.sh
+          bash tool/contracts/test_verify_release_tarball_architecture.sh
+          bash tool/contracts/test_release_recovery_flow.sh
+          bash tool/contracts/test_install.sh
+          shellcheck -x tool/release/*.sh install.sh
+
+  install-ps1-windows:
+    name: install.ps1 (Windows junction)
+    runs-on: windows-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: install.ps1 contract test (PowerShell 7)
+        shell: pwsh
+        run: ./tool/contracts/test_install.ps1
+
+      - name: install.ps1 contract test (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./tool/contracts/test_install.ps1
+
   analyze:
     name: dart analyze (steward gate)
     runs-on: ubuntu-latest

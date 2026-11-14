@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# Ensure release-src checkout matches the annotated tag and expected commit SHA.
+set -euo pipefail
+
+fail() { echo "verify_release_source_checkout: $*" >&2; exit 1; }
+ok() { echo "verify_release_source_checkout: $*"; }
+
+RELEASE_SRC="${1:-}"
+TAG="${2:-}"
+EXPECTED_SHA="${3:-}"
+DRY_RUN="${4:-false}"
+
+[[ -d "$RELEASE_SRC/.git" || -f "$RELEASE_SRC/.git" ]] || fail "release source is not a git checkout: $RELEASE_SRC"
+[[ -n "$EXPECTED_SHA" ]] || fail "usage: verify_release_source_checkout.sh <release-src> <tag-or-empty> <expected_sha> [dry_run]"
+
+head_sha="$(git -C "$RELEASE_SRC" rev-parse "HEAD^{commit}")"
+
+case "$DRY_RUN" in
+  true|True|TRUE|1|yes|Yes|YES)
+    if [[ "$head_sha" != "$EXPECTED_SHA" ]]; then
+      fail "HEAD ($head_sha) != expected release_sha ($EXPECTED_SHA)"
+    fi
+    ok "release-src at $head_sha (dry_run)"
+    exit 0
+    ;;
+esac
+
+[[ -n "$TAG" ]] || fail "tag required when dry_run is false"
+if [[ ! "$TAG" =~ ^universal_automation_toolkit-v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+  fail "invalid tag: $TAG"
+fi
+
+tag_sha="$(git -C "$RELEASE_SRC" rev-parse "refs/tags/${TAG}^{commit}")"
+
+if [[ "$head_sha" != "$tag_sha" ]]; then
+  fail "HEAD ($head_sha) != refs/tags/${TAG}^{commit} ($tag_sha)"
+fi
+if [[ "$head_sha" != "$EXPECTED_SHA" ]]; then
+  fail "HEAD ($head_sha) != expected release_sha ($EXPECTED_SHA)"
+fi
+
+ok "release-src at $head_sha matches tag $TAG"

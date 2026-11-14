@@ -79,3 +79,77 @@ The **sync-release-pr-constraints** job writes sibling pins on the release-pleas
 Re-run Release Please from **`main`** only (`workflow_dispatch` / push), never from unreviewed branches.
 
 See [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) for publish order rationale.
+
+## Toolkit GitHub Release binaries (no Dart install)
+
+Tags: `universal_automation_toolkit-v<version>` (Release Please). GitHub Releases
+are created by Release Please with `GITHUB_TOKEN`; **tag/release events do not
+trigger other workflows**, so binary builds are started only via explicit
+`workflow_dispatch`:
+
+1. **`dispatch-release-binaries`** in `release-please.yml` runs
+   `dart run tool/dispatch_release_binaries.dart` when the toolkit is in
+   `paths_released` (same train as pub.dev publish).
+2. **`.github/workflows/release_binaries.yml`** checks out **trusted tooling on
+   `main`** plus **immutable tag source**, builds `dart build cli` per matrix
+   (darwin-arm64 on `macos-15`, darwin-x64 on `macos-15-intel` — GitHub retired
+   `macos-13` on 2025-12-04; Intel runners sunset **Aug 2027**, linux-x64,
+   windows-x64 zip), verifies architectures (CLI **and**
+   bundled `.dylib`/`.so`/`.dll`), uploads assets to the **existing** toolkit
+   release, writes `checksums.txt`, and **postflight**
+   `assert_release_assets_complete.sh` asserts every expected asset is present.
+3. **`wait-package-publish`** waits for `release_binaries.yml` when the toolkit
+   shipped this train (before the strict post-publish audit).
+
+Manual recovery (re-attach assets for an old tag):
+
+```bash
+gh workflow run release_binaries.yml \
+  --repo Arenukvern/universal_automation_ai_device_use \
+  --ref main \
+  -f release_tag=universal_automation_toolkit-vX.Y.Z
+```
+
+### Dry-run binary build (pre-release smoke)
+
+`workflow_dispatch` loads the workflow definition from the **default branch**
+(`main`), not from a release PR branch. After merging the release-binary workflow
+to `main` and **before** the first real toolkit release, run a dry build from an
+arbitrary commit:
+
+```bash
+gh workflow run release_binaries.yml \
+  --repo Arenukvern/universal_automation_ai_device_use \
+  --ref main \
+  -f dry_run=true \
+  -f release_tag=<40-char-SHA-or-branch-name>
+```
+
+With `dry_run: true`, `release_tag` is a **git ref or full SHA** (not a Release
+Please tag). The workflow builds all four platform legs, runs architecture checks,
+writes `checksums.txt`, and uploads a single **workflow artifact** bundle. It does
+**not** upload to the GitHub Release, and `publish` / `postflight` are skipped.
+
+Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
+From-source path remains [`plugin/install.sh`](plugin/install.sh).
+
+Plugin bundle versions (`plugin/.cursor-plugin/plugin.json`,
+`plugin/.claude-plugin/plugin.json`) are Release Please **extra-files** on the
+toolkit package so they stay equal to the binary version.
+
+### macOS code signing (optional; not configured yet)
+
+TCC **Accessibility** and **Screen Recording** grants are tied to the code
+signature on macOS. Unsigned builds lose those grants on every binary update.
+When ready, add these GitHub **Actions secrets** (all optional; the workflow
+skips signing when they are absent):
+
+| Secret | Purpose |
+| --- | --- |
+| `MACOS_CERT_P12` | Base64-encoded Developer ID Application `.p12` (decoded only in the dedicated macOS **Sign** step — never passed as a filesystem path to build scripts) |
+| `MACOS_CERT_PASSWORD` | Import password for the `.p12` (same isolated step as the cert) |
+| `MACOS_CODESIGN_IDENTITY` | Optional explicit identity name |
+| `APPLE_ID` / `APPLE_TEAM_ID` / `APPLE_APP_PASSWORD` | Notarization (future) |
+| App Store Connect API key vars | Alternative notarization (future) |
+
+Until then, release notes and docs mark macOS artifacts as **preview (unsigned)**.
