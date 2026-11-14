@@ -8,6 +8,8 @@ ok() { echo "check_release_workflow: $*"; }
 
 dart run "$ROOT_DIR/tool/check_release_workflow.dart"
 
+bash "$ROOT_DIR/tool/contracts/check_negative_actionlint.sh"
+
 run_negative_dir() {
   local mode="$1"
   local dir="$2"

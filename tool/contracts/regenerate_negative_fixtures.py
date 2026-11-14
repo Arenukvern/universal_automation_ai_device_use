@@ -314,7 +314,13 @@ def main() -> None:
       "negative_dispatch_extra_publish_job",
       t.replace(
           "jobs:\n  build:",
-          "jobs:\n  extra-publish:\n    uses: ./.github/workflows/release_binaries_publish.yml\n  build:",
+          "jobs:\n  extra-publish:\n"
+          "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      version: 0.0.0\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  build:",
           1,
       ),
   ))

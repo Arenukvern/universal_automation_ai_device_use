@@ -25,6 +25,10 @@ permissions:
 jobs:
   extra-publish:
     uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: universal_automation_toolkit-v0.0.0
+      version: 0.0.0
+      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef
   build:
     permissions:
       contents: read

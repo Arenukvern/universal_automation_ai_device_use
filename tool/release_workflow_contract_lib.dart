@@ -781,7 +781,7 @@ List<String> _validateNoInlineWorkflowExprsInRun(
   String label,
 ) {
   final errors = <String>[];
-  final pattern = RegExp(r'\$\{\{\s*(inputs\.|needs\.)');
+  final pattern = RegExp(r'\$\{\{\s*(inputs\.|needs\.|steps\.)');
   for (final job in jobsMap.values) {
     if (job is! Map) {
       continue;
@@ -1294,26 +1294,6 @@ String _stripInlineComment(String line) {
     }
   }
   return line;
-}
-
-/// Effective `contents` for a job in a called reusable workflow (caller ceiling ∩ job/workflow grants).
-///
-/// See [Workflow syntax — permissions](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions#permissions)
-/// and [Reuse workflows](https://docs.github.com/en/actions/using-workflows/reusing-workflows).
-String effectiveContentsPermission({
-  required String? callerContents,
-  required String? workflowContents,
-  required String? jobContents,
-}) {
-  String rank(String? value) =>
-      value?.toString() == 'write' ? 'write' : 'read';
-  String intersect(String a, String b) => a == 'read' || b == 'read' ? 'read' : 'write';
-  var effective = rank(callerContents);
-  final scoped = jobContents ?? workflowContents;
-  if (scoped != null) {
-    effective = intersect(effective, rank(scoped));
-  }
-  return effective;
 }
 
 /// Validates [releaseBinariesRunListJsonFields] ⊆ gh documented fields.
