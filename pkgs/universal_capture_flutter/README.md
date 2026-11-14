@@ -5,6 +5,12 @@ MCP toolkit's `ext.mcp.toolkit.view_screenshots` service extension,
 polled through the Dart VM service and delivered through the
 `universal_screencast` pipeline contracts.
 
+Intra-workspace `universal_screencast` constraints are synced on each
+release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
+capture releases that adopt a new screencast line ship in the same release
+PR after `universal_screencast`.
+
 Part of the `universal_automation_*` family
 ([ADR 0037](../../docs/decisions/0037_universal_automation_family.md),
 capture split in [ADR 0038](../../docs/decisions/0038_automation_kernel_unification.md)).
