@@ -147,7 +147,7 @@ jobs:
         fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
       )
     permissions:
-      contents: read
+      contents: write
     uses: ./.github/workflows/release_binaries.yml
     secrets:
       MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}

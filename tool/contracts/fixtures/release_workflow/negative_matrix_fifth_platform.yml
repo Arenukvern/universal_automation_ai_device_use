@@ -303,8 +303,6 @@ jobs:
   publish:
     if: inputs.dry_run != true
     needs: [prepare, build]
-    permissions:
-      contents: write
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:

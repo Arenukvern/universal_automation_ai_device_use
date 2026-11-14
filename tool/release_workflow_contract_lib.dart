@@ -343,6 +343,10 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
     if (withMap is! Map) {
       errors.add('$label: release job must pass with:');
     }
+    final perms = release['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add('$label: release job must set permissions.contents: write');
+    }
   }
   if (jobsMap.length != 1) {
     errors.add('$label: exactly one release reusable-workflow caller job expected');
@@ -512,8 +516,8 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
       errors.add('release-please.yml: release-binaries-build must pass dry_run: false');
     }
     final perms = build['permissions'];
-    if (perms is Map && perms['contents']?.toString() != 'read') {
-      errors.add('release-please.yml: release-binaries-build needs contents: read');
+    if (perms is Map && perms['contents']?.toString() != 'write') {
+      errors.add('release-please.yml: release-binaries-build needs contents: write');
     }
     errors.addAll(
       _validateExplicitSigningSecretsMap(
@@ -923,11 +927,19 @@ List<String> _validateContentsWriteScope(
     }
   }
   final publish = jobsMap['publish'];
+  final isBuildReusable = jobsMap.containsKey('build');
   if (publish is Map) {
-    final perms = publish['permissions'];
-    if (perms is! Map || perms['contents']?.toString() != 'write') {
-      errors.add('$label: publish job must set permissions.contents: write');
+  final perms = publish['permissions'];
+  if (isBuildReusable) {
+    if (perms is Map && perms['contents']?.toString() == 'write') {
+      errors.add(
+        '$label: publish job must inherit GITHUB_TOKEN from workflow_call caller '
+        '(do not set job permissions.contents: write)',
+      );
     }
+  } else if (perms is! Map || perms['contents']?.toString() != 'write') {
+    errors.add('$label: publish job must set permissions.contents: write');
+  }
   }
   return errors;
 }
