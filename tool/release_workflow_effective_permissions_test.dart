@@ -9,9 +9,22 @@ void main() {
 
   group('production reusable chains (parsed from repo YAML)', () {
     late List<PermissionPathRow> paths;
+    late List<(String, String)> discoveredCallers;
 
     setUp(() {
+      discoveredCallers = discoverBinaryReusableCallerWorkflowFiles(repoRoot);
       paths = buildReusablePermissionPaths(repoRoot);
+    });
+
+    test('discovers every production caller workflow (no hard-coded list)', () {
+      expect(
+        discoveredCallers.map((e) => e.$1).toSet(),
+        {
+          'release-please.yml',
+          'release_binaries.yml',
+          'release_binaries_pr.yml',
+        },
+      );
     });
 
     test('enumerates every caller → callee job path', () {
@@ -73,22 +86,9 @@ void main() {
   });
 
   group('release-please local jobs', () {
-    test('includes audit-release-train and pub train jobs', () {
-      final rows = buildLocalCallerJobRows(repoRoot);
-      expect(
-        rows.map((r) => r.path).toSet(),
-        containsAll({
-          'release-please.yml → audit-release-train (local)',
-          'release-please.yml → dispatch-package-publish (local)',
-          'release-please.yml → wait-package-publish (local)',
-        }),
-      );
-    });
-
-    test('audit-release-train does not over-request explicit ceilings', () {
-      final rows = buildLocalCallerJobRows(repoRoot);
-      final audit = rows.firstWhere((r) => r.path.contains('audit-release-train'));
-      expect(audit.overRequestErrors, isEmpty);
+    test('audit-release-train and pub train respect explicit ceilings', () {
+      final errors = validateReleasePleaseLocalJobPermissions(repoRoot);
+      expect(errors, isEmpty, reason: errors.join('; '));
     });
   });
 
@@ -108,6 +108,13 @@ void main() {
       );
     });
 
+    test('rejects unknown access levels', () {
+      expect(
+        () => PermissionMap.parse({'contents': 'wirte'}),
+        throwsA(isA<PermissionParseException>()),
+      );
+    });
+
     test('callee write under read caller is an over-request (startup refused)', () {
       final errors = permissionChainErrors(
         callerJobScopes: {'contents': 'read'},
@@ -118,6 +125,33 @@ void main() {
       );
       expect(
         errors.any((e) => e.contains('contents') && e.contains('write')),
+        isTrue,
+        reason: errors.join('; '),
+      );
+    });
+
+    test('missing caller permissions block is not treated as write-all', () {
+      final resolved = PermissionMap.resolveCallerJobCeiling(
+        jobPerms: null,
+        workflowPerms: null,
+        label: 'test → publish',
+      );
+      expect(resolved.ceiling, isNull);
+      expect(resolved.error, contains('explicit permissions'));
+    });
+  });
+
+  group('negative fixture contracts', () {
+    test('zz_new_caller read-all → publish fails over-request (M2)', () {
+      final path =
+          '$repoRoot/tool/contracts/fixtures/release_workflow_caller/negative_zz_new_caller.yml';
+      final errors = validateBinaryReusableCallerYaml(
+        File(path).readAsStringSync(),
+        'negative_zz_new_caller.yml',
+        repoRoot: repoRoot,
+      );
+      expect(
+        errors.any((e) => e.contains('permission over-request') && e.contains('contents')),
         isTrue,
         reason: errors.join('; '),
       );

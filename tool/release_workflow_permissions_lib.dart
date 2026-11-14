@@ -21,13 +21,24 @@ const githubPermissionScopes = <String>[
   'vulnerability-alerts',
 ];
 
+final binaryReusableCalleePattern = RegExp(
+  r'release_binaries_(build|publish)\.yml',
+);
+
 enum AccessLevel {
   none,
   read,
   write,
 }
 
-AccessLevel parseAccessLevel(String? raw) {
+class PermissionParseException implements Exception {
+  PermissionParseException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+AccessLevel? tryParseAccessLevel(String? raw) {
   switch (raw?.toString().trim()) {
     case 'write':
       return AccessLevel.write;
@@ -36,8 +47,12 @@ AccessLevel parseAccessLevel(String? raw) {
     case 'none':
       return AccessLevel.none;
     default:
-      return AccessLevel.none;
+      return null;
   }
+}
+
+AccessLevel parseAccessLevel(String? raw) {
+  return tryParseAccessLevel(raw) ?? AccessLevel.none;
 }
 
 int accessRank(AccessLevel level) => switch (level) {
@@ -62,13 +77,16 @@ class PermissionMap {
 
   static PermissionMap allWrite() => allForLevel(AccessLevel.write);
 
-  /// [raw] null means inherit [inheritWhenMissing], or repository default (write-all).
+  /// [raw] null only when [inheritWhenMissing] is provided (explicit inheritance).
   factory PermissionMap.parse(
     dynamic raw, {
     PermissionMap? inheritWhenMissing,
   }) {
     if (raw == null) {
-      return inheritWhenMissing ?? PermissionMap.allWrite();
+      if (inheritWhenMissing != null) {
+        return inheritWhenMissing;
+      }
+      throw PermissionParseException('missing permissions block');
     }
     if (raw is String) {
       switch (raw.trim()) {
@@ -89,30 +107,49 @@ class PermissionMap {
     }
     final out = PermissionMap.allNone();
     for (final entry in map.entries) {
-      out.scopes[entry.key.toString()] = parseAccessLevel(entry.value?.toString());
+      final scope = entry.key.toString();
+      final rawLevel = entry.value?.toString();
+      final level = tryParseAccessLevel(rawLevel);
+      if (level == null) {
+        throw PermissionParseException(
+          'unknown permission level "$rawLevel" for scope $scope',
+        );
+      }
+      out.scopes[scope] = level;
     }
     return out;
   }
 
-  /// Caller job ceiling for a reusable `uses:` job.
-  static PermissionMap callerJobCeiling(
+  static bool hasExplicitCallerPermissions(
     dynamic jobPerms,
     dynamic workflowPerms,
-  ) {
-    if (jobPerms != null) {
-      return PermissionMap.parse(jobPerms);
+  ) =>
+      jobPerms != null || workflowPerms != null;
+
+  /// Caller job ceiling for a reusable `uses:` job (explicit job or workflow block only).
+  static ({PermissionMap? ceiling, String? error}) resolveCallerJobCeiling({
+    required dynamic jobPerms,
+    required dynamic workflowPerms,
+    required String label,
+  }) {
+    try {
+      if (jobPerms != null) {
+        return (ceiling: PermissionMap.parse(jobPerms), error: null);
+      }
+      if (workflowPerms != null) {
+        return (ceiling: PermissionMap.parse(workflowPerms), error: null);
+      }
+      return (
+        ceiling: null,
+        error:
+            '$label: reusable-workflow caller must set explicit permissions on the job or workflow',
+      );
+    } on PermissionParseException catch (e) {
+      return (ceiling: null, error: '$label: $e');
     }
-    if (workflowPerms != null) {
-      return PermissionMap.parse(workflowPerms);
-    }
-    return PermissionMap.allWrite();
   }
 
   /// Effective permissions for one job inside a called reusable workflow.
-  ///
-  /// Missing callee workflow block inherits [callerCeiling]. Missing callee job
-  /// block inherits the callee workflow default (or [callerCeiling] when that is
-  /// also missing).
   static PermissionMap effectiveCalleeJob({
     required PermissionMap callerCeiling,
     required dynamic calleeWorkflowPerms,
@@ -126,7 +163,6 @@ class PermissionMap {
         : PermissionMap(Map.from(workflowBase.scopes));
   }
 
-  /// Scopes where [requested] exceeds [ceiling] (GitHub refuses to start the run).
   List<String> scopesExceedingCeiling(PermissionMap ceiling) {
     final errors = <String>[];
     for (final entry in scopes.entries) {
@@ -169,21 +205,6 @@ class ReusableCallEdge {
   final dynamic callerWorkflowPermissions;
 }
 
-/// Local (non-reusable) job in a caller workflow.
-class LocalCallerJob {
-  LocalCallerJob({
-    required this.callerWorkflow,
-    required this.jobId,
-    required this.jobPermissions,
-    required this.workflowPermissions,
-  });
-
-  final String callerWorkflow;
-  final String jobId;
-  final dynamic jobPermissions;
-  final dynamic workflowPermissions;
-}
-
 List<ReusableCallEdge> parseReusableCalls(
   String callerWorkflowLabel,
   String yamlText,
@@ -205,8 +226,7 @@ List<ReusableCallEdge> parseReusableCalls(
       continue;
     }
     final uses = job['uses']?.toString() ?? '';
-    if (!uses.contains('release_binaries_build.yml') &&
-        !uses.contains('release_binaries_publish.yml')) {
+    if (!binaryReusableCalleePattern.hasMatch(uses)) {
       continue;
     }
     out.add(
@@ -222,65 +242,37 @@ List<ReusableCallEdge> parseReusableCalls(
   return out;
 }
 
-List<LocalCallerJob> parseLocalJobs(
-  String callerWorkflowLabel,
-  String yamlText, {
-  Set<String>? onlyJobIds,
-}) {
-  final doc = loadYaml(yamlText);
-  if (doc is! Map) {
+List<(String label, String path)> discoverBinaryReusableCallerWorkflowFiles(
+  String repoRoot,
+) {
+  final dir = Directory('$repoRoot/.github/workflows');
+  if (!dir.existsSync()) {
     return [];
   }
-  final root = Map<dynamic, dynamic>.from(doc);
-  final workflowPerms = root['permissions'];
-  final jobs = root['jobs'];
-  if (jobs is! Map) {
-    return [];
+  final out = <(String, String)>[];
+  for (final entity in dir.listSync(followLinks: false)) {
+    if (entity is! File) {
+      continue;
+    }
+    final name = entity.uri.pathSegments.last;
+    if (!name.endsWith('.yml') && !name.endsWith('.yaml')) {
+      continue;
+    }
+    if (name == 'release_binaries_build.yml' ||
+        name == 'release_binaries_publish.yml') {
+      continue;
+    }
+    final text = entity.readAsStringSync();
+    if (!binaryReusableCalleePattern.hasMatch(text)) {
+      continue;
+    }
+    if (parseReusableCalls(name, text).isEmpty) {
+      continue;
+    }
+    out.add((name, entity.path));
   }
-  final out = <LocalCallerJob>[];
-  for (final entry in jobs.entries) {
-    final jobId = entry.key.toString();
-    if (onlyJobIds != null && !onlyJobIds.contains(jobId)) {
-      continue;
-    }
-    final job = entry.value;
-    if (job is! Map) {
-      continue;
-    }
-    if (job.containsKey('uses')) {
-      continue;
-    }
-    out.add(
-      LocalCallerJob(
-        callerWorkflow: callerWorkflowLabel,
-        jobId: jobId,
-        jobPermissions: job['permissions'],
-        workflowPermissions: workflowPerms,
-      ),
-    );
-  }
+  out.sort((a, b) => a.$1.compareTo(b.$1));
   return out;
-}
-
-List<Map<String, dynamic>> calleeJobsInWorkflow(String yamlText) {
-  final doc = loadYaml(yamlText);
-  if (doc is! Map) {
-    return [];
-  }
-  final root = Map<dynamic, dynamic>.from(doc);
-  final wfPerms = root['permissions'];
-  final jobs = root['jobs'];
-  if (jobs is! Map) {
-    return [];
-  }
-  return jobs.entries.map((e) {
-    final job = e.value;
-    return {
-      'id': e.key.toString(),
-      'permissions': job is Map ? job['permissions'] : null,
-      'workflowPermissions': wfPerms,
-    };
-  }).toList();
 }
 
 String? calleeFileForUses(String uses, String repoRoot) {
@@ -308,102 +300,255 @@ class PermissionPathRow {
   final List<String> overRequestErrors;
 }
 
-List<PermissionPathRow> buildReusablePermissionPaths(String repoRoot) {
-  final callers = <(String label, String path)>[
-    ('release-please.yml', '$repoRoot/.github/workflows/release-please.yml'),
-    ('release_binaries.yml', '$repoRoot/.github/workflows/release_binaries.yml'),
-    ('release_binaries_pr.yml', '$repoRoot/.github/workflows/release_binaries_pr.yml'),
-  ];
+List<PermissionPathRow> buildReusablePermissionPathsForYaml(
+  String callerLabel,
+  String yamlText,
+  String repoRoot,
+) {
   final rows = <PermissionPathRow>[];
-  for (final (label, path) in callers) {
-    final text = File(path).readAsStringSync();
-    for (final edge in parseReusableCalls(label, text)) {
-      final calleePath = calleeFileForUses(edge.calleeWorkflowPath, repoRoot);
-      if (calleePath == null) {
-        continue;
-      }
-      final ceiling = PermissionMap.callerJobCeiling(
-        edge.callerJobPermissions,
-        edge.callerWorkflowPermissions,
+  for (final edge in parseReusableCalls(callerLabel, yamlText)) {
+    final resolved = PermissionMap.resolveCallerJobCeiling(
+      jobPerms: edge.callerJobPermissions,
+      workflowPerms: edge.callerWorkflowPermissions,
+      label: '$callerLabel → ${edge.callerJobId}',
+    );
+    if (resolved.ceiling == null) {
+      rows.add(
+        PermissionPathRow(
+          path: '$callerLabel → ${edge.callerJobId} (explicit permissions)',
+          effective: PermissionMap.allNone(),
+          ceiling: PermissionMap.allNone(),
+          overRequestErrors: [resolved.error!],
+        ),
       );
-      final calleeName = edge.calleeWorkflowPath.contains('build')
-          ? 'release_binaries_build.yml'
-          : 'release_binaries_publish.yml';
-      for (final cj in calleeJobsInWorkflow(File(calleePath).readAsStringSync())) {
-        final wfPerms = cj['workflowPermissions'];
-        final effective = PermissionMap.effectiveCalleeJob(
+      continue;
+    }
+    final ceiling = resolved.ceiling!;
+    final calleePath = calleeFileForUses(edge.calleeWorkflowPath, repoRoot);
+    if (calleePath == null || !File(calleePath).existsSync()) {
+      continue;
+    }
+    final calleeName = edge.calleeWorkflowPath.contains('build')
+        ? 'release_binaries_build.yml'
+        : 'release_binaries_publish.yml';
+    for (final cj in calleeJobsInWorkflow(File(calleePath).readAsStringSync())) {
+      final wfPerms = cj['workflowPermissions'];
+      PermissionMap effective;
+      PermissionMap wfBase;
+      try {
+        effective = PermissionMap.effectiveCalleeJob(
           callerCeiling: ceiling,
           calleeWorkflowPerms: wfPerms,
           calleeJobPerms: cj['permissions'],
         );
-        final wfBase = wfPerms != null
+        wfBase = wfPerms != null
             ? PermissionMap.parse(wfPerms)
             : PermissionMap(Map.from(ceiling.scopes));
-        final over = <String>[
-          ...wfBase.validateAgainstCeiling(
-            ceiling,
-            label: '$label → ${edge.callerJobId} → $calleeName (workflow)',
-          ),
-          ...effective.validateAgainstCeiling(
-            ceiling,
-            label: '$label → ${edge.callerJobId} → ${cj['id']}',
-          ),
-        ];
+      } on PermissionParseException catch (e) {
         rows.add(
           PermissionPathRow(
-            path: '$label → ${edge.callerJobId} → $calleeName → ${cj['id']}',
-            effective: effective,
+            path: '$callerLabel → ${edge.callerJobId} → $calleeName → ${cj['id']}',
+            effective: PermissionMap.allNone(),
             ceiling: ceiling,
-            overRequestErrors: over,
+            overRequestErrors: [
+              '$callerLabel → ${edge.callerJobId} → ${cj['id']}: $e',
+            ],
           ),
         );
+        continue;
       }
+      final over = <String>[
+        ...wfBase.validateAgainstCeiling(
+          ceiling,
+          label: '$callerLabel → ${edge.callerJobId} → $calleeName (workflow)',
+        ),
+        ...effective.validateAgainstCeiling(
+          ceiling,
+          label: '$callerLabel → ${edge.callerJobId} → ${cj['id']}',
+        ),
+      ];
+      rows.add(
+        PermissionPathRow(
+          path: '$callerLabel → ${edge.callerJobId} → $calleeName → ${cj['id']}',
+          effective: effective,
+          ceiling: ceiling,
+          overRequestErrors: over,
+        ),
+      );
     }
   }
   return rows;
 }
 
-List<PermissionPathRow> buildLocalCallerJobRows(String repoRoot) {
-  final please = File('$repoRoot/.github/workflows/release-please.yml').readAsStringSync();
+List<PermissionPathRow> buildReusablePermissionPaths(String repoRoot) {
   final rows = <PermissionPathRow>[];
-  for (final job in parseLocalJobs(
-    'release-please.yml',
-    please,
-    onlyJobIds: {
-      'audit-release-train',
-      'dispatch-package-publish',
-      'wait-package-publish',
-    },
+  for (final (label, path) in discoverBinaryReusableCallerWorkflowFiles(
+    repoRoot,
   )) {
-    final ceiling = PermissionMap.callerJobCeiling(
-      job.jobPermissions,
-      job.workflowPermissions,
-    );
-    final effective = PermissionMap.parse(
-      job.jobPermissions,
-      inheritWhenMissing: PermissionMap.parse(job.workflowPermissions),
-    );
-    rows.add(
-      PermissionPathRow(
-        path: 'release-please.yml → ${job.jobId} (local)',
-        effective: effective,
-        ceiling: ceiling,
-        overRequestErrors: effective.validateAgainstCeiling(
-          ceiling,
-          label: 'release-please.yml → ${job.jobId}',
-        ),
+    rows.addAll(
+      buildReusablePermissionPathsForYaml(
+        label,
+        File(path).readAsStringSync(),
+        repoRoot,
       ),
     );
   }
   return rows;
 }
 
-List<String> validateProductionReusablePermissionChains(String repoRoot) {
+List<Map<String, dynamic>> calleeJobsInWorkflow(String yamlText) {
+  final doc = loadYaml(yamlText);
+  if (doc is! Map) {
+    return [];
+  }
+  final root = Map<dynamic, dynamic>.from(doc);
+  final wfPerms = root['permissions'];
+  final jobs = root['jobs'];
+  if (jobs is! Map) {
+    return [];
+  }
+  return jobs.entries.map((e) {
+    final job = e.value;
+    return {
+      'id': e.key.toString(),
+      'permissions': job is Map ? job['permissions'] : null,
+      'workflowPermissions': wfPerms,
+    };
+  }).toList();
+}
+
+List<String> validateBinaryReusableCallerYaml(
+  String yamlText,
+  String label, {
+  required String repoRoot,
+}) {
   final errors = <String>[];
-  for (final row in buildReusablePermissionPaths(repoRoot)) {
+  final edges = parseReusableCalls(label, yamlText);
+  if (edges.isEmpty) {
+    return ['$label: no release_binaries_build/publish reusable calls found'];
+  }
+  for (final edge in edges) {
+    final resolved = PermissionMap.resolveCallerJobCeiling(
+      jobPerms: edge.callerJobPermissions,
+      workflowPerms: edge.callerWorkflowPermissions,
+      label: '$label → ${edge.callerJobId}',
+    );
+    if (resolved.error != null) {
+      errors.add(resolved.error!);
+    }
+  }
+  for (final row in buildReusablePermissionPathsForYaml(
+    label,
+    yamlText,
+    repoRoot,
+  )) {
     errors.addAll(row.overRequestErrors);
   }
   return errors;
+}
+
+List<String> validateDiscoveredProductionReusableCallers(String repoRoot) {
+  final errors = <String>[];
+  final discovered = discoverBinaryReusableCallerWorkflowFiles(repoRoot);
+  const expectedCallers = {
+    'release-please.yml',
+    'release_binaries.yml',
+    'release_binaries_pr.yml',
+  };
+  for (final name in discovered.map((e) => e.$1)) {
+    if (!expectedCallers.contains(name)) {
+      errors.add(
+        '$name: unexpected workflow calls release_binaries_build/publish (add to contract or remove)',
+      );
+    }
+  }
+  for (final (label, path) in discovered) {
+    errors.addAll(
+      validateBinaryReusableCallerYaml(
+        File(path).readAsStringSync(),
+        label,
+        repoRoot: repoRoot,
+      ),
+    );
+  }
+  return errors;
+}
+
+/// Explicit ceilings for selected local release-please jobs (not reusable callers).
+final releasePleaseLocalJobCeilings = <String, PermissionMap>{
+  'audit-release-train': PermissionMap.parse({'contents': 'read'}),
+  'dispatch-package-publish': PermissionMap.parse({'actions': 'write'}),
+  'wait-package-publish': PermissionMap.parse({
+    'actions': 'write',
+    'contents': 'read',
+  }),
+};
+
+final releasePleaseLocalJobRequiredJobPermissions = <String, PermissionMap>{
+  'audit-release-train': PermissionMap.parse({'contents': 'read'}),
+};
+
+List<String> validateReleasePleaseLocalJobPermissions(
+  String repoRoot, {
+  String? yamlText,
+  String label = 'release-please.yml',
+}) {
+  final errors = <String>[];
+  final text = yamlText ??
+      File('$repoRoot/.github/workflows/release-please.yml').readAsStringSync();
+  final doc = loadYaml(text);
+  if (doc is! Map) {
+    return ['$label: root must be a mapping'];
+  }
+  final jobs = doc['jobs'];
+  if (jobs is! Map) {
+    return ['$label: jobs missing'];
+  }
+  final workflowPerms = doc['permissions'];
+
+  for (final entry in releasePleaseLocalJobCeilings.entries) {
+    final jobId = entry.key;
+    final ceiling = entry.value;
+    final job = jobs[jobId];
+    if (job is! Map) {
+      errors.add('$label: missing local job $jobId');
+      continue;
+    }
+    if (job.containsKey('uses')) {
+      continue;
+    }
+    final required = releasePleaseLocalJobRequiredJobPermissions[jobId];
+    if (required != null && job['permissions'] == null) {
+      errors.add(
+        '$label: $jobId must set explicit job permissions (required for audit)',
+      );
+      continue;
+    }
+    try {
+      final effective = PermissionMap.parse(
+        job['permissions'],
+        inheritWhenMissing: workflowPerms != null
+            ? PermissionMap.parse(workflowPerms)
+            : null,
+      );
+      errors.addAll(
+        effective.validateAgainstCeiling(
+          ceiling,
+          label: '$label → $jobId',
+        ),
+      );
+    } on PermissionParseException catch (e) {
+      errors.add('$label → $jobId: $e');
+    }
+  }
+  return errors;
+}
+
+List<String> validateProductionReusablePermissionChains(String repoRoot) {
+  return [
+    ...validateDiscoveredProductionReusableCallers(repoRoot),
+    ...validateReleasePleaseLocalJobPermissions(repoRoot),
+  ];
 }
 
 /// Negative fixture: callee job requests write under a read-only caller ceiling.

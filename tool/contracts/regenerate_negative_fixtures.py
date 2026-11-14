@@ -22,6 +22,7 @@ OUT = {
     "dispatch": ROOT / "tool/contracts/fixtures/release_workflow_dispatch",
     "pr": ROOT / "tool/contracts/fixtures/release_workflow_pr",
     "please": ROOT / "tool/contracts/fixtures/release_workflow_please",
+    "caller": ROOT / "tool/contracts/fixtures/release_workflow_caller",
 }
 
 VALIDATOR = {
@@ -30,6 +31,7 @@ VALIDATOR = {
     "dispatch": "dispatch",
     "pr": "pr",
     "please": "please",
+    "caller": "caller",
 }
 
 
@@ -53,6 +55,14 @@ def dart_errors(kind: str, yml: Path) -> str:
             "run",
             str(ROOT / "tool/check_release_workflow.dart"),
             "--please-caller-workflow",
+            str(yml),
+        ]
+    elif kind == "caller":
+        cmd = [
+            "dart",
+            "run",
+            str(ROOT / "tool/check_release_workflow.dart"),
+            "--binary-reusable-caller-workflow",
             str(yml),
         ]
     else:
@@ -420,6 +430,49 @@ def main() -> None:
           count=1,
       ),
   ))
+
+  specs.append((
+      "please",
+      "negative_please_build_missing_permissions",
+      re.sub(
+          r"(  release-binaries-build:[\s\S]*?)\n    permissions:\n      contents: read\n",
+          r"\1\n",
+          pl(),
+          count=1,
+      ),
+  ))
+  specs.append((
+      "please",
+      "negative_please_publish_missing_permissions",
+      re.sub(
+          r"(  release-binaries-publish:[\s\S]*?)\n    permissions:\n      contents: write\n",
+          r"\1\n",
+          pl(),
+          count=1,
+      ),
+  ))
+  specs.append((
+      "please",
+      "negative_please_audit_write_all",
+      pl().replace(
+          "    permissions:\n      contents: read\n    steps:\n      - name: Checkout release tooling",
+          "    permissions: write-all\n    steps:\n      - name: Checkout release tooling",
+          1,
+      ),
+  ))
+
+  caller_dispatch = (
+      "name: ZZ new caller (negative fixture)\n"
+      "on:\n  workflow_dispatch:\n\n"
+      "permissions: read-all\n\n"
+      "jobs:\n  publish:\n"
+      "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+      "    with:\n"
+      "      release_tag: universal_automation_toolkit-v0.0.0\n"
+      "      version: 0.0.0\n"
+      "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+  )
+  specs.append(("caller", "negative_zz_new_caller", caller_dispatch))
 
   specs.append((
       "please",

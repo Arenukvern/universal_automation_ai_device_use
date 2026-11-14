@@ -305,12 +305,16 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
       !build['uses'].toString().contains('release_binaries_build.yml')) {
     errors.add('$label: build job must use release_binaries_build.yml');
   }
+  final workflowPerms = root['permissions'];
   if (build is Map) {
     errors.addAll(_validateExplicitSigningSecretsMap(build['secrets'], label));
     final withMap = build['with'];
     if (withMap is! Map) {
       errors.add('$label: build job must pass with:');
     }
+    errors.addAll(
+      _requireExplicitReusableJobPermissions(build, workflowPerms, '$label: build job'),
+    );
     final perms = build['permissions'];
     if (perms is! Map || perms['contents']?.toString() != 'read') {
       errors.add('$label: build job must set permissions.contents: read');
@@ -325,6 +329,13 @@ List<String> validateReleaseBinariesDispatchWorkflowYaml(
     if (publish.containsKey('secrets')) {
       errors.add('$label: publish reusable call must not pass secrets');
     }
+    errors.addAll(
+      _requireExplicitReusableJobPermissions(
+        publish,
+        workflowPerms,
+        '$label: publish job',
+      ),
+    );
     final perms = publish['permissions'];
     if (perms is! Map || perms['contents']?.toString() != 'write') {
       errors.add('$label: publish job must set permissions.contents: write');
@@ -349,6 +360,19 @@ List<String> _forbidSecretsInherit(String yamlText, String label) {
     return ['$label: secrets: inherit is forbidden (pass signing secrets by name)'];
   }
   return [];
+}
+
+List<String> _requireExplicitReusableJobPermissions(
+  Map<dynamic, dynamic> job,
+  dynamic workflowPerms,
+  String label,
+) {
+  if (job['permissions'] != null || workflowPerms != null) {
+    return [];
+  }
+  return [
+    '$label: reusable-workflow caller must set explicit permissions on the job or workflow',
+  ];
 }
 
 List<String> _validateReadOnlyPermissions(
@@ -457,6 +481,9 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
     errors.add('$label: smoke must not pass signing secrets');
   }
   errors.addAll(_forbidSecretsInherit(yamlText, label));
+  errors.addAll(
+    _requireExplicitReusableJobPermissions(smoke, workflowPerms, '$label: smoke'),
+  );
   final perms = smoke['permissions'];
   if (perms is Map && perms['contents']?.toString() != 'read') {
     errors.add('$label: smoke permissions.contents must be read');
@@ -505,6 +532,13 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     } else if (withMap['dry_run'] != false && withMap['dry_run']?.toString() != 'false') {
       errors.add('release-please.yml: release-binaries-build must pass dry_run: false');
     }
+    errors.addAll(
+      _requireExplicitReusableJobPermissions(
+        build,
+        null,
+        'release-please.yml: release-binaries-build',
+      ),
+    );
     final perms = build['permissions'];
     if (perms is Map && perms['contents']?.toString() != 'read') {
       errors.add('release-please.yml: release-binaries-build needs contents: read');
@@ -526,6 +560,13 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
         'release-please.yml: $releasePleaseBinariesPublishJob must use $releaseBinariesPublishWorkflowPath',
       );
     }
+    errors.addAll(
+      _requireExplicitReusableJobPermissions(
+        publish,
+        null,
+        'release-please.yml: $releasePleaseBinariesPublishJob',
+      ),
+    );
     final perms = publish['permissions'];
     if (perms is! Map || perms['contents']?.toString() != 'write') {
       errors.add(
@@ -547,6 +588,25 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
 
   errors.addAll(_validateReleasePleasePubTrainIndependence(jobsMap));
   errors.addAll(_validateReleasePleaseFinalBinaryAudit(jobsMap));
+
+  final audit = jobsMap[releasePleaseAuditTrainJob];
+  if (audit is Map) {
+    final p = audit['permissions'];
+    if (p.toString().trim() == 'write-all') {
+      errors.add(
+        'release-please.yml: $releasePleaseAuditTrainJob must use read-only permissions',
+      );
+    } else if (p is Map) {
+      for (final entry in p.entries) {
+        if (entry.value?.toString() == 'write') {
+          errors.add(
+            'release-please.yml: $releasePleaseAuditTrainJob must not request '
+            '${entry.key}: write',
+          );
+        }
+      }
+    }
+  }
 
   return errors;
 }

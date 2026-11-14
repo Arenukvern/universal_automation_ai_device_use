@@ -262,6 +262,8 @@ jobs:
         needs.wait-package-publish.result == 'failure'
       )
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout release tooling
         uses: actions/checkout@v7

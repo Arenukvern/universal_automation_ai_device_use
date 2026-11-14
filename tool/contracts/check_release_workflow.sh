@@ -18,6 +18,7 @@ run_negative_dir() {
     build|publish|dispatch) flag="--workflow" ;;
     pr) flag="--pr-smoke-workflow" ;;
     please) flag="--please-caller-workflow" ;;
+    caller) flag="--binary-reusable-caller-workflow" ;;
     *) fail "unknown negative mode: $mode" ;;
   esac
   shopt -s nullglob
@@ -51,5 +52,6 @@ run_negative_dir publish "$FIX/release_workflow_publish"
 run_negative_dir dispatch "$FIX/release_workflow_dispatch"
 run_negative_dir pr "$FIX/release_workflow_pr"
 run_negative_dir please "$FIX/release_workflow_please"
+run_negative_dir caller "$FIX/release_workflow_caller"
 
 ok "release_binaries workflow structure OK"
