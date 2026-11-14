@@ -9,7 +9,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fail() { echo "check_negative_actionlint: $*" >&2; exit 1; }
 ok() { echo "check_negative_actionlint: $*"; }
 
-bash "$ROOT_DIR/tool/contracts/run_actionlint.sh" >/dev/null
+bash "$ROOT_DIR/tool/contracts/run_actionlint.sh" >/dev/null || fail "run_actionlint failed"
 
 ACTIONLINT_VERSION="1.7.7"
 os="$(uname -s)"
@@ -44,7 +44,6 @@ ACTIONLINT_NOISE_RULES=(
   "negative_please_wrong_build_workflow.yml|workflow-call expression"
   "negative_pr_wrong_workflow.yml|workflow-call"
   "negative_publish_needs_postflight.yml|job-needs"
-  "negative_publish_nested_build.yml|syntax-check"
 )
 
 allowed_rules_for() {
@@ -77,7 +76,6 @@ validate_noise_rules() {
   set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$yml" 2>&1)"
   st=$?
-  set +e
   if [[ "$st" -eq 0 ]] && [[ -z "$out" ]]; then
     echo "check_negative_actionlint: $base is on ACTIONLINT_NOISE_RULES but actionlint is clean" >&2
     return 2
@@ -101,11 +99,8 @@ validate_noise_rules() {
 }
 
 shopt -s nullglob
-set +e
 for negative in "$ROOT_DIR"/tool/contracts/fixtures/**/negative_*.yml; do
-  set +e
   name="$(basename "$negative")"
-  set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$negative" 2>&1)"
   st=$?
   if is_expected_noise "$name"; then
@@ -139,6 +134,25 @@ if [[ "$meta_rc" -eq 2 ]]; then
 fi
 if [[ "$meta_rc" -ne 1 ]]; then
   fail "meta self-test: expected validate_noise_rules rc=1, got $meta_rc"
+fi
+
+META_BROKEN="$ROOT_DIR/tool/contracts/fixtures/actionlint_meta/broken_workflow_actionlint.yml"
+if [[ ! -f "$META_BROKEN" ]]; then
+  fail "missing actionlint meta fixture: broken_workflow_actionlint.yml"
+fi
+set +e
+(
+  set -uo pipefail
+  fail() { exit 1; }
+  "$BIN" -color -shellcheck= \
+    -ignore 'label "macos-15-intel" is unknown' \
+    "$META_BROKEN" >/dev/null 2>&1 || fail "run_actionlint failed"
+  exit 0
+)
+hook_rc=$?
+set +e
+if [[ "$hook_rc" -eq 0 ]]; then
+  fail "meta: workflow lint errors must make run_actionlint hook exit non-zero"
 fi
 
 ok "negative fixtures actionlint-clean (with documented exceptions)"

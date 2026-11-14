@@ -1,1 +1,1 @@
-negative_publish_extra_job.yml: unexpected job extra (allowed: publish, postflight)
+negative_publish_extra_job.yml: _validateReusableCalleeJobAllowlist: unexpected job extra (allowed: publish, postflight)

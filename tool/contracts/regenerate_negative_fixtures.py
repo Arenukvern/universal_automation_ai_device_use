@@ -330,7 +330,7 @@ def main() -> None:
       "negative_publish_nested_build",
       p().replace(
           "  publish:\n    permissions:",
-          "  nested:\n    needs: []\n"
+          "  nested:\n"
           "    uses: ./.github/workflows/release_binaries_build.yml\n"
           "    with:\n"
           "      release_tag: universal_automation_toolkit-v0.0.0\n"
