@@ -58,7 +58,7 @@ jobs:
       - name: Resolve release target
         id: resolve
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
+          GITHUB_EVENT_NAME: workflow_dispatch
           DISPATCH_RELEASE_TAG: ${{ github.event.pull_request.head.sha || github.sha }}
           DRY_RUN: true
         run: bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/resolve_release_tag.sh"
