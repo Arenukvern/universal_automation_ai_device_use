@@ -104,10 +104,10 @@ workflows). Zero manual steps:
 ### PR / main path smoke (all four legs, artifacts only)
 
 **`.github/workflows/release_binaries_pr.yml`** runs on pull requests and pushes
-to `main` when release-related paths change. It calls `release_binaries.yml` with
-`dry_run: true` and `release_tag` set to the PR head SHA (or `github.sha` on
-`main`). Fork PRs get no signing secrets (unsigned macOS is fine). **`publish` /
-`postflight` never run** when `dry_run` is true.
+to `main` when release-related paths change. It mirrors the **`release_binaries.yml`**
+dry-run legs (`prepare` → four-way `build` → `dry-run-bundle`) with
+`release_tag` = PR head SHA (or `github.sha` on `main`). Fork PRs get no signing
+secrets (unsigned macOS is fine). **`publish` / `postflight` never run**.
 
 ### Manual escape hatch (`workflow_dispatch`)
 

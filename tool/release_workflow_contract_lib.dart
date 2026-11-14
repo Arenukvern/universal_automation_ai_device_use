@@ -235,26 +235,22 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
 
   final jobs = root['jobs'];
   if (jobs is! Map || jobs.isEmpty) {
-    errors.add('$label: must define a reusable-workflow caller job');
+    errors.add('$label: jobs must be defined');
     return errors;
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-  if (jobsMap.length != 1) {
-    errors.add('$label: exactly one caller job expected');
-  }
+
   for (final entry in jobsMap.entries) {
     final job = entry.value;
     if (job is! Map) {
       continue;
     }
     final uses = job['uses']?.toString() ?? '';
+    if (uses.isEmpty) {
+      continue;
+    }
     if (!uses.contains('release_binaries.yml')) {
       errors.add('$label: job ${entry.key} must use release_binaries.yml');
-    }
-    if (!uses.contains('./.github/workflows/release_binaries.yml')) {
-      errors.add(
-        '$label: job ${entry.key} must use ./.github/workflows/release_binaries.yml',
-      );
     }
     final withMap = job['with'];
     if (withMap is! Map) {
@@ -271,7 +267,19 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
     if (perms is Map && perms['contents']?.toString() != 'read') {
       errors.add('$label: caller job permissions.contents must be read');
     }
+    return errors;
   }
+
+  for (final id in ['prepare', 'build', 'dry-run-bundle']) {
+    if (!jobsMap.containsKey(id)) {
+      errors.add('$label: missing job $id (inline dry-run smoke)');
+    }
+  }
+  if (jobsMap.containsKey('publish')) {
+    errors.add('$label: must not define publish on PR smoke workflow');
+  }
+  errors.addAll(_validateBuildMatrix(jobsMap, label));
+  errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
 
   return errors;
 }

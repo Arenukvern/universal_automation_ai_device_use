@@ -4,11 +4,6 @@ on:
   pull_request:
     paths:
       - pkgs/universal_automation_toolkit/**
-  push:
-    branches:
-      - main
-    paths:
-      - pkgs/universal_automation_toolkit/**
 
 permissions:
   contents: read
@@ -19,5 +14,5 @@ jobs:
     permissions:
       contents: read
     with:
-      release_tag: ${{ github.event.pull_request.head.sha || github.sha }}
+      release_tag: deadbeef
       dry_run: false
