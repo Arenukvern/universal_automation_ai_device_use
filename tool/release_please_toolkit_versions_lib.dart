@@ -5,12 +5,12 @@ import 'dart:io';
 /// `pkgs/universal_automation_toolkit/test/package_version_test.dart`).
 const toolkitVersionSurfaces = <({String path, String kind, String? jsonpath})>[
   (
-    path: 'pkgs/universal_automation_toolkit/lib/src/package_version.dart',
+    path: 'lib/src/package_version.dart',
     kind: 'generic',
     jsonpath: null,
   ),
   (
-    path: 'pkgs/universal_automation_toolkit/server.json',
+    path: 'server.json',
     kind: 'json',
     jsonpath: r'$.version',
   ),
@@ -72,7 +72,7 @@ bool extraFilesCoverSurface(
 ) {
   for (final entry in extraFiles) {
     final path = normalizeExtraFilePath('${entry['path']}');
-    if (path != surface.path) {
+    if (path != normalizeExtraFilePath(surface.path)) {
       continue;
     }
     final type = '${entry['type'] ?? 'string'}';
