@@ -45,6 +45,15 @@
           "type": "json",
           "path": "/plugin/.claude-plugin/plugin.json",
           "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "pkgs/universal_automation_toolkit/lib/src/package_version.dart"
+        },
+        {
+          "type": "json",
+          "path": "pkgs/universal_automation_toolkit/server.json",
+          "jsonpath": "$.version"
         }
       ]
     },
