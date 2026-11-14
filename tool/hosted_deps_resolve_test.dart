@@ -597,6 +597,105 @@ void main() {
     });
   });
 
+  group('auditPublishedLatestErrors', () {
+    final fixForwardPackages = [
+      WorkspacePackage(
+        name: 'universal_pkg_a',
+        version: '0.5.0',
+        pubspecPath: 'x/a',
+        workspaceDeps: {},
+      ),
+      WorkspacePackage(
+        name: 'universal_pkg_b',
+        version: '0.3.0',
+        pubspecPath: 'x/b',
+        workspaceDeps: {'universal_pkg_a': '^0.5.0'},
+      ),
+    ];
+
+    const fixForwardPubVersions = {
+      'universal_pkg_a': ['0.4.0'],
+      'universal_pkg_b': ['0.2.0'],
+    };
+
+    /// pub.dev latest of A is broken (requires B ^0.4.0; 0.3.0 in-train too low).
+    const fixForwardLatestDeps = {
+      'universal_pkg_a': {'universal_pkg_b': '^0.4.0'},
+    };
+
+    const fixForwardReleaseSet = {'universal_pkg_a', 'universal_pkg_b'};
+
+    test('release-PR in-train sibling satisfies with in-train version', () {
+      final findings = auditPublishedLatestErrors(
+        packages: fixForwardPackages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        pubDevVersions: fixForwardPubVersions,
+        publishedLatestDeps: {
+          'universal_pkg_b': {'universal_pkg_a': '^0.2.0'},
+        },
+        releaseSet: fixForwardReleaseSet,
+        releasePrMode: true,
+      );
+      expect(findings.errors, isEmpty);
+    });
+
+    test('release-PR warns when pub.dev latest is broken but train fixes it', () {
+      final findings = auditPublishedLatestErrors(
+        packages: fixForwardPackages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        pubDevVersions: fixForwardPubVersions,
+        publishedLatestDeps: fixForwardLatestDeps,
+        releaseSet: fixForwardReleaseSet,
+        releasePrMode: true,
+      );
+      expect(findings.errors, isEmpty);
+      expect(findings.warnings, isNotEmpty);
+      expect(
+        findings.warnings.any((w) => w.contains('universal_pkg_a@0.4.0')),
+        isTrue,
+      );
+    });
+
+    test('main/post-publish still errors on broken pub.dev latest', () {
+      final findings = auditPublishedLatestErrors(
+        packages: fixForwardPackages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        pubDevVersions: fixForwardPubVersions,
+        publishedLatestDeps: fixForwardLatestDeps,
+        releaseSet: fixForwardReleaseSet,
+        releasePrMode: false,
+      );
+      expect(findings.errors, isNotEmpty);
+      expect(findings.warnings, isEmpty);
+    });
+
+    test('version-bump: B requires A in-train; release-PR audit passes', () async {
+      final code = await runAuditPublished(
+        packages: fixForwardPackages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        catalog: _FakePubDevGateway(
+          versions: fixForwardPubVersions,
+          latestDeps: fixForwardLatestDeps,
+        ),
+        releasePrMode: true,
+      );
+      expect(code, 0);
+    });
+
+    test('without release-pr, in-train train still blocks on main audit', () async {
+      final code = await runAuditPublished(
+        packages: fixForwardPackages,
+        workspaceNames: {'universal_pkg_a', 'universal_pkg_b'},
+        catalog: _FakePubDevGateway(
+          versions: fixForwardPubVersions,
+          latestDeps: fixForwardLatestDeps,
+        ),
+        releasePrMode: false,
+      );
+      expect(code, 1);
+    });
+  });
+
   group('runAuditPublished', () {
     test('fails closed when pub.dev is unreachable', () async {
       final packages = [

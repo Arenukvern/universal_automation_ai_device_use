@@ -74,6 +74,7 @@ jobs:
           if ! git ls-remote --heads origin release-please--branches--main | grep -q .; then
             echo "No release-please branch; skipping constraint sync"
             echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            echo "sync_commit_sha=" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git fetch origin release-please--branches--main
@@ -96,6 +97,7 @@ jobs:
           if git diff --quiet -- pkgs; then
             echo "Workspace pub constraints already in sync"
             echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            echo "sync_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           while IFS= read -r line; do
@@ -116,17 +118,21 @@ jobs:
           git commit -m "chore: sync intra-workspace pub dependency constraints"
           git push origin HEAD:release-please--branches--main
           echo "sync_pushed=true" >> "$GITHUB_OUTPUT"
+          echo "sync_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Dispatch CI on release PR branch
-        if: ${{ steps.sync_constraints.outputs.sync_pushed == 'true' }}
+        if: ${{ steps.sync_constraints.outputs.sync_commit_sha != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-          RELEASE_BRANCH: release-please--branches--main
+          SYNC_SHA: ${{ steps.sync_constraints.outputs.sync_commit_sha }}
         run: |
-          echo "Dispatching Validate and tooling_runtime CI for ${RELEASE_BRANCH}"
-          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
-          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}"
+          RELEASE_BRANCH=release-please--branches--main
+          echo "Dispatching Validate and tooling_runtime CI on ${RELEASE_BRANCH} @ ${SYNC_SHA}"
+          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
+          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
 
   dispatch-package-publish:
     needs: release-please
@@ -149,8 +155,39 @@ jobs:
         run: dart pub get
 
       - name: Dispatch pub.dev publish per released package
+        id: dispatch_publish
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
         run: dart run tool/dispatch_pub_dev_publish.dart
+
+  wait-package-publish:
+    needs: [release-please, dispatch-package-publish]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Wait for publish runs, retry once, audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+        run: dart run tool/wait_publish_train.dart

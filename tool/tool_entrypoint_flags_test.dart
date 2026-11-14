@@ -26,10 +26,21 @@ void main() {
       expect(r.stdout, contains('Hosted dependency resolve'));
     });
 
-    test('--release-pr without --check-manifest-drift exits 64', () async {
+    test('--release-pr without manifest-drift or audit exits 64', () async {
       final r = await _runTool('check_hosted_deps_resolve.dart', ['--release-pr']);
       expect(r.exitCode, 64);
-      expect(r.stderr, contains('--release-pr requires --check-manifest-drift'));
+      expect(
+        r.stderr,
+        contains('--release-pr requires --check-manifest-drift or --audit-published'),
+      );
+    });
+
+    test('--release-pr with --audit-published is allowed', () async {
+      final r = await _runTool(
+        'check_hosted_deps_resolve.dart',
+        ['--audit-published', '--release-pr', '--help'],
+      );
+      expect(r.exitCode, 0);
     });
   });
 

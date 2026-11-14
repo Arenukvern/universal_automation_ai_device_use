@@ -8,6 +8,8 @@ import 'package:universal_automation_interface/universal_automation_interface.da
 import 'package:universal_automation_toolkit/universal_automation_toolkit.dart';
 import 'package:universal_driver_macos/universal_driver_macos.dart';
 
+import 'support/fake_ax_bridge.dart';
+
 Future<Map<String, Object?>?> call(
   ToolkitMcpServer server,
   int id,
@@ -27,226 +29,6 @@ Map<String, Object?> payloadOf(Map<String, Object?>? response) => jsonDecode(
               as List<Object?>)
           .single as Map<String, Object?>)['text'] as String,
     ) as Map<String, Object?>;
-
-/// Records every bridge call and replays scripted observations — the
-/// macOS-driver test's FakeBridge pattern, trimmed to what the anchor
-/// and focus-contract paths touch.
-final class FakeAxDriverBridge implements AxDriverBridge {
-  BridgeJsonResult snapshotResult = (code: 0, json: _appJson);
-  BridgeJsonResult snapshotAppResult = (code: 0, json: _appJson);
-  BridgeJsonResult appsResult = (code: 0, json: _appsJson);
-  BridgeJsonResult frontmostResult = (code: 0, json: _safariJson);
-  int activateResult = 0;
-
-  final calls = <String>[];
-  final pressed = <int>[];
-  final setValues = <(int, String)>[];
-  final elementActionCalls = <(int, String)>[];
-  int? lastSnapshotPid;
-  int? lastActivatedPid;
-
-  @override
-  String version() => 'xs-ax-driver/1';
-
-  @override
-  bool axTrusted() => true;
-
-  @override
-  bool requestTrust() => true;
-
-  @override
-  BridgeJsonResult snapshotJson({
-    required int maxDepth,
-    required int maxNodes,
-  }) {
-    calls.add('snapshot');
-    return snapshotResult;
-  }
-
-  @override
-  BridgeJsonResult snapshotAppJson({
-    required int maxDepth,
-    required int maxNodes,
-    required int pid,
-    int preferWebContent = 1,
-  }) {
-    calls.add('snapshotApp(pid=$pid)');
-    lastSnapshotPid = pid;
-    return snapshotAppResult;
-  }
-
-  @override
-  BridgeJsonResult appsJson() {
-    calls.add('apps');
-    return appsResult;
-  }
-
-  @override
-  BridgeJsonResult frontmostJson() {
-    calls.add('frontmost');
-    return frontmostResult;
-  }
-
-  @override
-  int activateApp(int pid) {
-    calls.add('activate($pid)');
-    lastActivatedPid = pid;
-    // Activation moves the event stream's owner, as the real workspace
-    // would — the focus contract's retry observes the new frontmost.
-    frontmostResult = (code: 0, json: _finderJson);
-    return activateResult;
-  }
-
-  @override
-  int launchApp(String bundleId) => 4242;
-
-  @override
-  int terminateApp(int pid) => 0;
-
-  @override
-  BridgeJsonResult elementAtPositionJson({
-    required double x,
-    required double y,
-  }) => (code: 4, json: '');
-
-  @override
-  int press(int handle) {
-    calls.add('press($handle)');
-    pressed.add(handle);
-    return 0;
-  }
-
-  @override
-  int focus(int handle) => 0;
-
-  @override
-  int setValue(int handle, String value) {
-    calls.add('setValue($handle)');
-    setValues.add((handle, value));
-    return 0;
-  }
-
-  @override
-  int performElementAction(int handle, String action) {
-    calls.add('elementAction($handle,$action)');
-    elementActionCalls.add((handle, action));
-    return 0;
-  }
-
-  @override
-  int typeText(String text) => 0;
-
-  @override
-  int keyPress(String key) => 0;
-
-  @override
-  int scroll(double dx, double dy) => 0;
-
-  @override
-  int pointerMove({
-    required double x,
-    required double y,
-    Iterable<String> modifiers = const [],
-  }) => 0;
-
-  @override
-  int pointerButton({
-    required double x,
-    required double y,
-    required String button,
-    required bool down,
-    int clickCount = 1,
-    Iterable<String> modifiers = const [],
-  }) => 0;
-
-  @override
-  int keyDown(String key) => 0;
-
-  @override
-  int keyUp(String key) => 0;
-
-  @override
-  int typeTextToPid(int pid, String text) {
-    pidTypedText.add((pid: pid, text: text));
-    return 0;
-  }
-
-  /// Recorded pid-scoped typing (the ADR 0064 rung).
-  final pidTypedText = <({int pid, String text})>[];
-  final scrollToPidCalls = <({int pid, double dx, double dy})>[];
-
-  @override
-  int keyPressToPid(int pid, String key) => 0;
-
-  @override
-  int keyDownToPid(int pid, String key) => 0;
-
-  @override
-  int keyUpToPid(int pid, String key) => 0;
-
-  @override
-  int pointerMoveToPid(
-    int pid, {
-    required double x,
-    required double y,
-    Iterable<String> modifiers = const [],
-  }) => 0;
-
-  @override
-  int pointerButtonToPid(
-    int pid, {
-    required double x,
-    required double y,
-    required String button,
-    required bool down,
-    int clickCount = 1,
-    Iterable<String> modifiers = const [],
-  }) => 0;
-
-  @override
-  int scrollToPid(int pid, {required double dx, required double dy}) {
-    scrollToPidCalls.add((pid: pid, dx: dx, dy: dy));
-    return 0;
-  }
-
-  @override
-  void releaseAll() {}
-
-  @override
-  BridgeBytesResult screenshotPng({int displayId = 0, int maxPx = 0}) =>
-      (code: 0, bytes: Uint8List.fromList([1]));
-
-  @override
-  BridgeBytesResult screenshotWindowPng({
-    required int windowId,
-    int maxPx = 0,
-  }) => (code: 0, bytes: Uint8List.fromList([1]));
-
-  @override
-  BridgeJsonResult windowsJson({int pid = 0}) => (code: 0, json: '[]');
-}
-
-const _appJson =
-    '{"role":"application","name":"Finder",'
-    '"attributes":{"axid":"0","pid":"42"},'
-    '"children":['
-    '{"role":"button","name":"Save","attributes":{"axid":"2"}},'
-    '{"role":"textbox","name":"Search","value":"","attributes":{"axid":"3"}}'
-    ']}';
-
-const _appsJson =
-    '[{"pid":42,"bundleId":"com.apple.finder","name":"Finder",'
-    '"active":false,"hidden":false},'
-    '{"pid":1234,"bundleId":"com.apple.Safari","name":"Safari",'
-    '"active":true,"hidden":false}]';
-
-const _safariJson =
-    '{"pid":1234,"bundleId":"com.apple.Safari","name":"Safari",'
-    '"active":true,"hidden":false}';
-
-const _finderJson =
-    '{"pid":42,"bundleId":"com.apple.finder","name":"Finder",'
-    '"active":false,"hidden":false}';
 
 /// The plain text content of an isError tool result (not JSON) — the
 /// prose block; structured details ride as a second block (ADR 0003).
@@ -316,7 +98,14 @@ void main() {
       final registry = SessionRegistry(
         bindings: const {},
         factories: {
-          AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+          AutomationTransport.osAccessibility:
+              (binding, endpoint, timeout) async {
+            final name = Uri.decodeComponent(endpoint.path.substring(1));
+            throw ElementNotFoundException(
+              'application',
+              'name "$name" (running: )',
+            );
+          },
         },
       );
       await expectLater(
@@ -335,10 +124,20 @@ void main() {
     });
 
     test('a pid anchor attaches an anchored macOS driver', () async {
+      final bridge = FakeAxDriverBridge();
       final registry = SessionRegistry(
         bindings: const {},
         factories: {
-          AutomationTransport.osAccessibility: desktopOsAccessibilityFactory,
+          AutomationTransport.osAccessibility:
+              (binding, endpoint, timeout) async {
+            return _StubSession(
+              binding,
+              driver: BehavioralMacosDriver(
+                bridge: bridge,
+                targetPid: _anchorPid(endpoint),
+              ),
+            );
+          },
         },
       );
       final session = await registry.attachApp(
@@ -653,7 +452,8 @@ final class _StubSession implements ResolvedSession {
   Uri? get url => null;
 
   @override
-  BehavioralDriver? asBehavioral() => null;
+  BehavioralDriver? asBehavioral() =>
+      driver is BehavioralDriver ? driver as BehavioralDriver : null;
 
   @override
   Future<void> detach() async {}

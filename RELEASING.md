@@ -1,81 +1,69 @@
 # Releasing workspace packages to pub.dev
 
-## Sanctioned publish path (CI default)
+## Zero-touch publish path (default)
 
-After **release-please** merges and tags `<package>-v<version>`, **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** on each release tag. Publish uses **OIDC** (`environment: pub.dev`, Anton required reviewer) — no long-lived `PUB_TOKEN` in GitHub secrets.
+1. **Release Please** opens `release-please--branches--main` with version bumps and changelogs.
+2. **Green CI on that PR is the gate** — steward review on the release PR plus green `Validate`. CI mirrors the publisher: co-release resolve, manifest drift (`--release-pr`), **every publishable package** `dart analyze` + `dart test` via workspace resolution (`tool/validate_publishable_packages.dart`; publish dry-run stays on `publish_package.yml` after the exact-version dep wait), and `--audit-published --release-pr` (in-train versions count as pending; broken pub.dev-latest sibling edges in the release set warn instead of blocking).
+3. Merge the release PR to `main`. Release Please tags `universal_<package>-v<version>` for each released component.
+4. **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** once per tag (`workflow_dispatch` on the tag ref). **Pub.dev environment reviewers were removed** (Anton’s decision: zero-touch publishing). Human review is the **release PR** (second-steward review) plus green CI — not per-package deployment approvals. OIDC still mints a **fresh** token immediately before `dart pub publish --force`.
+5. **`wait-package-publish`** (180-minute job timeout) waits on each dispatched publish run, watching **new** `workflow_dispatch` runs only, **re-dispatches once** when the **publish** job actually failed (not skipped/cancelled/waiting), then runs **`check_hosted_deps_resolve.dart --audit-published`** as a blocking step. If an environment **approval gate is ever re-added** on `pub.dev`, publishes may still complete after this job times out red — treat **`post_publish_audit.yml`** as the authoritative final audit and re-run it manually when that happens.
+6. **Post-publish audit** remains available manually: Actions → **Post-publish audit** → Run workflow.
+
+**Deployment policy:** GitHub can deploy only from tag refs matching `universal_*-v*`. Tags are **immutable** via the `release-tags-immutable` ruleset (Admin-only bypass). Do not move or recreate tags to “fix” constraint drift — land a new version instead.
+
+Constraint sync dispatches `validate.yml` on branch `release-please--branches--main` with `expected_sha` so CI verifies the exact synced commit (workflow_dispatch cannot target a bare SHA ref).
+
+### Manual publish recovery (single package)
 
 ```bash
-# Manual recovery (same workflow as CI):
 gh workflow run publish_package.yml \
   --repo Arenukvern/universal_automation_ai_device_use \
   --ref universal_<package>-vX.Y.Z
 ```
 
-Jobs: **guard** (tag ref + pubspec) → **ci** (release-path `check_hosted_deps_resolve` co-release + drift `--release-pr` + `--audit-published`, then analyze/test at the tag ref) → **publish** (one **`pub.dev` environment approval per package** — up to **17** approvals in a full release train) → skip-if-published (HTTP **404** from the pub.dev package API means first publish; proceed) → **exact-version** runtime dep wait → dry-run → **fresh** OIDC mint → `dart pub publish --force` → **verify**. Dependency wait and dry-run run only after approval so downstream packages (e.g. harness waiting for toolkit 0.5.0) do not time out while earlier packages await Anton. Same-tag reruns are serialized (`concurrency: publish-${{ github.ref }}`). Skips publish if that exact version is already listed on pub.dev.
+`publish_package.yml` jobs: **guard** (tag ref + pubspec) → **ci** (release-path resolve + audit + analyze/test) → **publish** (skip-if-listed on pub.dev via object-shaped `/api/packages` versions, runtime dep wait, dry-run, OIDC, `dart pub publish --force`) → **verify** (exact version on pub.dev). Same-tag reruns are serialized (`concurrency: publish-${{ github.ref }}`).
 
-### Manual fallback (`publish_in_order`)
+### First publish of a **new** package (one-time manual)
 
-For bulk trains or offline recovery, run the publish train **on the owner’s Mac** with local pub.dev credentials (`dart pub token` / interactive login):
+Before CI can publish a package that has never been on pub.dev:
+
+1. Publish **manually once** on pub.dev (owner credentials).
+2. On pub.dev → package → **Automated publishing from GitHub Actions**:
+   - Tag pattern: `<pkg>-v{{version}}` (e.g. `universal_foo-v{{version}}`)
+   - Environment: `pub.dev`
+3. Subsequent releases use the zero-touch path above.
+
+Pub.dev deployment in GitHub is restricted to `universal_*-v*` tag refs. **Do not** set `ACTIONS_ID_TOKEN_REQUEST_*` in workflow env; the `pub.dev` environment provides OIDC (`id-token: write`). Published tokens are masked.
+
+### Manual fallback train (`publish_in_order`)
+
+For bulk recovery on a maintainer machine with local pub.dev credentials:
 
 ```bash
 dart pub get
-dart run tool/publish_in_order.dart
-# prints release set, publish_order.yaml sequence, and exact `(cd pkgs/… && dart pub publish)` commands (dry-run)
-
-dart run tool/publish_in_order.dart --publish
-# prompts: type `publish` to confirm
-
+dart run tool/publish_in_order.dart          # dry-run + commands
 dart run tool/publish_in_order.dart --publish --yes
-# non-interactive confirm (scripts only; prefer interactive)
 ```
 
-`tool/publish_in_order.dart` reads `tool/publish_order.yaml`, selects the **release set**, runs version policy + co-release resolve, publishes in order, waits for each exact version on pub.dev, then runs **`--audit-published`**.
+Reads `tool/publish_order.yaml`, publishes in dependency order, waits for each version on pub.dev, then runs `--audit-published` (with tag-source provenance).
 
-**Do not** run bare `dart pub publish` from package directories outside CI or this train — order and pub.dev visibility are not enforced.
+**Do not** run bare `dart pub publish` outside CI or this train.
 
-### Version policy (CI + publish train)
+### Version policy (summary)
 
-- **Manifest** (release-please) = last released version on `main`; on an open **release-please PR** the manifest is bumped to the **next** version together with pubspec (not yet on pub.dev).
-- **Blocking everywhere** except on **`main` and ordinary PRs** until companion PR **#24** lands: manifest markers that trail pub.dev (`manifest < pub.dev latest`, or manifest version never shipped) are **warnings** on the blocking `--co-release --warn-manifest-behind-pub` step (not errors). **Release paths** keep manifest-behind blocking; see the table below for manifest-not-on-pub.dev. **Git-tag reuse** runs only on `--check-manifest-drift` paths, and only for packages in the **release set** (not on ordinary PR validate).
-- Pubspec < pub.dev latest → error (backward). Pubspec equals pub.dev latest → OK only if unchanged since git tag `<package>-v<version>` (else version reuse error; no tag → OK with warning). Pubspec on pub.dev but not latest → reuse error. Pending packages (ahead of pub.dev, not published) satisfy sibling constraints via co-release in `publish_order.yaml` order.
-- **Published exact-version constraint parity** (release paths + `--audit-published` on `main`/ordinary PRs only): if pubspec version **V** is already on pub.dev, every local `universal_*` dependency constraint must match the `https://pub.dev/api/packages/<name>/versions/<V>` tarball (not merely resolve). Pending release-set packages are exempt (same as `--release-pr` pending releases). Drift → land `fix(<package>)` on `main` so release-please bumps it and you publish a new version (pub.dev cannot replace an existing version).
+| Context | Command |
+| --- | --- |
+| Ordinary PR / `main` | `--co-release --warn-manifest-behind-pub` |
+| **Release-please PR** | `--co-release --check-manifest-drift --release-pr` + full publishable package tests + `--audit-published` |
+| Tag publish workflow | `--co-release --check-manifest-drift --release-pr` + `--audit-published` |
+| Post-publish / train end | `--audit-published` |
 
-| Context | Command | Manifest not on pub.dev |
-| --- | --- | --- |
-| `main` / ordinary PR validate | `--co-release --warn-manifest-behind-pub` | Warning (if manifest trails policy) |
-| Publish / tag workflows | `--co-release --check-manifest-drift` | Error: claimed release never shipped |
-| **Release-please PR** sync job | `--co-release --check-manifest-drift --release-pr` | OK when manifest == pubspec **>** pub.dev latest (pending release); otherwise error |
-| **Release-please PR** validate CI | `--co-release --check-manifest-drift --release-pr` (blocking; no `--audit-published`) | Same as sync job — pending versions are not on pub.dev yet |
-| Post-publish | `--audit-published` | N/A (all workspace versions must exist on pub.dev) |
+`--release-pr` accepts pending manifest == pubspec ahead of pub.dev. Published exact-version workspace constraints must match pub.dev archives; tag-source vs hosted mismatches are checked with a **known-history allowlist** (e.g. harness `0.3.0` toolkit pin, screencast `0.3.1` CDP pin) — reported as warnings, not repaired by retagging.
 
-`--release-pr` is only valid with `--check-manifest-drift`. Pre-publish `--audit-published` runs from `publish_in_order.dart` and `post_publish_audit.yml`, not from the release-please constraint sync job.
+### Release-please constraint sync
 
-All release-please packages publish via [`.github/workflows/publish_package.yml`](.github/workflows/publish_package.yml) (OIDC, `workflow_dispatch` on the release tag). See pub.dev automated publishing config: tag pattern `<pkg>-v{{version}}`.
+The **sync-release-pr-constraints** job writes sibling pins on the release-please branch. When it pushes, CI is dispatched at the **exact synced commit SHA** (`gh workflow run validate.yml --ref <sha>`). Constraint-only commits use `chore:` so release-please does not treat them as releasable churn.
 
-## After every publish train
+Re-run Release Please from **`main`** only (`workflow_dispatch` / push), never from unreviewed branches.
 
-1. Confirm the train finished with **post-publish audit** passing (automatic with `--publish`).
-2. Optionally re-run the workflow: **Actions → Post-publish audit → Run workflow** (`post_publish_audit.yml`), which runs `dart run tool/check_hosted_deps_resolve.dart --audit-published` (blocking, fail closed).
-
-## Release-please
-
-Release Please runs on pushes to `main` and can be **re-run manually** after tag or manifest fixes (no new code push required). Manual dispatch must use **`main`** as the ref: the workflow is gated with `if: github.ref == 'refs/heads/main'` so an unreviewed branch cannot run Release Please or trust-check out arbitrary `tool/` at that SHA.
-
-- **GitHub:** Actions → **Release Please** → **Run workflow** (branch `main` only).
-- **CLI:** `gh workflow run release-please.yml --repo Arenukvern/universal_automation_ai_device_use --ref main`
-
-Release Please discovers the last release from the `<package>-v<version>` git tag that matches the version in `.release-please-manifest.json`. If you manually published a version and then **backfill** that tag, point it at the **published source commit** — not an arbitrary SHA — or the next release PR can miscompute the baseline.
-
-### Intra-workspace constraint sync
-
-The **sync-release-pr-constraints** job writes sibling pins on the release-please branch and commits them as **`chore: sync intra-workspace pub dependency constraints`** so release-please does **not** treat the commit as a releasable package change. That is intentional for *pending* releases on the release PR.
-
-If pins change for a package whose **current pubspec version is already on pub.dev**, the chore sync is not enough: land a scoped **`fix(<package>)`** on `main` (or merge a maintainer commit that bumps that package) so release-please opens a version-bump PR and you **publish a new version**. We do **not** switch the sync bot to `fix()` per package — that would force unrelated version bumps across the workspace.
-
-The **sync-release-pr-constraints** job checks out the release-please branch at the repo root (for `pkgs/` and manifest) and a nested **trusted** checkout of the triggering `main` commit; it runs `trusted/tool/…` from the release tree so guards like `--release-pr` always match CI on `main`.
-
-The job runs **no `dart pub get` before the sync**. It previously resolved the trusted checkout of the triggering `main` commit first — and that commit is transiently unresolvable exactly when constraint repair is needed (the documented `fix()`-before-release-merge flow), so the job died before the sync tool ever ran. To keep the sync resolution-independent by construction, the tool is invoked with plain `dart trusted/tool/sync_workspace_pub_constraints.dart --write` — its entry chain is SDK-only (guarded by a test in `tool/workspace_pub_constraints_sync_test.dart`; `dart run`'s tolerance of failed implicit pub gets is an SDK-version detail, not a contract). The drift check afterwards needs `package:pub_semver`, so it runs via `dart run trusted/tool/check_hosted_deps_resolve.dart …` and resolves the now-synced tree; a tree the sync could not repair fails loudly there instead of being committed.
-
-Merge release-please PRs only when **release-path** CI passes: co-release resolve and release-PR version policy (`--check-manifest-drift --release-pr`) on the release branch.
-
-See also [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) (publish order) and [PR #23](https://github.com/Arenukvern/universal_automation_ai_device_use/pull/23) (guards).
+See [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) for publish order rationale.

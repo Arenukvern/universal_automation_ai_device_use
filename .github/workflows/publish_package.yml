@@ -113,24 +113,26 @@ jobs:
           VERSION: ${{ needs.guard.outputs.version }}
         run: |
           set -euo pipefail
-          tmp=$(mktemp)
-          code=$(curl -sSL -o "$tmp" -w "%{http_code}" \
-            "https://pub.dev/api/packages/${PACKAGE_NAME}")
-          if [ "$code" = "404" ]; then
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-            echo "First publish for ${PACKAGE_NAME} (not on pub.dev yet)."
-            exit 0
-          fi
-          if [ "$code" != "200" ]; then
-            echo "::error::pub.dev API HTTP ${code} for ${PACKAGE_NAME}"
-            exit 1
-          fi
-          if jq -e --arg v "$VERSION" '.versions | index($v)' "$tmp" >/dev/null; then
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-            echo "::notice::${PACKAGE_NAME}@${VERSION} is already on pub.dev; skipping publish"
-          else
-            echo "skip=false" >> "$GITHUB_OUTPUT"
-          fi
+          outcome=$(dart run tool/pub_dev_version_listed.dart \
+            --package "$PACKAGE_NAME" \
+            --version "$VERSION")
+          case "$outcome" in
+            listed)
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              echo "::notice::${PACKAGE_NAME}@${VERSION} is already on pub.dev; skipping publish (idempotent no-op)"
+              ;;
+            not_listed)
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              ;;
+            not_found)
+              echo "skip=false" >> "$GITHUB_OUTPUT"
+              echo "First publish for ${PACKAGE_NAME} (not on pub.dev yet)."
+              ;;
+            *)
+              echo "::error::unexpected pub_dev_version_listed outcome: $outcome"
+              exit 1
+              ;;
+          esac
 
       - name: Wait for runtime dependencies on pub.dev
         if: steps.skip.outputs.skip != 'true'

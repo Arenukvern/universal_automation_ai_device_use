@@ -214,6 +214,7 @@ Future<int> runPublishInOrder({
         packages: packages,
         workspaceNames: workspaceNames,
         catalog: gateway,
+        repoRoot: root,
       );
       if (auditCode != 0) {
         stderr.writeln('Post-publish audit failed.');

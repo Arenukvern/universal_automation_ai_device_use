@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:pub_semver/pub_semver.dart';
 
+import 'tag_pubspec_provenance_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 const _pubDevPackageApi = 'https://pub.dev/api/packages';
@@ -667,14 +668,34 @@ List<String> resolveErrorsAlongPublishOrder({
   return errors;
 }
 
+/// Outcome of checking pub.dev **latest** tarball sibling constraints.
+class AuditPublishedLatestFindings {
+  AuditPublishedLatestFindings({
+    required this.errors,
+    required this.warnings,
+  });
+
+  final List<String> errors;
+  final List<String> warnings;
+}
+
 /// Checks pub.dev **latest** tarball pubspecs for unresolved sibling deps.
-List<String> auditPublishedLatestErrors({
+///
+/// On a release-please PR ([releasePrMode]), unresolved latest constraints for
+/// a package in [releaseSet] or involving a sibling in [releaseSet] are
+/// warnings (fix-forward train), not blocking errors.
+AuditPublishedLatestFindings auditPublishedLatestErrors({
   required List<WorkspacePackage> packages,
   required Set<String> workspaceNames,
   required Map<String, List<String>> pubDevVersions,
   required Map<String, Map<String, String>> publishedLatestDeps,
+  Set<String> releaseSet = const {},
+  bool releasePrMode = false,
 }) {
   final errors = <String>[];
+  final warnings = <String>[];
+  final byName = {for (final p in packages) p.name: p};
+
   for (final pkg in packages) {
     final versions = pubDevVersions[pkg.name];
     if (versions == null || versions.isEmpty) {
@@ -689,16 +710,29 @@ List<String> auditPublishedLatestErrors({
       if (!workspaceNames.contains(entry.key)) {
         continue;
       }
-      final available = pubDevVersions[entry.key] ?? [];
+      final available = List<String>.from(pubDevVersions[entry.key] ?? const []);
+      if (releaseSet.contains(entry.key)) {
+        final inTrain = byName[entry.key]?.version;
+        if (inTrain != null && !available.contains(inTrain)) {
+          available.add(inTrain);
+        }
+      }
       if (!constraintSatisfiedByAnyVersion(entry.value, available)) {
-        errors.add(
-          'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
-          '(pub.dev has: ${available.join(', ')})',
-        );
+        final msg =
+            'pub.dev ${pkg.name}@$latest requires ${entry.key} ${entry.value} '
+            '(pub.dev has: ${(pubDevVersions[entry.key] ?? []).join(', ')}'
+            '${releaseSet.contains(entry.key) ? '; in-train: ${byName[entry.key]?.version}' : ''})';
+        final pendingFix = releasePrMode &&
+            (releaseSet.contains(pkg.name) || releaseSet.contains(entry.key));
+        if (pendingFix) {
+          warnings.add('PENDING RELEASE (pub.dev latest drift): $msg');
+        } else {
+          errors.add(msg);
+        }
       }
     }
   }
-  return errors;
+  return AuditPublishedLatestFindings(errors: errors, warnings: warnings);
 }
 
 String publishedDepsAtVersionKey(String packageName, String version) =>
@@ -1151,6 +1185,8 @@ Future<int> runAuditPublished({
   required Set<String> workspaceNames,
   required PubDevGateway catalog,
   bool githubReport = false,
+  Directory? repoRoot,
+  bool releasePrMode = false,
 }) async {
   try {
     final pubVersions = await fetchAllPubDevVersions(catalog, workspaceNames);
@@ -1170,16 +1206,18 @@ Future<int> runAuditPublished({
         return 1;
       }
     }
-    final errors = auditPublishedLatestErrors(
+    final releaseSet = computeReleaseSet(
+      packages: packages,
+      pubDevVersions: pubVersions,
+      coReleaseEnabled: releasePrMode,
+    );
+    final latestFindings = auditPublishedLatestErrors(
       packages: packages,
       workspaceNames: workspaceNames,
       pubDevVersions: pubVersions,
       publishedLatestDeps: latestDeps,
-    );
-    final releaseSet = computeReleaseSet(
-      packages: packages,
-      pubDevVersions: pubVersions,
-      coReleaseEnabled: true,
+      releaseSet: releaseSet,
+      releasePrMode: releasePrMode,
     );
     final publishedAtVersion =
         await fetchPublishedWorkspaceDepsForShippedPubspecVersions(
@@ -1194,7 +1232,29 @@ Future<int> runAuditPublished({
       releaseSet: releaseSet,
       publishedDepsAtExactVersion: publishedAtVersion,
     );
-    final allErrors = [...errors, ...constraintDriftErrors];
+    var provenanceWarnings = <String>[];
+    var provenanceErrors = <String>[];
+    if (repoRoot != null) {
+      final provenance = await evaluateTagSourcePubDevProvenance(
+        packages: packages,
+        pubDevVersions: pubVersions,
+        publishedDepsAtExactVersion: publishedAtVersion,
+        repoRoot: repoRoot,
+      );
+      provenanceWarnings = provenance.warnings;
+      provenanceErrors = provenance.errors;
+    }
+  final allErrors = [
+      ...latestFindings.errors,
+      ...constraintDriftErrors,
+      ...provenanceErrors,
+    ];
+    for (final w in [
+      ...latestFindings.warnings,
+      ...provenanceWarnings,
+    ]) {
+      stdout.writeln('::warning::$w');
+    }
     if (allErrors.isEmpty) {
       stdout.writeln('All pub.dev latest packages resolve sibling deps.');
       return 0;
