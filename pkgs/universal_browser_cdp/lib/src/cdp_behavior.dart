@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:meta/meta.dart';
 import 'package:universal_automation_interface/universal_automation_interface.dart';
 
 import 'cdp_driver.dart';
@@ -87,13 +88,16 @@ class BehavioralCdpDriver extends CdpDriver implements BehavioralDriver {
     return outcome;
   }
 
+  @visibleForTesting
+  Future<void> enforceReactionFloorForTest(int floorUs) =>
+      _enforceReactionFloor(floorUs);
+
   Future<void> _enforceReactionFloor(int floorUs) async {
     if (floorUs <= 0) return;
     final clock = page.observationMonotonic;
     if (clock == null) return;
-    final elapsedUs = clock.elapsedMicroseconds;
-    final remainingUs = floorUs - elapsedUs;
-    if (remainingUs > 0) {
+    while (clock.elapsedMicroseconds < floorUs) {
+      final remainingUs = floorUs - clock.elapsedMicroseconds;
       await Future<void>.delayed(Duration(microseconds: remainingUs));
     }
   }

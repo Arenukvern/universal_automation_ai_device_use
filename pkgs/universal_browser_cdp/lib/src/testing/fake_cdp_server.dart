@@ -26,6 +26,19 @@ class FakeCdpServer {
   /// Recorded `Input.*` params, prefixed with the method name.
   final List<Map<String, Object?>> inputEvents = [];
 
+  /// When set, [firstMousePressedAtObservation] samples this stopwatch on the
+  /// first `Input.dispatchMouseEvent` with `type: mousePressed` (same clock as
+  /// behavioral reaction floors on [CdpPage]).
+  Stopwatch? observationMonotonic;
+
+  /// Elapsed on [observationMonotonic] when the first mouse press input lands.
+  Duration? firstMousePressedAtObservation;
+
+  /// Clears [firstMousePressedAtObservation] before a behavioral dispatch test.
+  void clearInputObservationTiming() {
+    firstMousePressedAtObservation = null;
+  }
+
   /// Recorded `Page.screencastFrameAck` params.
   final List<Map<String, Object?>> screencastAcks = [];
 
@@ -365,6 +378,14 @@ class FakeCdpServer {
         });
       default:
         if (method.startsWith('Input.')) {
+          if (method == 'Input.dispatchMouseEvent' &&
+              params['type'] == 'mousePressed' &&
+              firstMousePressedAtObservation == null) {
+            final clock = observationMonotonic;
+            if (clock != null) {
+              firstMousePressedAtObservation = clock.elapsed;
+            }
+          }
           inputEvents.add({'method': method, ...params});
         }
         respond(const {});
