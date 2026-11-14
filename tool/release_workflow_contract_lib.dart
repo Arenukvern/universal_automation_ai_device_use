@@ -20,12 +20,24 @@ const ghRunListJsonFieldsGh21030 = <String>[
   'workflowName',
 ];
 
-const exactReleaseBinariesRunName = 'release-binaries \${{ inputs.release_tag }}';
+const exactReleaseBinariesRunName = r'release-binaries ${{ inputs.release_tag }}';
 const exactPublishIf = 'inputs.dry_run != true';
 const exactPostflightIf = 'inputs.dry_run != true';
 const exactDryRunBundleIf = 'inputs.dry_run == true';
 
 const signStepName = 'Sign macOS bundle';
+
+const requiredScriptSteps = <String, String>{
+  'assert_release_assets_complete.sh': 'postflight',
+  'verify_release_tarball_architecture.sh': 'build',
+  'check_release_assets_conflict.sh': 'publish',
+};
+
+const allowedBuildJobEnvSecretKeys = <String>{
+  'HAS_SIGNING',
+  'HAS_CERT_P12',
+  'HAS_CERT_PASSWORD',
+};
 
 /// Structural validation for `.github/workflows/release_binaries.yml`.
 List<String> validateReleaseBinariesWorkflowYaml(
@@ -101,6 +113,16 @@ List<String> validateReleaseBinariesWorkflowYaml(
   requireExactJobIf('postflight', exactPostflightIf);
   requireExactJobIf('dry-run-bundle', exactDryRunBundleIf);
 
+  for (final entry in jobsMap.entries) {
+    final job = entry.value;
+    if (job is Map && job['continue-on-error'] == true) {
+      errors.add('$label: job ${entry.key} must not set continue-on-error');
+    }
+  }
+
+  errors.addAll(_validateRequiredScriptSteps(jobsMap, label));
+  errors.addAll(_validateRunBlocksBeforeScripts(jobsMap, label));
+
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
     final needs = postflight['needs'];
@@ -109,21 +131,6 @@ List<String> validateReleaseBinariesWorkflowYaml(
     if (!needsList.contains('prepare') || !needsList.contains('publish')) {
       errors.add('$label: postflight must need prepare and publish');
     }
-    if (!_stepRunsScriptAtCommandStart(
-      postflight,
-      'assert_release_assets_complete.sh',
-    )) {
-      errors.add(
-        '$label: postflight must invoke assert_release_assets_complete.sh as a command',
-      );
-    }
-    errors.addAll(
-      _requiredRunStepViolations(
-        postflight,
-        label,
-        stepNameHint: 'Assert release',
-      ),
-    );
   }
 
   final build = jobsMap['build'];
@@ -133,14 +140,6 @@ List<String> validateReleaseBinariesWorkflowYaml(
       errors.add('$label: build must need prepare');
     }
     errors.addAll(_validateSigningSecretsScope(build, label));
-    errors.addAll(
-      _requiredRunStepViolations(
-        build,
-        label,
-        scriptName: 'verify_release_tarball_architecture.sh',
-        stepNameHint: 'Verify archive architecture',
-      ),
-    );
   }
 
   if (!jobsMap.containsKey('dry-run-bundle')) {
@@ -162,16 +161,144 @@ List<String> validateReleaseBinariesWorkflowYaml(
     errors.add('$label: publish job must set append_body: true on action-gh-release');
   }
 
-  errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, label));
+  errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, yamlText, label));
 
   return errors;
 }
 
-List<String> _workflowSecretsOutsideAllowlist(
+List<String> _validateRequiredScriptSteps(
   Map<dynamic, dynamic> jobsMap,
   String label,
 ) {
   final errors = <String>[];
+  for (final entry in requiredScriptSteps.entries) {
+    final script = entry.key;
+    final jobId = entry.value;
+    final job = jobsMap[jobId];
+    if (job is! Map) {
+      errors.add('$label: missing job $jobId for required script $script');
+      continue;
+    }
+    final unconditional =
+        _unconditionalScriptSteps(job).where((s) => _stepInvokesScript(s, script)).toList();
+    final conditional =
+        _conditionalScriptSteps(job).where((s) => _stepInvokesScript(s, script)).toList();
+
+    if (unconditional.length != 1) {
+      errors.add(
+        '$label: job $jobId must have exactly one unconditional step running $script '
+        '(found ${unconditional.length})',
+      );
+    }
+    if (conditional.isNotEmpty) {
+      errors.add(
+        '$label: job $jobId must not run $script in conditional steps '
+        '(found ${conditional.length} with if:)',
+      );
+    }
+  }
+  return errors;
+}
+
+List<String> _validateRunBlocksBeforeScripts(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  for (final script in requiredScriptSteps.keys) {
+    for (final job in jobsMap.values) {
+      if (job is! Map) {
+        continue;
+      }
+      final steps = job['steps'];
+      if (steps is! List) {
+        continue;
+      }
+      for (final step in steps) {
+        if (step is! Map) {
+          continue;
+        }
+        if (!_stepInvokesScript(step, script)) {
+          continue;
+        }
+        final run = step['run']?.toString() ?? '';
+        if (_runDisablesEerrexitBeforeScript(run, script)) {
+          errors.add(
+            '$label: step `${step['name']}` must not use exit 0/set +e before $script',
+          );
+        }
+        if (step.containsKey('if')) {
+          errors.add(
+            '$label: required script $script must not run under step if: '
+            '(step `${step['name']}`)',
+          );
+        }
+        if (step['continue-on-error'] == true) {
+          errors.add(
+            '$label: step running $script must not set continue-on-error',
+          );
+        }
+        final trimmedRun = run.trim();
+        if (trimmedRun.contains('|| true') || trimmedRun.contains('|| :')) {
+          errors.add('$label: step running $script must not use || true/|| :');
+        }
+      }
+    }
+  }
+  return errors;
+}
+
+bool _runDisablesEerrexitBeforeScript(String run, String script) {
+  final escaped = RegExp.escape(script);
+  final invoke = RegExp(r'(bash|sh)\s+.*' + escaped);
+  var seenScript = false;
+  for (final line in run.split('\n')) {
+    final command = _stripInlineComment(line).trim();
+    if (command.isEmpty) {
+      continue;
+    }
+    if (!seenScript) {
+      if (RegExp(r'^(exit\s+0|set\s+\+e)\b').hasMatch(command)) {
+        return true;
+      }
+      if (invoke.hasMatch(command)) {
+        seenScript = true;
+      }
+    }
+  }
+  return false;
+}
+
+List<Map<dynamic, dynamic>> _unconditionalScriptSteps(Map<dynamic, dynamic> job) {
+  final steps = job['steps'];
+  if (steps is! List) {
+    return [];
+  }
+  return steps
+      .whereType<Map>()
+      .where((s) => !s.containsKey('if'))
+      .toList();
+}
+
+List<Map<dynamic, dynamic>> _conditionalScriptSteps(Map<dynamic, dynamic> job) {
+  final steps = job['steps'];
+  if (steps is! List) {
+    return [];
+  }
+  return steps.whereType<Map>().where((s) => s.containsKey('if')).toList();
+}
+
+bool _stepInvokesScript(Map<dynamic, dynamic> step, String scriptName) {
+  return _stepRunsScriptAtCommandStart(step, scriptName);
+}
+
+List<String> _workflowSecretsOutsideAllowlist(
+  Map<dynamic, dynamic> jobsMap,
+  String yamlText,
+  String label,
+) {
+  final errors = <String>[];
+  final secretPattern = RegExp(r'\$\{\{\s*secrets\.\w+');
 
   for (final entry in jobsMap.entries) {
     final jobId = entry.key.toString();
@@ -183,12 +310,14 @@ List<String> _workflowSecretsOutsideAllowlist(
     if (jobEnv is Map) {
       if (jobId == 'build') {
         for (final key in jobEnv.keys) {
-          if (key == 'HAS_SIGNING') {
+          final k = key.toString();
+          if (allowedBuildJobEnvSecretKeys.contains(k)) {
             continue;
           }
           if (jobEnv[key].toString().contains('secrets.')) {
             errors.add(
-              '$label: build job env may only reference secrets in HAS_SIGNING',
+              '$label: build job env may only reference secrets in '
+              '${allowedBuildJobEnvSecretKeys.join(", ")}',
             );
           }
         }
@@ -210,21 +339,38 @@ List<String> _workflowSecretsOutsideAllowlist(
         continue;
       }
       final stepName = step['name']?.toString() ?? '';
+      if (step.containsKey('if')) {
+        final ifExpr = step['if'].toString();
+        if (secretPattern.hasMatch(ifExpr) ||
+            RegExp(r'\bsecrets\.\w+').hasMatch(ifExpr)) {
+          errors.add(
+            '$label: step `$stepName` must not reference secrets in if:',
+          );
+        }
+      }
       final stepEnv = step['env'];
-      if (stepEnv is! Map) {
-        continue;
+      if (stepEnv is Map) {
+        final referencesSecrets =
+            stepEnv.values.any((v) => v.toString().contains('secrets.'));
+        if (referencesSecrets &&
+            !(jobId == 'build' && stepName == signStepName)) {
+          errors.add(
+            '$label: secrets in step env only allowed on build/$signStepName '
+            '(got $jobId/$stepName)',
+          );
+        }
       }
-      final referencesSecrets =
-          stepEnv.values.any((v) => v.toString().contains('secrets.'));
-      if (!referencesSecrets) {
-        continue;
+      final withMap = step['with'];
+      if (withMap is Map) {
+        for (final v in withMap.values) {
+          if (v.toString().contains('secrets.')) {
+            errors.add('$label: step `$stepName` must not reference secrets in with:');
+          }
+        }
       }
-      final allowed =
-          jobId == 'build' && stepName == signStepName;
-      if (!allowed) {
-        errors.add(
-          '$label: secrets in step env only allowed on build/$signStepName (got $jobId/$stepName)',
-        );
+      final run = step['run']?.toString() ?? '';
+      if (run.contains('secrets.') && !(jobId == 'build' && stepName == signStepName)) {
+        errors.add('$label: step `$stepName` must not reference secrets in run:');
       }
     }
   }
@@ -242,56 +388,12 @@ List<String> _validateSigningSecretsScope(
     return errors;
   }
   for (final key in env.keys) {
-    if (key == 'HAS_SIGNING') {
+    if (allowedBuildJobEnvSecretKeys.contains(key.toString())) {
       continue;
     }
     final val = env[key].toString();
     if (val.contains('secrets.')) {
-      errors.add('$label: build job env may only reference secrets in HAS_SIGNING');
-    }
-  }
-  return errors;
-}
-
-List<String> _requiredRunStepViolations(
-  Map<dynamic, dynamic> job,
-  String label, {
-  String? scriptName,
-  String? stepNameHint,
-}) {
-  final errors = <String>[];
-  final steps = job['steps'];
-  if (steps is! List) {
-    return errors;
-  }
-  for (final step in steps) {
-    if (step is! Map) {
-      continue;
-    }
-    final name = step['name']?.toString() ?? '';
-    if (stepNameHint != null && !name.contains(stepNameHint)) {
-      if (scriptName != null && !_stepRunsScriptAtCommandStart(step, scriptName)) {
-        continue;
-      }
-    }
-    if (scriptName != null) {
-      final run = step['run'];
-      if (run is! String || !run.contains(scriptName)) {
-        continue;
-      }
-    } else if (stepNameHint != null && !name.contains(stepNameHint)) {
-      continue;
-    }
-
-    if (step.containsKey('if')) {
-      errors.add('$label: step `$name` must not use `if:`');
-    }
-    if (step['continue-on-error'] == true) {
-      errors.add('$label: step `$name` must not set continue-on-error');
-    }
-    final run = step['run']?.toString() ?? '';
-    if (run.contains('|| true') || run.contains('|| :')) {
-      errors.add('$label: step `$name` must not use `|| true` or `|| :`');
+      errors.add('$label: build job env may only reference secrets in HAS_* keys');
     }
   }
   return errors;
@@ -350,34 +452,26 @@ bool _allCheckoutsPersistFalse(Map<dynamic, dynamic> jobsMap) {
 }
 
 /// True when [scriptName] is invoked via `bash …/scriptName` on a real command line.
-bool _stepRunsScriptAtCommandStart(dynamic jobOrStep, String scriptName) {
-  final steps = jobOrStep is Map && jobOrStep.containsKey('steps')
-      ? jobOrStep['steps']
-      : [jobOrStep];
-  if (steps is! List) {
+bool _stepRunsScriptAtCommandStart(dynamic step, String scriptName) {
+  if (step is! Map) {
+    return false;
+  }
+  final run = step['run'];
+  if (run is! String) {
     return false;
   }
   final escaped = RegExp.escape(scriptName);
   final invokePattern = RegExp(r'^(bash|sh)\s+.*' + escaped);
-  for (final step in steps) {
-    if (step is! Map) {
+  for (final line in run.split('\n')) {
+    final command = _stripInlineComment(line).trim();
+    if (command.isEmpty || command.startsWith('#')) {
       continue;
     }
-    final run = step['run'];
-    if (run is! String) {
+    if (RegExp(r'^true\b').hasMatch(command)) {
       continue;
     }
-    for (final line in run.split('\n')) {
-      final command = _stripInlineComment(line).trim();
-      if (command.isEmpty || command.startsWith('#')) {
-        continue;
-      }
-      if (RegExp(r'^true\b').hasMatch(command)) {
-        continue;
-      }
-      if (invokePattern.hasMatch(command)) {
-        return true;
-      }
+    if (invokePattern.hasMatch(command)) {
+      return true;
     }
   }
   return false;

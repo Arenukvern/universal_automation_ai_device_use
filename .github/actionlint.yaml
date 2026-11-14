@@ -1,0 +1,4 @@
+# Intel macOS hosted runner label used in release_binaries.yml matrix.
+self-hosted-runner:
+  labels:
+    - macos-15-intel

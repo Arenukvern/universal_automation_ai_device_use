@@ -28,14 +28,6 @@ function Resolve-LatestVersion {
 
 function Resolve-PhysicalRoot([string]$Path) {
   if (-not (Test-Path -LiteralPath $Path)) { return $null }
-  try {
-    $resolved = [System.IO.Directory]::ResolveLinkTarget($Path, $true)
-    if ($null -ne $resolved) {
-      return $resolved.FullName
-    }
-  } catch {
-    # PowerShell 5.1 fallback below.
-  }
   $item = Get-Item -LiteralPath $Path -Force
   if (($item.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) {
     $target = $item.Target
@@ -81,11 +73,11 @@ function Switch-CurrentJunction([string]$InstallRoot) {
   $parent = $ShareRoot
   $tmpPath = Join-Path $parent ".current-$PID"
   Remove-DirectoryJunction $tmpPath
-  Remove-DirectoryJunction $CurrentLink
   $out = cmd /c "mklink /J `"$tmpPath`" `"$abs`""
   if ($LASTEXITCODE -ne 0) {
     throw "mklink /J failed ($LASTEXITCODE): $out"
   }
+  Remove-DirectoryJunction $CurrentLink
   Rename-Item -LiteralPath $tmpPath -NewName "current"
 }
 
@@ -115,8 +107,11 @@ function Prune-VersionDirs([string]$Ver, [string]$KeepCurrent, [string]$KeepPrev
     $fullKey = Normalize-PathKey $_.FullName
     if ($fullKey -eq $keepCurrentKey) { return }
     if ($keepPreviousKey -and $fullKey -eq $keepPreviousKey) { return }
+    $trashName = ".trash-$PID-" + [guid]::NewGuid().ToString("N").Substring(0, 8)
+    $trashPath = Join-Path $VersionsDir $trashName
     try {
-      Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop
+      Rename-Item -LiteralPath $_.FullName -NewName $trashName -ErrorAction Stop
+      Remove-Item -LiteralPath $trashPath -Recurse -Force -ErrorAction Stop
     } catch {
       Write-Warning "Skipped pruning in-use directory: $($_.FullName)"
     }
@@ -159,8 +154,9 @@ New-Item -ItemType Directory -Path $temp -Force | Out-Null
 try {
   $archivePath = Join-Path $temp $archive
   $checksumsPath = Join-Path $temp "checksums.txt"
-  Invoke-WebRequest -Uri "$BaseUrl/$archive" -OutFile $archivePath -UseBasicParsing
-  Invoke-WebRequest -Uri "$BaseUrl/checksums.txt" -OutFile $checksumsPath -UseBasicParsing
+  $noCache = @{ "Cache-Control" = "no-cache" }
+  Invoke-WebRequest -Uri "$BaseUrl/$archive" -OutFile $archivePath -UseBasicParsing -Headers $noCache
+  Invoke-WebRequest -Uri "$BaseUrl/checksums.txt" -OutFile $checksumsPath -UseBasicParsing -Headers $noCache
 
   $matched = Select-String -Path $checksumsPath -Pattern "^[0-9a-fA-F]+\s+$([regex]::Escape($archive))$" | Select-Object -First 1
   if (-not $matched) { throw "Missing checksum for $archive" }
@@ -216,10 +212,9 @@ try {
   $ver = & $activeExe --version
   if ($LASTEXITCODE -ne 0) { throw "Active CLI --version failed" }
 
-  $physCurrent = Resolve-PhysicalRoot $CurrentLink
-  $cliForSnippet = Join-Path $physCurrent "bin\universal_automation.exe"
+  $cliForSnippet = Join-Path $CurrentLink "bin\universal_automation.exe"
   if (-not (Test-Path -LiteralPath $cliForSnippet)) {
-    $cliForSnippet = Join-Path $physCurrent "bin\universal-automation.exe"
+    $cliForSnippet = Join-Path $CurrentLink "bin\universal-automation.exe"
   }
 
   Write-Host "Installed universal-automation $ver"

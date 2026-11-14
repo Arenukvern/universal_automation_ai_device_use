@@ -45,6 +45,7 @@ jobs:
         run: |
           set -euo pipefail
           chmod +x tool/release/*.sh tool/contracts/*.sh install.sh
+          bash tool/contracts/run_actionlint.sh
           bash tool/contracts/check_release_workflow.sh
           bash tool/contracts/check_macos_release_shell_compat.sh
           bash tool/contracts/check_plugin_version_sync.sh
@@ -64,8 +65,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
 
-      - name: install.ps1 contract test
+      - name: install.ps1 contract test (PowerShell 7)
         shell: pwsh
+        run: ./tool/contracts/test_install.ps1
+
+      - name: install.ps1 contract test (Windows PowerShell 5.1)
+        shell: powershell
         run: ./tool/contracts/test_install.ps1
 
   analyze:

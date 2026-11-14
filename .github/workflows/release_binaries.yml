@@ -123,6 +123,8 @@ jobs:
     timeout-minutes: 45
     env:
       HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' }}
+      HAS_CERT_P12: ${{ secrets.MACOS_CERT_P12 != '' }}
+      HAS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD != '' }}
 
     steps:
       - name: Checkout workflow tooling (trusted SHA)
@@ -170,7 +172,7 @@ jobs:
             --defer-archive
 
       - name: Warn partial macOS signing secrets
-        if: (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64') && ((secrets.MACOS_CERT_P12 != '') != (secrets.MACOS_CERT_PASSWORD != ''))
+        if: (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64') && ((env.HAS_CERT_P12 == 'true') != (env.HAS_CERT_PASSWORD == 'true'))
         shell: bash
         run: |
           echo "::warning::Partial macOS signing secrets — configure both MACOS_CERT_P12 and MACOS_CERT_PASSWORD or neither"
@@ -309,7 +311,9 @@ jobs:
           body: |
             ## Prebuilt `universal-automation` binaries
 
-            macOS darwin archives: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' && '**signed with Developer ID** (macOS Sign step ran).' || '**preview (unsigned)** until signing secrets are configured (see [RELEASING.md](RELEASING.md)).' }}
+            macOS darwin archives are **signed with Developer ID** when the CI
+            **Sign macOS bundle** step runs (`HAS_SIGNING=true` on the build job);
+            otherwise they are **preview (unsigned)** (see [RELEASING.md](RELEASING.md)).
 
             Install without Dart:
 
