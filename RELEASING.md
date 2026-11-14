@@ -84,35 +84,32 @@ See [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) for pu
 
 Tags: `universal_automation_toolkit-v<version>` (Release Please). When the
 toolkit ships on a release train, **`release-please.yml` calls**
-**`.github/workflows/release_binaries.yml`** as a reusable workflow (no
-`workflow_dispatch` — integration tokens do not reliably trigger sibling
-workflows). Zero manual steps:
+**`release_binaries_build.yml`** then **`release_binaries_publish.yml`** (no
+`workflow_dispatch` between them — integration tokens do not reliably trigger
+sibling workflows). Zero manual steps:
 
-1. **`release-binaries`** job in `release-please.yml` runs when
-   `pkgs/universal_automation_toolkit--release_created` is true, passing the
-   toolkit tag and `dry_run: false`. `wait-package-publish` **`needs`**
-   that job (success or skipped) before the strict post-publish audit.
-2. **`release_binaries.yml`** checks out **trusted tooling on `main`** plus
-   **immutable tag source**, builds `dart build cli` per matrix (darwin-arm64 on
-   `macos-15`, darwin-x64 on `macos-15-intel` — GitHub retired `macos-13` on
-   2025-12-04; Intel runners sunset **Aug 2027**, linux-x64, windows-x64 zip),
-   verifies architectures (CLI **and** bundled `.dylib`/`.so`/`.dll`), uploads
-   assets to the **existing** toolkit release, writes `checksums.txt`, and
-   **postflight** `assert_release_assets_complete.sh` asserts every expected
-   asset is present.
+1. **`release-binaries-build`** (`release_binaries_build.yml`, `contents: read`
+   only) runs when `pkgs/universal_automation_toolkit--release_created` is true,
+   passing the toolkit tag and `dry_run: false`. It checks out **caller tooling
+   ref on the default branch** plus **immutable tag source**, builds four
+   matrix legs, and (for production) signs macOS when secrets are present.
+2. **`release-binaries-publish`** (`release_binaries_publish.yml`, `contents:
+   write` on publish only) downloads artifacts from the build run id, uploads to
+   the **existing** toolkit release, writes `checksums.txt`, and **postflight**
+   `assert_release_assets_complete.sh`.
+3. `wait-package-publish` **`needs`** both jobs (success or skipped) before the
+   strict post-publish audit.
 
 ### PR / main path smoke (all four legs, artifacts only)
 
-**`.github/workflows/release_binaries_pr.yml`** runs on pull requests and pushes
-to `main` when release-related paths change. It mirrors the **`release_binaries.yml`**
-dry-run legs (`prepare` → four-way `build` → `dry-run-bundle`) with
-`release_tag` = PR head SHA (or `github.sha` on `main`). Fork PRs get no signing
-secrets (unsigned macOS is fine). **`publish` / `postflight` never run**.
+**`.github/workflows/release_binaries_pr.yml`** calls
+**`release_binaries_build.yml`** with `dry_run: true`, `tooling_ref` = PR head
+SHA (or `github.sha` on `main`), and **no secrets**. Fork PRs get unsigned
+macOS builds. Publish never runs on PRs.
 
 ### Manual escape hatch (`workflow_dispatch`)
 
-Re-attach assets for an old tag, or dry-run from an arbitrary ref without opening
-a PR:
+**`release_binaries.yml`** chains build → publish for operators:
 
 ```bash
 gh workflow run release_binaries.yml \
@@ -123,7 +120,6 @@ gh workflow run release_binaries.yml \
 # artifact-only (no GitHub Release upload):
 gh workflow run release_binaries.yml \
   --repo Arenukvern/universal_automation_ai_device_use \
-  --ref main \
   -f dry_run=true \
   -f release_tag=<40-char-SHA-or-branch-name>
 ```

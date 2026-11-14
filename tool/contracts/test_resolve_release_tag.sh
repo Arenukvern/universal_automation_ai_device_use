@@ -23,6 +23,16 @@ grep -q 'release_tag=universal_automation_toolkit-v1.2.3' "$out" || fail "releas
 grep -q 'version=1.2.3' "$out" || fail "version output"
 grep -q 'release_ref=refs/tags/universal_automation_toolkit-v1.2.3' "$out" || fail "release_ref output"
 
+for event in workflow_dispatch push workflow_call; do
+  : >"$out"
+  GITHUB_EVENT_NAME="$event" \
+    DISPATCH_RELEASE_TAG=universal_automation_toolkit-v2.0.0 \
+    DRY_RUN=false \
+    GITHUB_OUTPUT="$out" \
+    bash "$SCRIPT" || fail "production tag with event=$event"
+  grep -q 'release_tag=universal_automation_toolkit-v2.0.0' "$out" || fail "event=$event release_tag"
+done
+
 if GITHUB_EVENT_NAME=workflow_dispatch DISPATCH_RELEASE_TAG=bad-tag DRY_RUN=false GITHUB_OUTPUT="$out" bash "$SCRIPT" 2>/dev/null; then
   fail "invalid tag must fail"
 fi

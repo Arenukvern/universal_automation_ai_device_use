@@ -20,16 +20,24 @@ const ghRunListJsonFieldsGh21030 = <String>[
   'workflowName',
 ];
 
-const exactReleaseBinariesRunName = r'release-binaries ${{ inputs.release_tag }}';
+const exactReleaseBinariesBuildRunName =
+    "release-binaries-build \${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}";
+const exactReleaseBinariesDispatchRunName =
+    r'release-binaries ${{ inputs.release_tag }}';
+const releaseBinariesBuildWorkflowPath =
+    './.github/workflows/release_binaries_build.yml';
 const exactPublishIf = 'inputs.dry_run != true';
 const exactPostflightIf = 'inputs.dry_run != true';
 const exactDryRunBundleIf = 'inputs.dry_run == true';
 
 const signStepName = 'Sign macOS bundle';
 
-const requiredScriptSteps = <String, String>{
-  'assert_release_assets_complete.sh': 'postflight',
+const requiredScriptStepsBuild = <String, String>{
   'verify_release_tarball_architecture.sh': 'build',
+};
+
+const requiredScriptStepsPublish = <String, String>{
+  'assert_release_assets_complete.sh': 'postflight',
   'check_release_assets_conflict.sh': 'publish',
 };
 
@@ -54,10 +62,10 @@ const requiredGhReleaseAssetSuffixes = <String>[
   'checksums.txt',
 ];
 
-/// Structural validation for `.github/workflows/release_binaries.yml`.
-List<String> validateReleaseBinariesWorkflowYaml(
+/// Structural validation for `.github/workflows/release_binaries_build.yml`.
+List<String> validateReleaseBinariesBuildWorkflowYaml(
   String yamlText, {
-  String label = 'release_binaries.yml',
+  String label = 'release_binaries_build.yml',
 }) {
   final errors = <String>[];
   final dynamic doc;
@@ -102,6 +110,9 @@ List<String> validateReleaseBinariesWorkflowYaml(
       if (!inputs.containsKey('dry_run')) {
         errors.add('$label: on.$trigger.inputs.dry_run required');
       }
+      if (!inputs.containsKey('tooling_ref')) {
+        errors.add('$label: on.$trigger.inputs.tooling_ref required');
+      }
     }
   }
 
@@ -112,10 +123,15 @@ List<String> validateReleaseBinariesWorkflowYaml(
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
 
-  const requiredJobs = ['prepare', 'build', 'publish', 'postflight'];
+  const requiredJobs = ['prepare', 'build', 'dry-run-bundle'];
   for (final id in requiredJobs) {
     if (!jobsMap.containsKey(id)) {
       errors.add('$label: missing job $id');
+    }
+  }
+  for (final forbidden in ['publish', 'postflight']) {
+    if (jobsMap.containsKey(forbidden)) {
+      errors.add('$label: must not define job $forbidden (publish is separate)');
     }
   }
 
@@ -130,8 +146,6 @@ List<String> validateReleaseBinariesWorkflowYaml(
     }
   }
 
-  requireExactJobIf('publish', exactPublishIf);
-  requireExactJobIf('postflight', exactPostflightIf);
   requireExactJobIf('dry-run-bundle', exactDryRunBundleIf);
 
   for (final entry in jobsMap.entries) {
@@ -141,18 +155,12 @@ List<String> validateReleaseBinariesWorkflowYaml(
     }
   }
 
-  errors.addAll(_validateRequiredScriptSteps(jobsMap, label));
-  errors.addAll(_validateRunBlocksBeforeScripts(jobsMap, label));
-
-  final postflight = jobsMap['postflight'];
-  if (postflight is Map) {
-    final needs = postflight['needs'];
-    final needsList =
-        needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
-    if (!needsList.contains('prepare') || !needsList.contains('publish')) {
-      errors.add('$label: postflight must need prepare and publish');
-    }
-  }
+  errors.addAll(
+    _validateRequiredScriptSteps(jobsMap, label, requiredScriptStepsBuild),
+  );
+  errors.addAll(
+    _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsBuild),
+  );
 
   final build = jobsMap['build'];
   if (build is Map) {
@@ -163,14 +171,10 @@ List<String> validateReleaseBinariesWorkflowYaml(
     errors.addAll(_validateSigningSecretsScope(build, label));
   }
 
-  if (!jobsMap.containsKey('dry-run-bundle')) {
-    errors.add('$label: missing dry-run-bundle job for artifact-only dry runs');
-  }
-
   final runName = root['run-name']?.toString().trim() ?? '';
-  if (runName != exactReleaseBinariesRunName) {
+  if (runName != exactReleaseBinariesBuildRunName) {
     errors.add(
-      '$label: run-name must be exactly `$exactReleaseBinariesRunName`',
+      '$label: run-name must be exactly `$exactReleaseBinariesBuildRunName`',
     );
   }
 
@@ -178,16 +182,159 @@ List<String> validateReleaseBinariesWorkflowYaml(
     errors.add('$label: every actions/checkout must set persist-credentials: false');
   }
 
-  if (!_publishUsesAppendBody(jobsMap['publish'])) {
-    errors.add('$label: publish job must set append_body: true on action-gh-release');
-  }
-
   errors.addAll(_workflowSecretsOutsideAllowlist(jobsMap, yamlText, label));
   errors.addAll(_validateBuildMatrix(jobsMap, label));
-  errors.addAll(_validatePublishNeeds(jobsMap, label));
+  errors.addAll(_validateReadOnlyPermissions(jobsMap, root, label));
+
+  return errors;
+}
+
+/// Alias for negative fixtures targeting the build reusable workflow.
+List<String> validateReleaseBinariesWorkflowYaml(
+  String yamlText, {
+  String label = 'release_binaries.yml',
+}) =>
+    validateReleaseBinariesBuildWorkflowYaml(yamlText, label: label);
+
+/// `.github/workflows/release_binaries_publish.yml` — publish + postflight only.
+List<String> validateReleaseBinariesPublishWorkflowYaml(
+  String yamlText, {
+  String label = 'release_binaries_publish.yml',
+}) {
+  final errors = <String>[];
+  final dynamic doc;
+  try {
+    doc = loadYaml(yamlText);
+  } catch (e) {
+    return ['$label: invalid YAML: $e'];
+  }
+  if (doc is! Map) {
+    return ['$label: root must be a mapping'];
+  }
+  final root = Map<dynamic, dynamic>.from(doc);
+  final on = root['on'];
+  if (on is! Map || !Map.from(on).containsKey('workflow_call')) {
+    errors.add('$label: on.workflow_call is required');
+  }
+  final jobs = root['jobs'];
+  if (jobs is! Map) {
+    errors.add('$label: jobs must be a mapping');
+    return errors;
+  }
+  final jobsMap = Map<dynamic, dynamic>.from(jobs);
+  if (!jobsMap.containsKey('publish') || !jobsMap.containsKey('postflight')) {
+    errors.add('$label: must define publish and postflight jobs');
+  }
+  errors.addAll(
+    _validateRequiredScriptSteps(jobsMap, label, requiredScriptStepsPublish),
+  );
+  errors.addAll(
+    _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsPublish),
+  );
   errors.addAll(_validateGhReleaseAssets(jobsMap, label));
   errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
+  final postflight = jobsMap['postflight'];
+  if (postflight is Map) {
+    final needs = postflight['needs'];
+    final needsList =
+        needs is List ? needs.map((e) => e.toString()).toList() : <String>[];
+    if (!needsList.contains('publish')) {
+      errors.add('$label: postflight must need publish');
+    }
+  }
+  return errors;
+}
 
+/// Manual `release_binaries.yml` dispatcher (workflow_dispatch → build + publish).
+List<String> validateReleaseBinariesDispatchWorkflowYaml(
+  String yamlText, {
+  String label = 'release_binaries.yml',
+}) {
+  final errors = <String>[];
+  final dynamic doc;
+  try {
+    doc = loadYaml(yamlText);
+  } catch (e) {
+    return ['$label: invalid YAML: $e'];
+  }
+  if (doc is! Map) {
+    return ['$label: root must be a mapping'];
+  }
+  final root = Map<dynamic, dynamic>.from(doc);
+  final on = root['on'];
+  if (on is! Map || !Map.from(on).containsKey('workflow_dispatch')) {
+    errors.add('$label: on.workflow_dispatch is required');
+  }
+  if (on is Map && Map.from(on).containsKey('workflow_call')) {
+    errors.add('$label: must not define workflow_call on dispatch wrapper');
+  }
+  final runName = root['run-name']?.toString().trim() ?? '';
+  if (runName != exactReleaseBinariesDispatchRunName) {
+    errors.add(
+      '$label: run-name must be exactly `$exactReleaseBinariesDispatchRunName`',
+    );
+  }
+  errors.addAll(_forbidSecretsInherit(yamlText, label));
+  final jobs = root['jobs'];
+  if (jobs is! Map) {
+    errors.add('$label: jobs missing');
+    return errors;
+  }
+  final jobsMap = Map<dynamic, dynamic>.from(jobs);
+  final build = jobsMap['build'];
+  final publish = jobsMap['publish'];
+  if (build is! Map ||
+      !build['uses'].toString().contains('release_binaries_build.yml')) {
+    errors.add('$label: build job must use release_binaries_build.yml');
+  }
+  if (publish is! Map ||
+      !publish['uses'].toString().contains('release_binaries_publish.yml')) {
+    errors.add('$label: publish job must use release_binaries_publish.yml');
+  }
+  if (build is Map) {
+    final secrets = build['secrets'];
+    if (secrets is! Map) {
+      errors.add('$label: build job must pass explicit signing secrets map');
+    }
+  }
+  return errors;
+}
+
+List<String> _forbidSecretsInherit(String yamlText, String label) {
+  if (RegExp(r'secrets:\s*inherit\b').hasMatch(yamlText)) {
+    return ['$label: secrets: inherit is forbidden (pass signing secrets by name)'];
+  }
+  return [];
+}
+
+List<String> _validateReadOnlyPermissions(
+  Map<dynamic, dynamic> jobsMap,
+  Map<dynamic, dynamic> root,
+  String label,
+) {
+  final errors = <String>[];
+  final workflowPerms = root['permissions'];
+  if (workflowPerms is Map) {
+    for (final entry in workflowPerms.entries) {
+      if (entry.value?.toString() == 'write') {
+        errors.add('$label: workflow permissions must not include write scopes');
+      }
+    }
+  }
+  for (final entry in jobsMap.entries) {
+    final job = entry.value;
+    if (job is! Map) {
+      continue;
+    }
+    final perms = job['permissions'];
+    if (perms is Map) {
+      for (final v in perms.values) {
+        if (v?.toString() == 'write') {
+          errors.add('$label: job ${entry.key} must not request contents: write');
+        }
+      }
+    }
+  }
   return errors;
 }
 
@@ -239,52 +386,41 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
     return errors;
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-
-  for (final entry in jobsMap.entries) {
-    final job = entry.value;
-    if (job is! Map) {
-      continue;
-    }
-    final uses = job['uses']?.toString() ?? '';
-    if (uses.isEmpty) {
-      continue;
-    }
-    if (!uses.contains('release_binaries.yml')) {
-      errors.add('$label: job ${entry.key} must use release_binaries.yml');
-    }
-    final withMap = job['with'];
-    if (withMap is! Map) {
-      errors.add('$label: job ${entry.key} must pass with:');
-      continue;
-    }
-    final dryRun = withMap['dry_run'];
-    if (dryRun != true && dryRun?.toString() != 'true') {
-      errors.add(
-        '$label: job ${entry.key} must pass dry_run: true literally',
-      );
-    }
-    final perms = job['permissions'];
-    if (perms is Map && perms['contents']?.toString() != 'read') {
-      errors.add('$label: caller job permissions.contents must be read');
-    }
+  if (jobsMap.length != 1) {
+    errors.add('$label: exactly one reusable-workflow caller job expected');
+  }
+  final smoke = jobsMap['smoke'];
+  if (smoke is! Map) {
+    errors.add('$label: missing smoke caller job');
     return errors;
   }
-
-  for (final id in ['prepare', 'build', 'dry-run-bundle']) {
-    if (!jobsMap.containsKey(id)) {
-      errors.add('$label: missing job $id (inline dry-run smoke)');
+  final uses = smoke['uses']?.toString() ?? '';
+  if (uses != releaseBinariesBuildWorkflowPath) {
+    errors.add(
+      '$label: smoke must use $releaseBinariesBuildWorkflowPath (got `$uses`)',
+    );
+  }
+  final withMap = smoke['with'];
+  if (withMap is! Map) {
+    errors.add('$label: smoke must pass with:');
+  } else {
+    final dryRun = withMap['dry_run'];
+    if (dryRun != true && dryRun?.toString() != 'true') {
+      errors.add('$label: smoke must pass dry_run: true literally');
     }
   }
-  if (jobsMap.containsKey('publish')) {
-    errors.add('$label: must not define publish on PR smoke workflow');
+  if (smoke.containsKey('secrets')) {
+    errors.add('$label: smoke must not pass signing secrets');
   }
-  errors.addAll(_validateBuildMatrix(jobsMap, label));
-  errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
-
+  errors.addAll(_forbidSecretsInherit(yamlText, label));
+  final perms = smoke['permissions'];
+  if (perms is Map && perms['contents']?.toString() != 'read') {
+    errors.add('$label: smoke permissions.contents must be read');
+  }
   return errors;
 }
 
-/// Caller job in release-please.yml must invoke release_binaries with dry_run false.
+/// Release-please binary train jobs: read-only build, then publish.
 List<String> validateReleasePleaseBinariesCaller(String yamlText) {
   final errors = <String>[];
   final dynamic doc;
@@ -301,26 +437,44 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
     return ['release-please.yml: jobs missing'];
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-  final caller = jobsMap['release-binaries'];
-  if (caller is! Map) {
-    return ['release-please.yml: missing release-binaries reusable-workflow job'];
-  }
-  final uses = caller['uses']?.toString() ?? '';
-  if (!uses.contains('release_binaries.yml')) {
-    errors.add('release-please.yml: release-binaries must use release_binaries.yml');
-  }
-  final withMap = caller['with'];
-  if (withMap is! Map) {
-    errors.add('release-please.yml: release-binaries must pass with:');
+  errors.addAll(_forbidSecretsInherit(yamlText, 'release-please.yml'));
+
+  final build = jobsMap['release-binaries-build'];
+  if (build is! Map) {
+    errors.add('release-please.yml: missing release-binaries-build job');
   } else {
-    final dryRun = withMap['dry_run'];
-    if (dryRun != false && dryRun?.toString() != 'false') {
-      errors.add('release-please.yml: release-binaries must pass dry_run: false');
+    if (build['uses']?.toString() != releaseBinariesBuildWorkflowPath) {
+      errors.add(
+        'release-please.yml: release-binaries-build must use $releaseBinariesBuildWorkflowPath',
+      );
+    }
+    final withMap = build['with'];
+    if (withMap is! Map) {
+      errors.add('release-please.yml: release-binaries-build must pass with:');
+    } else if (withMap['dry_run'] != false && withMap['dry_run']?.toString() != 'false') {
+      errors.add('release-please.yml: release-binaries-build must pass dry_run: false');
+    }
+    final perms = build['permissions'];
+    if (perms is Map && perms['contents']?.toString() != 'read') {
+      errors.add('release-please.yml: release-binaries-build needs contents: read');
+    }
+    final secrets = build['secrets'];
+    if (secrets is! Map) {
+      errors.add('release-please.yml: release-binaries-build must pass explicit secrets map');
     }
   }
-  final perms = caller['permissions'];
-  if (perms is Map && perms['contents']?.toString() != 'write') {
-    errors.add('release-please.yml: release-binaries job needs contents: write');
+
+  final publish = jobsMap['release-binaries-publish'];
+  if (publish is! Map) {
+    errors.add('release-please.yml: missing release-binaries-publish job');
+  } else {
+    if (!publish['uses'].toString().contains('release_binaries_publish.yml')) {
+      errors.add('release-please.yml: release-binaries-publish must use release_binaries_publish.yml');
+    }
+    final perms = publish['permissions'];
+    if (perms is Map && perms['contents']?.toString() != 'write') {
+      errors.add('release-please.yml: release-binaries-publish needs contents: write');
+    }
   }
   return errors;
 }
@@ -472,9 +626,10 @@ List<String> _validateContentsWriteScope(
 List<String> _validateRequiredScriptSteps(
   Map<dynamic, dynamic> jobsMap,
   String label,
+  Map<String, String> scripts,
 ) {
   final errors = <String>[];
-  for (final entry in requiredScriptSteps.entries) {
+  for (final entry in scripts.entries) {
     final script = entry.key;
     final jobId = entry.value;
     final job = jobsMap[jobId];
@@ -506,9 +661,10 @@ List<String> _validateRequiredScriptSteps(
 List<String> _validateRunBlocksBeforeScripts(
   Map<dynamic, dynamic> jobsMap,
   String label,
+  Map<String, String> scripts,
 ) {
   final errors = <String>[];
-  for (final script in requiredScriptSteps.keys) {
+  for (final script in scripts.keys) {
     for (final job in jobsMap.values) {
       if (job is! Map) {
         continue;

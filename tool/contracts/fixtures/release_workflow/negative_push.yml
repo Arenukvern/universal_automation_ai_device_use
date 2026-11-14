@@ -1,21 +1,64 @@
-name: Release binaries (toolkit)
-run-name: release-binaries ${{ inputs.release_tag }}
+name: Release binaries build
+run-name: release-binaries-build ${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}
 
-# Release Please creates tags/releases with GITHUB_TOKEN; those events do not
-# trigger other workflows. Dispatch explicitly from release-please.yml / train.
 on:
+  workflow_dispatch:
   push:
     branches: [main]
-  # workflow_dispatch:
-  #   inputs:
-  #     release_tag:
-  #       required: true
+    inputs:
+      release_tag:
+        description: Toolkit release tag or dry-run git ref/SHA.
+        required: true
+        type: string
+      dry_run:
+        description: Artifact-only build; never upload to a GitHub Release.
+        required: false
+        type: boolean
+        default: false
+      tooling_ref:
+        description: Commit that supplies tool/release scripts.
+        required: true
+        type: string
+  workflow_call_DISABLED:
+    inputs:
+      release_tag:
+        required: true
+        type: string
+      dry_run:
+        required: false
+        type: boolean
+        default: false
+      tooling_ref:
+        required: true
+        type: string
+    outputs:
+      release_tag:
+        value: ${{ jobs.prepare.outputs.release_tag }}
+      version:
+        value: ${{ jobs.prepare.outputs.version }}
+      release_sha:
+        value: ${{ jobs.prepare.outputs.release_sha }}
+      artifact_run_id:
+        value: ${{ github.run_id }}
+    secrets:
+      MACOS_CERT_P12:
+        required: false
+      MACOS_CERT_PASSWORD:
+        required: false
+      MACOS_CODESIGN_IDENTITY:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
+      APPLE_APP_PASSWORD:
+        required: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-binaries-${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}
+  group: release-binaries-build-${{ inputs.dry_run == true && 'dry-run' || inputs.release_tag }}
   cancel-in-progress: false
 
 env:
@@ -32,17 +75,16 @@ jobs:
       release_ref: ${{ steps.resolve.outputs.release_ref }}
       dry_run: ${{ steps.resolve.outputs.dry_run }}
     steps:
-      - name: Checkout workflow tooling (trusted SHA on main)
+      - name: Checkout workflow tooling at caller commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.tooling_ref }}
           path: ${{ env.TOOLING_CHECKOUT_PATH }}
           persist-credentials: false
 
       - name: Resolve release target
         id: resolve
         env:
-          GITHUB_EVENT_NAME: ${{ github.event_name }}
           DISPATCH_RELEASE_TAG: ${{ inputs.release_tag }}
           DRY_RUN: ${{ inputs.dry_run }}
         run: bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/resolve_release_tag.sh"
@@ -59,10 +101,11 @@ jobs:
         name: Record and verify release commit SHA
         env:
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+          DRY_RUN: ${{ inputs.dry_run }}
         run: |
           set -euo pipefail
           head_sha="$(git -C "${{ env.RELEASE_SRC_PATH }}" rev-parse "HEAD^{commit}")"
-          if [[ "${{ inputs.dry_run }}" != "true" ]]; then
+          if [[ "$DRY_RUN" != "true" ]]; then
             tag_sha="$(git -C "${{ env.RELEASE_SRC_PATH }}" rev-parse "refs/tags/${RELEASE_TAG}^{commit}")"
             if [[ "$tag_sha" != "$head_sha" ]]; then
               echo "::error::release-src HEAD ($head_sha) != tag^{commit} ($tag_sha)"
@@ -113,13 +156,18 @@ jobs:
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 45
     env:
-      HAS_SIGNING: ${{ secrets.MACOS_CERT_P12 != '' && secrets.MACOS_CERT_PASSWORD != '' }}
+      HAS_SIGNING: >-
+        ${{ inputs.dry_run != true && secrets.MACOS_CERT_P12 != '' &&
+        secrets.MACOS_CERT_PASSWORD != '' }}
+      HAS_CERT_P12: ${{ inputs.dry_run != true && secrets.MACOS_CERT_P12 != '' }}
+      HAS_CERT_PASSWORD: >-
+        ${{ inputs.dry_run != true && secrets.MACOS_CERT_PASSWORD != '' }}
 
     steps:
-      - name: Checkout workflow tooling (trusted SHA)
+      - name: Checkout workflow tooling at caller commit
         uses: actions/checkout@v7
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ inputs.tooling_ref }}
           path: ${{ env.TOOLING_CHECKOUT_PATH }}
           persist-credentials: false
 
@@ -160,8 +208,20 @@ jobs:
             --skip-sign \
             --defer-archive
 
+      - name: Warn partial macOS signing secrets
+        if: >-
+          inputs.dry_run != true &&
+          (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64') &&
+          ((env.HAS_CERT_P12 == 'true') != (env.HAS_CERT_PASSWORD == 'true'))
+        shell: bash
+        run: |
+          echo "::warning::Partial macOS signing secrets — configure both MACOS_CERT_P12 and MACOS_CERT_PASSWORD or neither"
+
       - name: Sign macOS bundle
-        if: env.HAS_SIGNING == 'true' && (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64')
+        if: >-
+          inputs.dry_run != true &&
+          env.HAS_SIGNING == 'true' &&
+          (matrix.triple == 'darwin-arm64' || matrix.triple == 'darwin-x64')
         shell: bash
         env:
           MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
@@ -172,12 +232,12 @@ jobs:
           APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
         run: |
           set -euo pipefail
+          trap 'bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/cleanup_signing_keychain.sh"' EXIT
           sign_env="$(mktemp)"
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/setup_signing_keychain.sh" "$sign_env"
           # shellcheck source=/dev/null
           source "$sign_env"
           export MACOS_CERT_FILE MACOS_SIGNING_KEYCHAIN MACOS_SIGNING_KEYCHAIN_PATH
-          trap 'bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/cleanup_signing_keychain.sh"' EXIT
           dist="${{ env.RELEASE_SRC_PATH }}/dist/release"
           stage="${dist}/universal_automation_${{ needs.prepare.outputs.version }}_${{ matrix.triple }}"
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/codesign_macos_bundle.sh" "$stage"
@@ -195,7 +255,7 @@ jobs:
             --skip-sign \
             --package-only
 
-      - name: Verify archive architecture (trusted tooling script)
+      - name: Verify archive architecture (tooling script)
         shell: bash
         env:
           VERSION: ${{ needs.prepare.outputs.version }}
@@ -246,94 +306,3 @@ jobs:
           name: release-dry-run-${{ needs.prepare.outputs.version }}
           path: dist/release/*
           if-no-files-found: error
-
-  publish:
-    if: inputs.dry_run != true
-    permissions:
-      contents: write
-    runs-on: ubuntu-latest
-    needs: [prepare, build]
-    timeout-minutes: 15
-
-    steps:
-      - name: Checkout workflow tooling (trusted SHA)
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          path: ${{ env.TOOLING_CHECKOUT_PATH }}
-          persist-credentials: false
-
-      - name: Download release artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: dist/release
-          merge-multiple: true
-
-      - name: Generate checksums
-        run: |
-          set -euo pipefail
-          cd dist/release
-          shopt -s nullglob
-          files=(universal_automation_${{ needs.prepare.outputs.version }}_*.tar.gz universal_automation_${{ needs.prepare.outputs.version }}_*.zip)
-          sha256sum "${files[@]}" > checksums.txt
-
-      - name: Guard against conflicting GitHub release assets
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/check_release_assets_conflict.sh" \
-            "${{ needs.prepare.outputs.release_tag }}" \
-            "${{ needs.prepare.outputs.version }}"
-
-      - name: Publish GitHub release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ needs.prepare.outputs.release_tag }}
-          append_body: true
-          body: |
-            ## Prebuilt `universal-automation` binaries
-
-            macOS builds are **preview (unsigned)** until Apple code signing
-            secrets are configured (see [RELEASING.md](RELEASING.md)).
-
-            Install without Dart:
-
-            ```sh
-            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash -s -- --version ${{ needs.prepare.outputs.version }}
-            ```
-
-            ```powershell
-            irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
-            ```
-          files: |
-            dist/release/universal_automation_${{ needs.prepare.outputs.version }}_darwin-arm64.tar.gz
-            dist/release/universal_automation_${{ needs.prepare.outputs.version }}_darwin-x64.tar.gz
-            dist/release/universal_automation_${{ needs.prepare.outputs.version }}_linux-x64.tar.gz
-            dist/release/universal_automation_${{ needs.prepare.outputs.version }}_windows-x64.zip
-            dist/release/checksums.txt
-          fail_on_unmatched_files: true
-
-  postflight:
-    if: inputs.dry_run != true
-    permissions:
-      contents: read
-    runs-on: ubuntu-latest
-    needs: [prepare, publish]
-    timeout-minutes: 10
-    steps:
-      - name: Checkout workflow tooling (trusted SHA)
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ github.sha }}
-          path: ${{ env.TOOLING_CHECKOUT_PATH }}
-          persist-credentials: false
-
-      - name: Assert release has all assets and checksums
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GITHUB_REPOSITORY: ${{ github.repository }}
-        run: |
-          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete.sh" \
-            "${{ needs.prepare.outputs.release_tag }}" \
-            "${{ needs.prepare.outputs.version }}"

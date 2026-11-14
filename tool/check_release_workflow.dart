@@ -1,4 +1,4 @@
-// Structural contract check for release_binaries.yml (not grep — YAML AST).
+// Structural contract check for release binary workflows (not grep — YAML AST).
 //
 // Usage:
 //   dart run tool/check_release_workflow.dart
@@ -7,7 +7,6 @@
 import 'dart:io';
 
 import 'release_workflow_contract_lib.dart';
-import 'wait_publish_train_lib.dart';
 
 Future<void> main(List<String> args) async {
   final root = Directory.current;
@@ -50,7 +49,7 @@ Future<void> main(List<String> args) async {
     }
     workflowPath = args[i + 1];
   } else {
-    workflowPath = '${root.path}/.github/workflows/release_binaries.yml';
+    workflowPath = '${root.path}/.github/workflows/release_binaries_build.yml';
   }
 
   final file = File(workflowPath);
@@ -60,15 +59,14 @@ Future<void> main(List<String> args) async {
   }
 
   final text = await file.readAsString();
-  var errors = validateReleaseBinariesWorkflowYaml(
-    text,
-    label: file.uri.pathSegments.last,
-  );
-  if (workflowPath.endsWith('release_binaries.yml')) {
-    errors = [
-      ...errors,
-      ...validateGhRunListJsonFieldAllowlist(releaseBinariesRunListJsonFields),
-    ];
+  final name = file.uri.pathSegments.last;
+  final List<String> errors;
+  if (name == 'release_binaries_publish.yml') {
+    errors = validateReleaseBinariesPublishWorkflowYaml(text, label: name);
+  } else if (name == 'release_binaries.yml') {
+    errors = validateReleaseBinariesDispatchWorkflowYaml(text, label: name);
+  } else {
+    errors = validateReleaseBinariesBuildWorkflowYaml(text, label: name);
   }
 
   if (errors.isNotEmpty) {
@@ -83,37 +81,37 @@ Future<void> main(List<String> args) async {
 }
 
 Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
-  final binaries =
-      File('$rootPath/.github/workflows/release_binaries.yml');
-  final prSmoke =
-      File('$rootPath/.github/workflows/release_binaries_pr.yml');
-  final releasePlease =
-      File('$rootPath/.github/workflows/release-please.yml');
-  for (final f in [binaries, prSmoke, releasePlease]) {
-    if (!f.existsSync()) {
-      stderr.writeln('Missing workflow: ${f.path}');
+  final paths = [
+    '$rootPath/.github/workflows/release_binaries_build.yml',
+    '$rootPath/.github/workflows/release_binaries_publish.yml',
+    '$rootPath/.github/workflows/release_binaries.yml',
+    '$rootPath/.github/workflows/release_binaries_pr.yml',
+    '$rootPath/.github/workflows/release-please.yml',
+  ];
+  for (final p in paths) {
+    if (!File(p).existsSync()) {
+      stderr.writeln('Missing workflow: $p');
       exit(1);
     }
   }
 
-  final binariesText = await binaries.readAsString();
-  var errors = validateReleaseBinariesWorkflowYaml(
-    binariesText,
-    label: 'release_binaries.yml',
-  );
-  errors = [
-    ...errors,
-    ...validateGhRunListJsonFieldAllowlist(releaseBinariesRunListJsonFields),
-  ];
-
-  errors.addAll(
-    validateReleaseBinariesPrWorkflowYaml(
-      await prSmoke.readAsString(),
+  var errors = <String>[
+    ...validateReleaseBinariesBuildWorkflowYaml(
+      await File(paths[0]).readAsString(),
     ),
-  );
-  errors.addAll(
-    validateReleasePleaseBinariesCaller(await releasePlease.readAsString()),
-  );
+    ...validateReleaseBinariesPublishWorkflowYaml(
+      await File(paths[1]).readAsString(),
+    ),
+    ...validateReleaseBinariesDispatchWorkflowYaml(
+      await File(paths[2]).readAsString(),
+    ),
+    ...validateReleaseBinariesPrWorkflowYaml(
+      await File(paths[3]).readAsString(),
+    ),
+    ...validateReleasePleaseBinariesCaller(
+      await File(paths[4]).readAsString(),
+    ),
+  ];
 
   if (errors.isNotEmpty) {
     stderr.writeln('check_release_workflow failures:');

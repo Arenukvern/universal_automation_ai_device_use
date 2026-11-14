@@ -10,9 +10,10 @@ permissions:
 
 jobs:
   smoke:
-    uses: ./.github/workflows/release_binaries.yml
+    uses: ./.github/workflows/release_binaries_build.yml
     permissions:
       contents: read
     with:
       release_tag: deadbeef
       dry_run: false
+      tooling_ref: deadbeef

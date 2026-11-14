@@ -138,7 +138,7 @@ jobs:
           gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
             -f expected_sha="${SYNC_SHA}"
 
-  release-binaries:
+  release-binaries-build:
     needs: release-please
     if: >-
       github.ref == 'refs/heads/main' &&
@@ -147,12 +147,36 @@ jobs:
         fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
       )
     permissions:
-      contents: write
-    secrets: inherit
-    uses: ./.github/workflows/release_binaries.yml
+      contents: read
+    uses: ./.github/workflows/release_binaries_build.yml
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
     with:
       release_tag: ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--tag_name'] }}
       dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [release-please, release-binaries-build]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == true ||
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
+      )
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
+      version: ${{ needs.release-binaries-build.outputs.version }}
+      artifact_run_id: ${{ needs.release-binaries-build.outputs.artifact_run_id }}
+      tooling_ref: ${{ github.sha }}
 
   dispatch-package-publish:
     needs: release-please
@@ -183,14 +207,19 @@ jobs:
         run: dart run tool/dispatch_pub_dev_publish.dart
 
   wait-package-publish:
-    needs: [release-please, dispatch-package-publish, release-binaries]
+    needs:
+      - release-please
+      - dispatch-package-publish
+      - release-binaries-build
+      - release-binaries-publish
     if: >-
       always() &&
       github.ref == 'refs/heads/main' &&
       !cancelled() &&
       needs.release-please.result == 'success' &&
       needs.dispatch-package-publish.result == 'success' &&
-      (needs.release-binaries.result == 'success' || needs.release-binaries.result == 'skipped')
+      (needs.release-binaries-build.result == 'success' || needs.release-binaries-build.result == 'skipped') &&
+      (needs.release-binaries-publish.result == 'success' || needs.release-binaries-publish.result == 'skipped')
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:

@@ -16,13 +16,7 @@ DRY_RUN_TRUTHY() {
 }
 
 resolve_production_tag() {
-  local tag=""
-  if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-    tag="$DISPATCH_TAG"
-  else
-    fail "unsupported GITHUB_EVENT_NAME: $EVENT_NAME (dispatch only)"
-  fi
-
+  local tag="$DISPATCH_TAG"
   if [[ -z "$tag" ]]; then
     fail "empty release tag"
   fi
