@@ -103,8 +103,7 @@ Future<void> main() async {
     exit(1);
   }
 
-  // Toolkit binaries: release-please.yml `release-binaries` reusable workflow job
-  // is a hard `needs` dependency of wait-package-publish (no separate dispatch run).
+  // Toolkit binaries: audited in release-please.yml `audit-release-train` (independent of pub.dev wait).
   exit(await _runStrictPostPublishAudit());
 }
 

@@ -349,6 +349,21 @@ def main() -> None:
       "negative_please_publish_without_build",
       t.replace("needs: [release-please, release-binaries-build]", "needs: [release-please]", 1),
   ))
+  specs.append((
+      "please",
+      "negative_please_wait_blocks_on_binaries",
+      t.replace(
+          "      needs.dispatch-package-publish.result == 'success'",
+          "      needs.dispatch-package-publish.result == 'success' &&\n"
+          "      (needs.release-binaries-build.result == 'success' || needs.release-binaries-build.result == 'skipped')",
+          1,
+      ).replace(
+          "    needs:\n      - release-please\n      - dispatch-package-publish",
+          "    needs:\n      - release-please\n      - dispatch-package-publish\n"
+          "      - release-binaries-build\n      - release-binaries-publish",
+          1,
+      ),
+  ))
 
   for kind, name, text in specs:
     record(kind, name, text)

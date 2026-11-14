@@ -97,8 +97,10 @@ sibling workflows). Zero manual steps:
    write` on publish only) downloads artifacts from the build run id, uploads to
    the **existing** toolkit release, writes `checksums.txt`, and **postflight**
    `assert_release_assets_complete.sh`.
-3. `wait-package-publish` **`needs`** both jobs (success or skipped) before the
-   strict post-publish audit.
+3. `wait-package-publish` waits on **pub.dev only** (`needs` release-please +
+   dispatch-package-publish; not binary jobs). `audit-release-train` runs after
+   a successful pub wait and **fails the workflow** if the toolkit released but
+   binary build/publish did not succeed.
 
 ### PR / main path smoke (all four legs, artifacts only)
 

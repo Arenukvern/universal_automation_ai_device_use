@@ -456,7 +456,14 @@ List<String> validateReleaseBinariesPrWorkflowYaml(
   return errors;
 }
 
-/// Release-please binary train jobs: read-only build, then publish.
+/// `dispatch-package-publish` must not depend on toolkit binary jobs.
+const releasePleaseDispatchPublishJob = 'dispatch-package-publish';
+const releasePleaseWaitPublishJob = 'wait-package-publish';
+const releasePleaseAuditTrainJob = 'audit-release-train';
+const releasePleaseBinariesBuildJob = 'release-binaries-build';
+const releasePleaseBinariesPublishJob = 'release-binaries-publish';
+
+/// Release-please train: binaries, pub.dev dispatch/wait independence, final audit.
 List<String> validateReleasePleaseBinariesCaller(String yamlText) {
   final errors = <String>[];
   final dynamic doc;
@@ -525,7 +532,158 @@ List<String> validateReleasePleaseBinariesCaller(String yamlText) {
       );
     }
   }
+
+  errors.addAll(_validateReleasePleasePubTrainIndependence(jobsMap));
+  errors.addAll(_validateReleasePleaseFinalBinaryAudit(jobsMap));
+
   return errors;
+}
+
+List<String> _validateReleasePleasePubTrainIndependence(
+  Map<dynamic, dynamic> jobsMap,
+) {
+  final errors = <String>[];
+  final dispatch = jobsMap[releasePleaseDispatchPublishJob];
+  if (dispatch is Map) {
+    final needs = _jobNeedsList(dispatch);
+    const forbidden = {'release-binaries-build', 'release-binaries-publish'};
+    for (final n in needs) {
+      if (forbidden.contains(n)) {
+        errors.add(
+          'release-please.yml: $releasePleaseDispatchPublishJob must not need $n',
+        );
+      }
+    }
+    if (!needs.contains('release-please')) {
+      errors.add(
+        'release-please.yml: $releasePleaseDispatchPublishJob must need release-please',
+      );
+    }
+  }
+
+  final wait = jobsMap[releasePleaseWaitPublishJob];
+  if (wait is! Map) {
+    errors.add('release-please.yml: missing $releasePleaseWaitPublishJob job');
+    return errors;
+  }
+  final waitNeeds = _jobNeedsList(wait);
+  for (final n in waitNeeds) {
+    if (n == releasePleaseBinariesBuildJob ||
+        n == releasePleaseBinariesPublishJob) {
+      errors.add(
+        'release-please.yml: $releasePleaseWaitPublishJob must not need $n (pub.dev train is independent)',
+      );
+    }
+  }
+  if (!waitNeeds.contains('release-please') ||
+      !waitNeeds.contains(releasePleaseDispatchPublishJob)) {
+    errors.add(
+      'release-please.yml: $releasePleaseWaitPublishJob must need release-please and $releasePleaseDispatchPublishJob',
+    );
+  }
+  final waitIf = wait['if']?.toString() ?? '';
+  if (!waitIf.contains('always()')) {
+    errors.add(
+      'release-please.yml: $releasePleaseWaitPublishJob if must include always()',
+    );
+  }
+  if (waitIf.contains('release-binaries-build.result') ||
+      waitIf.contains('release-binaries-publish.result')) {
+    errors.add(
+      'release-please.yml: $releasePleaseWaitPublishJob if must not gate on binary job results',
+    );
+  }
+  return errors;
+}
+
+List<String> _validateReleasePleaseFinalBinaryAudit(
+  Map<dynamic, dynamic> jobsMap,
+) {
+  final errors = <String>[];
+  final audit = jobsMap[releasePleaseAuditTrainJob];
+  if (audit is! Map) {
+    errors.add('release-please.yml: missing $releasePleaseAuditTrainJob job');
+    return errors;
+  }
+  final needs = _jobNeedsList(audit);
+  for (final required in [
+    'release-please',
+    releasePleaseDispatchPublishJob,
+    releasePleaseWaitPublishJob,
+    releasePleaseBinariesBuildJob,
+    releasePleaseBinariesPublishJob,
+  ]) {
+    if (!needs.contains(required)) {
+      errors.add(
+        'release-please.yml: $releasePleaseAuditTrainJob must need $required',
+      );
+    }
+  }
+  final auditIf = audit['if']?.toString() ?? '';
+  if (!auditIf.contains('always()')) {
+    errors.add(
+      'release-please.yml: $releasePleaseAuditTrainJob if must include always()',
+    );
+  }
+  if (!auditIf.contains('wait-package-publish.result == \'success\'')) {
+    errors.add(
+      'release-please.yml: $releasePleaseAuditTrainJob if must require wait-package-publish success',
+    );
+  }
+  final steps = audit['steps'];
+  if (steps is! List) {
+    return errors;
+  }
+  var sawAuditScript = false;
+  for (final step in steps) {
+    if (step is! Map) {
+      continue;
+    }
+    final run = step['run']?.toString() ?? '';
+    if (run.contains('audit_release_binaries_train.sh')) {
+      sawAuditScript = true;
+      final env = step['env'];
+      if (env is! Map) {
+        errors.add(
+          'release-please.yml: audit step must pass toolkit/binary results via env:',
+        );
+      } else {
+        for (final key in [
+          'TOOLKIT_RELEASE_CREATED',
+          'RELEASE_BINARIES_BUILD_RESULT',
+          'RELEASE_BINARIES_PUBLISH_RESULT',
+        ]) {
+          if (!env.containsKey(key)) {
+            errors.add(
+              'release-please.yml: audit step env must define $key',
+            );
+          }
+        }
+      }
+      if (run.contains('fromJSON(needs.') || run.contains('\${{ needs.')) {
+        errors.add(
+          'release-please.yml: audit step run must not inline needs/context expressions',
+        );
+      }
+    }
+  }
+  if (!sawAuditScript) {
+    errors.add(
+      'release-please.yml: $releasePleaseAuditTrainJob must run audit_release_binaries_train.sh',
+    );
+  }
+  return errors;
+}
+
+List<String> _jobNeedsList(Map<dynamic, dynamic> job) {
+  final needs = job['needs'];
+  if (needs is List) {
+    return needs.map((e) => e.toString()).toList();
+  }
+  if (needs != null) {
+    return [needs.toString()];
+  }
+  return [];
 }
 
 List<String> _validateExplicitSigningSecretsMap(

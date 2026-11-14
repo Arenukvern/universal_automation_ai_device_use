@@ -210,16 +210,12 @@ jobs:
     needs:
       - release-please
       - dispatch-package-publish
-      - release-binaries-build
-      - release-binaries-publish
     if: >-
       always() &&
       github.ref == 'refs/heads/main' &&
       !cancelled() &&
       needs.release-please.result == 'success' &&
-      needs.dispatch-package-publish.result == 'success' &&
-      (needs.release-binaries-build.result == 'success' || needs.release-binaries-build.result == 'skipped') &&
-      (needs.release-binaries-publish.result == 'success' || needs.release-binaries-publish.result == 'skipped')
+      needs.dispatch-package-publish.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     permissions:
@@ -246,3 +242,35 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
         run: dart run tool/wait_publish_train.dart
+
+  # Pub.dev train must not wait on binary jobs. This job fails the workflow when
+  # the toolkit released but GitHub Release binaries did not succeed.
+  audit-release-train:
+    needs:
+      - release-please
+      - dispatch-package-publish
+      - wait-package-publish
+      - release-binaries-build
+      - release-binaries-publish
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      needs.release-please.result == 'success' &&
+      needs.dispatch-package-publish.result == 'success' &&
+      needs.wait-package-publish.result == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert toolkit GitHub Release binaries succeeded when required
+        env:
+          TOOLKIT_RELEASE_CREATED: >-
+            ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] }}
+          RELEASE_BINARIES_BUILD_RESULT: ${{ needs.release-binaries-build.result }}
+          RELEASE_BINARIES_PUBLISH_RESULT: ${{ needs.release-binaries-publish.result }}
+        run: bash tool/release/audit_release_binaries_train.sh
