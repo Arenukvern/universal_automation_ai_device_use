@@ -6,6 +6,7 @@
 
 import 'dart:io';
 
+import 'release_please_toolkit_versions_lib.dart';
 import 'release_workflow_contract_lib.dart';
 import 'release_workflow_permissions_lib.dart';
 
@@ -188,6 +189,7 @@ Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
       await File(paths[4]).readAsString(),
     ),
     ...validateProductionReusablePermissionChains(rootPath),
+    ...validateToolkitVersionSurfacesReleasePlease(rootPath),
   ];
 
   if (errors.isNotEmpty) {

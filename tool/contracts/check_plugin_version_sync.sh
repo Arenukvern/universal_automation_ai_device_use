@@ -36,7 +36,9 @@ while IFS= read -r rel; do
     fail "$manifest version $got != toolkit pubspec $VERSION"
   fi
 done < <(jq -r --arg pkg "$TOOLKIT_PKG" '
-    .packages[$pkg]."extra-files"[]? | .path // empty
+    .packages[$pkg]."extra-files"[]?
+    | select(.type == "json" or ((.path // "") | endswith(".json")))
+    | .path // empty
   ' "$CONFIG")
 
 [[ "$count" -ge 1 ]] || fail "release-please-config.json must list toolkit extra-files"

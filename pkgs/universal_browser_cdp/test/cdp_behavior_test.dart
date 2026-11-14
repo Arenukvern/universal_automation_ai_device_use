@@ -175,22 +175,43 @@ void main() {
       await driver.close();
     });
 
+    test('reaction floor wait reaches 150ms on the observation stopwatch',
+        () async {
+      final driver = await attachDriver();
+      await driver.snapshot();
+      final monotonic = driver.page.observationMonotonic;
+      expect(monotonic, isNotNull);
+      while (monotonic!.elapsedMicroseconds < 149_000) {
+        await Future<void>.delayed(const Duration(microseconds: 200));
+      }
+      await driver.enforceReactionFloorForTest(150_000);
+      expect(monotonic.elapsedMicroseconds, greaterThanOrEqualTo(150_000));
+      await driver.close();
+    });
+
     test('enforces the reaction floor against the last observation',
         () async {
       final driver = await attachDriver();
       await driver.snapshot();
+      final monotonic = driver.page.observationMonotonic;
+      expect(monotonic, isNotNull);
+      while (monotonic!.elapsedMicroseconds < 149_000) {
+        await Future<void>.delayed(const Duration(microseconds: 200));
+      }
+      server.observationMonotonic = monotonic;
+      server.clearInputObservationTiming();
       final profile = BehaviorProfile.agentImmediate.copyWith(
         reaction: const ReactionDelay(floorUs: 150_000),
       );
-      final watch = Stopwatch()..start();
       await driver.performWith(
-        const ClickAction(css: '#go'),
+        const ClickAtAction(40, 60),
         profile,
         seed: 2,
       );
+      expect(server.firstMousePressedAtObservation, isNotNull);
       expect(
-        watch.elapsed,
-        greaterThanOrEqualTo(const Duration(milliseconds: 150)),
+        server.firstMousePressedAtObservation!.inMicroseconds,
+        greaterThanOrEqualTo(150_000),
       );
       await driver.close();
     });

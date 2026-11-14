@@ -249,6 +249,14 @@ class CdpPage {
   DateTime? get lastObservationAt => _lastObservationAt;
   DateTime? _lastObservationAt;
 
+  /// Monotonic clock started when the last observation completed.
+  ///
+  /// Behavioral reaction floors measure elapsed time from this stopwatch so
+  /// enforcement and tests share one clock (wall-clock `DateTime` is not used
+  /// for floor math).
+  Stopwatch? get observationMonotonic => _observationMonotonic;
+  Stopwatch? _observationMonotonic;
+
   /// Navigates the page and waits per [waitUntil].
   ///
   /// Correctness contract: navigation failures surface as typed errors —
@@ -334,6 +342,7 @@ class CdpPage {
     }
     _revision++;
     _lastObservationAt = null;
+    _observationMonotonic = null;
   }
 
   /// Evaluates [expression] with `returnByValue` and returns the value.
@@ -438,6 +447,7 @@ class CdpPage {
     _ensureOpen();
     final result = await connection.send('Accessibility.getFullAXTree');
     _lastObservationAt = DateTime.now();
+    _observationMonotonic = Stopwatch()..start();
     final raw = (result['nodes'] as List<Object?>? ?? const [])
         .whereType<Map<String, Object?>>()
         .toList(growable: false);
