@@ -89,13 +89,16 @@ class PermissionMap {
       throw PermissionParseException('missing permissions block');
     }
     if (raw is String) {
-      switch (raw.trim()) {
+      final shorthand = raw.trim();
+      switch (shorthand) {
         case 'read-all':
           return PermissionMap.allRead();
         case 'write-all':
           return PermissionMap.allWrite();
         default:
-          return PermissionMap.allNone();
+          throw PermissionParseException(
+            'unknown permissions shorthand "$shorthand"',
+          );
       }
     }
     if (raw is! Map) {
@@ -242,7 +245,9 @@ List<ReusableCallEdge> parseReusableCalls(
   return out;
 }
 
-List<(String label, String path)> discoverBinaryReusableCallerWorkflowFiles(
+/// Every workflow file under `.github/workflows/` that contains a job `uses:` of
+/// the binary release reusables (including nested calls inside callees).
+List<(String label, String path)> discoverAllBinaryReusableCallSources(
   String repoRoot,
 ) {
   final dir = Directory('$repoRoot/.github/workflows');
@@ -258,14 +263,7 @@ List<(String label, String path)> discoverBinaryReusableCallerWorkflowFiles(
     if (!name.endsWith('.yml') && !name.endsWith('.yaml')) {
       continue;
     }
-    if (name == 'release_binaries_build.yml' ||
-        name == 'release_binaries_publish.yml') {
-      continue;
-    }
     final text = entity.readAsStringSync();
-    if (!binaryReusableCalleePattern.hasMatch(text)) {
-      continue;
-    }
     if (parseReusableCalls(name, text).isEmpty) {
       continue;
     }
@@ -273,6 +271,19 @@ List<(String label, String path)> discoverBinaryReusableCallerWorkflowFiles(
   }
   out.sort((a, b) => a.$1.compareTo(b.$1));
   return out;
+}
+
+/// Top-level caller workflows (excludes the two reusable callee definitions).
+List<(String label, String path)> discoverBinaryReusableCallerWorkflowFiles(
+  String repoRoot,
+) {
+  const calleeOnly = {
+    'release_binaries_build.yml',
+    'release_binaries_publish.yml',
+  };
+  return discoverAllBinaryReusableCallSources(repoRoot)
+      .where((e) => !calleeOnly.contains(e.$1))
+      .toList();
 }
 
 String? calleeFileForUses(String uses, String repoRoot) {
@@ -382,9 +393,7 @@ List<PermissionPathRow> buildReusablePermissionPathsForYaml(
 
 List<PermissionPathRow> buildReusablePermissionPaths(String repoRoot) {
   final rows = <PermissionPathRow>[];
-  for (final (label, path) in discoverBinaryReusableCallerWorkflowFiles(
-    repoRoot,
-  )) {
+  for (final (label, path) in discoverAllBinaryReusableCallSources(repoRoot)) {
     rows.addAll(
       buildReusablePermissionPathsForYaml(
         label,
@@ -449,20 +458,20 @@ List<String> validateBinaryReusableCallerYaml(
 
 List<String> validateDiscoveredProductionReusableCallers(String repoRoot) {
   final errors = <String>[];
-  final discovered = discoverBinaryReusableCallerWorkflowFiles(repoRoot);
+  final topLevel = discoverBinaryReusableCallerWorkflowFiles(repoRoot);
   const expectedCallers = {
     'release-please.yml',
     'release_binaries.yml',
     'release_binaries_pr.yml',
   };
-  for (final name in discovered.map((e) => e.$1)) {
+  for (final name in topLevel.map((e) => e.$1)) {
     if (!expectedCallers.contains(name)) {
       errors.add(
         '$name: unexpected workflow calls release_binaries_build/publish (add to contract or remove)',
       );
     }
   }
-  for (final (label, path) in discovered) {
+  for (final (label, path) in discoverAllBinaryReusableCallSources(repoRoot)) {
     errors.addAll(
       validateBinaryReusableCallerYaml(
         File(path).readAsStringSync(),

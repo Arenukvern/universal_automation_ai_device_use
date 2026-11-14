@@ -44,6 +44,7 @@ ACTIONLINT_NOISE_RULES=(
   "negative_please_wrong_build_workflow.yml|workflow-call expression"
   "negative_pr_wrong_workflow.yml|workflow-call"
   "negative_publish_needs_postflight.yml|job-needs"
+  "negative_publish_nested_build.yml|syntax-check"
 )
 
 allowed_rules_for() {
@@ -105,12 +106,9 @@ for negative in "$ROOT_DIR"/tool/contracts/fixtures/**/negative_*.yml; do
   set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$negative" 2>&1)"
   st=$?
-  set -e
   if is_expected_noise "$name"; then
-    set +e
     validate_noise_rules "$negative" "$name"
     rc=$?
-    set -e
     if [[ "$rc" -eq 2 ]]; then
       fail "$name is on ACTIONLINT_NOISE_RULES but actionlint is clean"
     fi
@@ -128,31 +126,14 @@ META_EXTRA="$ROOT_DIR/tool/contracts/fixtures/actionlint_meta/publish_needs_post
 if [[ ! -f "$META_EXTRA" ]]; then
   fail "missing actionlint meta fixture: publish_needs_postflight_extra_actionlint.yml"
 fi
-PIN_BASE="negative_publish_needs_postflight.yml"
-if ! allowed="$(allowed_rules_for "$PIN_BASE")"; then
-  fail "meta self-test: $PIN_BASE not in ACTIONLINT_NOISE_RULES"
-fi
-set +e
-meta_out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$META_EXTRA" 2>&1)"
-set -e
-meta_rules="$(printf '%s\n' "$meta_out" | grep -oE '\[[-a-z0-9]+\]' | tr -d '[]' | sort -u)"
-meta_rejected_extra=0
-while IFS= read -r rule; do
-  [[ -z "$rule" ]] && continue
-  found=0
-  for allowed_rule in $allowed; do
-    if [[ "$rule" == "$allowed_rule" ]]; then
-      found=1
-      break
-    fi
-  done
-  if [[ "$found" -eq 0 ]]; then
-    meta_rejected_extra=1
-    break
-  fi
-done <<<"$meta_rules"
-if [[ "$meta_rejected_extra" -ne 1 ]]; then
+meta_rc=0
+validate_noise_rules "$META_EXTRA" "negative_publish_needs_postflight.yml" >/dev/null 2>&1
+meta_rc=$?
+if [[ "$meta_rc" -eq 0 ]]; then
   fail "noise rule pin must reject extra unrelated actionlint errors (meta fixture)"
+fi
+if [[ "$meta_rc" -eq 2 ]]; then
+  fail "meta fixture must remain actionlint-noisy"
 fi
 
 ok "negative fixtures actionlint-clean (with documented exceptions)"

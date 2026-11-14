@@ -132,20 +132,13 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
 
-  const requiredJobs = ['prepare', 'build', 'dry-run-bundle'];
-  for (final id in requiredJobs) {
-    if (!jobsMap.containsKey(id)) {
-      errors.add('$label: missing job $id');
-    }
-  }
-
-  for (final forbidden in ['publish', 'postflight']) {
-    if (jobsMap.containsKey(forbidden)) {
-      errors.add(
-        '$label: must not define $forbidden (use release_binaries_publish.yml reusable)',
-      );
-    }
-  }
+  errors.addAll(
+    _validateReusableCalleeJobAllowlist(
+      jobsMap,
+      label,
+      allowedJobIds: {'prepare', 'build', 'dry-run-bundle'},
+    ),
+  );
 
   void requireExactJobIf(String jobId, String exact) {
     final job = jobsMap[jobId];
@@ -235,9 +228,13 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
     return errors;
   }
   final jobsMap = Map<dynamic, dynamic>.from(jobs);
-  if (!jobsMap.containsKey('publish') || !jobsMap.containsKey('postflight')) {
-    errors.add('$label: must define publish and postflight jobs');
-  }
+  errors.addAll(
+    _validateReusableCalleeJobAllowlist(
+      jobsMap,
+      label,
+      allowedJobIds: {'publish', 'postflight'},
+    ),
+  );
   errors.addAll(
     _validateRequiredScriptSteps(jobsMap, label, requiredScriptStepsPublish),
   );
@@ -360,6 +357,38 @@ List<String> _forbidSecretsInherit(String yamlText, String label) {
     return ['$label: secrets: inherit is forbidden (pass signing secrets by name)'];
   }
   return [];
+}
+
+/// Reusable callee workflows may only define [allowedJobIds]; no nested `uses:`.
+List<String> _validateReusableCalleeJobAllowlist(
+  Map<dynamic, dynamic> jobsMap,
+  String label, {
+  required Set<String> allowedJobIds,
+}) {
+  final errors = <String>[];
+  for (final entry in jobsMap.entries) {
+    final jobId = entry.key.toString();
+    final job = entry.value;
+    if (job is! Map) {
+      continue;
+    }
+    if (job.containsKey('uses')) {
+      errors.add(
+        '$label: job $jobId must not call another reusable workflow (uses:)',
+      );
+    }
+    if (!allowedJobIds.contains(jobId)) {
+      errors.add(
+        '$label: unexpected job $jobId (allowed: ${allowedJobIds.join(', ')})',
+      );
+    }
+  }
+  for (final id in allowedJobIds) {
+    if (!jobsMap.containsKey(id)) {
+      errors.add('$label: missing job $id');
+    }
+  }
+  return errors;
 }
 
 List<String> _requireExplicitReusableJobPermissions(

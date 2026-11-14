@@ -115,6 +115,13 @@ void main() {
       );
     });
 
+    test('rejects unknown permission shorthands', () {
+      expect(
+        () => PermissionMap.parse('read_all'),
+        throwsA(isA<PermissionParseException>()),
+      );
+    });
+
     test('callee write under read caller is an over-request (startup refused)', () {
       final errors = permissionChainErrors(
         callerJobScopes: {'contents': 'read'},

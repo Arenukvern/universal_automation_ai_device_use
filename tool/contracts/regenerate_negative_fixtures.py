@@ -223,6 +223,26 @@ def main() -> None:
   ))
   specs.append((
       "build",
+      "negative_build_nested_publish",
+      t.replace(
+          "  build:\n    needs: prepare",
+          "  nested:\n    needs: prepare\n"
+          "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      version: 0.0.0\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  build:\n    needs: prepare",
+          1,
+      ),
+  ))
+  specs.append((
+      "build",
+      "negative_build_extra_job",
+      t + "\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bad\n",
+  ))
+  specs.append((
+      "build",
       "negative_workflow_contents_write",
       t.replace("permissions:\n  contents: read", "permissions:\n  contents: write", 1),
   ))
@@ -304,6 +324,26 @@ def main() -> None:
           "",
           1,
       ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_nested_build",
+      p().replace(
+          "  publish:\n    permissions:",
+          "  nested:\n    needs: []\n"
+          "    uses: ./.github/workflows/release_binaries_build.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      dry_run: true\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  publish:\n    permissions:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_extra_job",
+      p() + "\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bad\n",
   ))
   specs.append((
       "publish",
