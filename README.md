@@ -47,6 +47,35 @@ Windows, CDP, WebDriver), screencast/capture helpers, and WebRTC sidecars. The
 agent-facing CLI and MCP server live in
 [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/).
 
+## Architecture: one MCP server, many adapters
+
+Universal Automation exposes **one MCP server** (`universal-automation serve …`) and
+one `automation_*` tool surface (observe, act, capture/verify). Platform code plugs
+in as **adapter packages** registered on a single runtime registry — macOS, Windows,
+Linux, browser (CDP/WebDriver), and future Android, iOS, and Flutter tiers.
+
+Do **not** ship or configure separate per-platform MCP servers (`android-use`,
+`ios-use`, `macos-use`, …). That would duplicate browser tooling, capture, and
+config, let implementations drift, and force agents to learn which server to call.
+
+| Layer | Role |
+| --- | --- |
+| `universal_automation_interface` | Contracts only; no native code (ADR 0004) |
+| `universal_driver_*` / `universal_browser_*` | Adapters chosen at install or composition time |
+| `universal_automation_toolkit` | Plans, runner, MCP face, registry |
+
+**Lean default:** core + desktop OS adapter + optional browser tier (`serve --os`,
+`--cdp`). Flutter, mobile adapters, harness/SDK, and oka-supervised runners are
+opt-in dependencies — still the **same** MCP entry in the client. Shared tools
+(screenshot, semantics tree, tap) cover common work; truly platform-specific
+behavior (e.g. Flutter hot reload) lives in named tool groups on that server, not a
+forked product. The Flutter adapter stays thin over
+[`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) (`flutter_mcp_toolkit_core`
+^7.1.1), takes a VM service URI or device handle, and never launches apps — **oka**
+owns devices, emulators, and processes.
+
+Durable rule: [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx).
+
 ## Packages
 
 | Package | Role |

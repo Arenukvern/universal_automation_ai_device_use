@@ -30,6 +30,7 @@ Run the following commands to interact with the project's agentic tools:
 | Publish packages | README → Publish order; `dart pub publish --dry-run` per package |
 | Wire a consumer | path override to `pkgs/<name>` (not DFP) |
 | Install MCP + skill plugin | `plugin/install.sh` (see [plugin/README.md](plugin/README.md)) |
+| Add a platform tier | [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx) — add an **adapter package**, never a new MCP server |
 
 ## North Star Impact
 
@@ -71,6 +72,18 @@ Skills are installed locally under `.agents/skills/`. You can view them using:
 For more information on the project charter and decisions:
 - Read [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) (charter)
 - Read [ADR Index](docs/decisions/README) (if present)
+- Read [ADR 0009 — one MCP server with adapters](docs/decisions/0009_one_mcp_server_with_adapters.mdx) before adding platforms or MCP surfaces
+
+## MCP product rule (ADR 0009)
+
+- **One** Universal Automation MCP server; **one** `automation_*` tool surface and registry.
+- New macOS / Windows / Linux / Android / iOS / Flutter / browser support → **adapter**
+  (`universal_driver_*`, `universal_browser_*`, …) + factory registration, **not** a
+  separate MCP server product.
+- Lean default wiring: interface + desktop OS adapter + browser; mobile, Flutter, harness,
+  and oka runners are opt-in on the same server config.
+- Flutter adapter: thin over `mcp_flutter` (`flutter_mcp_toolkit_core` ^7.1.1); VM service
+  URI or device in; **never** launch apps (oka owns processes).
 
 <!-- codemap-index:start -->
 # Codemap — navigate this repo

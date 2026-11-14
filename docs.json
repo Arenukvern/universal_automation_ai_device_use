@@ -81,6 +81,10 @@
         {
           "title": "0002 — Public GitHub home and rename",
           "href": "/decisions/0002_public_github_rename"
+        },
+        {
+          "title": "0009 — One MCP server with adapters",
+          "href": "/decisions/0009_one_mcp_server_with_adapters"
         }
       ]
     },

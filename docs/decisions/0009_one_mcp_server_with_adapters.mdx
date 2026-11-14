@@ -1,0 +1,93 @@
+---
+title: One MCP server with adapters
+status: accepted
+date: 2026-11-14
+---
+
+# ADR 0009 — One MCP server with adapters
+
+**Status:** Accepted (2026-11-14)  
+**Builds on:** [ADR 0004 — Harness layer and packaging boundaries](/decisions/0004_harness_layer_and_packaging_boundaries)  
+**North-star impact:** `amends` — states the durable MCP product shape agents and clients must assume.
+
+## Context
+
+Agents and MCP clients should learn **one** automation surface: observe, act, capture
+(and verify), backed by **one** runtime registry in `universal_automation_toolkit`.
+Platform differences belong behind **adapters** (Dart driver packages registered at
+install or composition time), not behind separate MCP server products.
+
+A per-platform server family (`android-use`, `ios-use`, `macos-use`, …) would
+duplicate browser tooling, capture plumbing, configuration, and consent flows. Those
+servers would drift apart, and every agent would need a routing table for which
+server to call for which task.
+
+Modularity already lives at the **package and install** layer:
+`universal_automation_interface` is the pure contract surface (no native code;
+see ADR 0004). Adapter packages (`universal_driver_*`, `universal_browser_*`,
+future mobile tiers) are selected when the operator or embedder wires the
+composition root. The MCP **face** stays stable.
+
+**oka** owns devices, emulators, and processes. Universal Automation **attaches**
+to endpoints oka (or the human) exposes — it does not launch apps or start emulators
+on the MCP path.
+
+## Decision
+
+1. **Single MCP server.** Ship one Universal Automation MCP server (`universal-automation serve …`)
+   with a unified `automation_*` tool surface and one registry. Agents call the same tools
+   regardless of macOS, Windows, Linux, Android, iOS, Flutter, or browser targets.
+
+2. **Adapters behind the registry.** Each platform tier implements `AutomationDriver` (and
+   optional capability facades from ADR 0004/0005) and registers a `DriverFactory` on the
+   runtime registry. Routing picks the adapter; the MCP schema does not fork per OS.
+
+3. **Lean default install.** Default wiring is **core + one desktop OS adapter + browser**
+   (as today’s `serve --os` + optional `--cdp`). Flutter VM, Android, iOS, harness/SDK, and
+   oka-supervised runners are **opt-in** dependencies and factories — still the **same**
+   MCP server binary and client config entry.
+
+4. **Shared tools first.** Screenshot, semantics tree, tap/click, navigate, verify, and
+   consent requests are the common vocabulary. Only capabilities with no honest cross-tier
+   mapping (e.g. Flutter hot reload) appear in a **named tool group**, not a separate server.
+
+5. **Flutter adapter boundary.** The Flutter tier is a thin adapter over
+   [`mcp_flutter`](https://github.com/Arenukvern/mcp_flutter) published packages
+   (`flutter_mcp_toolkit_core` ^7.1.1). Inputs are a declared VM service URI or device
+   handle; the adapter **never** launches applications. Gaps in Flutter-specific
+   capabilities are fixed **upstream in mcp_flutter**, not by forking a second MCP product.
+
+6. **Process ownership.** Device lifecycle, emulators, and supervised processes remain
+   **oka** (or operator) responsibilities. This repo’s MCP server remains attach-only.
+
+## Consequences
+
+- MCP client configuration stays **one** `mcp.json` / plugin entry; enabling a tier is
+  dependency + factory registration, not a new server name.
+- Documentation, skills, and ADRs treat “add a platform” as “add an adapter package,”
+  never “add an MCP server.”
+- Drift risk shifts to registry wiring and adapter conformance — where conformance tests
+  already belong — instead of duplicated MCP tool catalogs.
+- Flutter-specific tools may grow in a grouped namespace on the **same** server; they must
+  not justify a standalone “Flutter MCP server” in this family.
+
+## Rejected alternatives
+
+### One MCP server per platform
+
+Separate servers per OS or runtime (e.g. dedicated Android-use / iOS-use / macOS-use MCP
+binaries) were rejected because they:
+
+- Duplicate browser automation, capture options, consent tools, and plan/MCP codecs.
+- Force agents to maintain a server picker and divergent tool names for the same verbs.
+- Multiply client configuration, security review, and registry publication work without
+  improving isolation (adapters already bound native code at the package layer).
+
+Per-platform **packages** remain; per-platform **MCP servers** do not.
+
+## Non-claims
+
+- This ADR does not require every adapter tier to be production-ready today; it governs
+  product shape only.
+- This ADR does not merge `mcp_flutter` into this repository; it defines the seam.
+- Replacing oka supervision or embedding the full harness in every client is out of scope.

@@ -13,6 +13,11 @@ description: >
 
 # Universal Automation Toolkit
 
+**One MCP server** with platform adapters behind the same tools (ADR 0009).
+Never add a separate per-platform MCP server (`android-use`, `ios-use`, …).
+Add a `universal_driver_*` / `universal_browser_*` adapter and register its
+factory on the toolkit registry; keep a single client `mcp.json` entry.
+
 One vocabulary for the observe/act/verify loop across browser and OS
 tiers (ADR 0046). Attach-only: it never spawns or stops processes —
 launch targets yourself (or point at oka-published session handles) and
@@ -255,3 +260,20 @@ When the model emits pixel `click(x,y)` / `screenshot` / `type` (not AX locators
 7. Rebuild native bridge after driver changes: `./plugin/install.sh`
 
 Semantic `automation_observe` / `automation_act` remain preferred when roles and names exist.
+
+## Adding a platform adapter (checklist, ADR 0009)
+
+1. Implement `AutomationDriver` (+ capability facades as needed) in a new or existing
+   `universal_driver_*` / `universal_browser_*` package — not a new MCP binary.
+2. Add conformance coverage in `universal_automation_conformance` for the tier’s honest verbs.
+3. Register a `DriverFactory` on the composition root / registry; expose routing via existing
+   `automation_*` tools (shared observe / act / capture first).
+4. Put truly platform-only verbs in a **named tool group** on the same server (e.g. Flutter
+   hot reload), backed by upstream packages when appropriate (`flutter_mcp_toolkit_core` ^7.1.1
+   via mcp_flutter); do not fork a second MCP product.
+5. Document install-time optional dependencies; default lean install stays core + desktop OS +
+   browser.
+6. Flutter / mobile: accept VM service URI or oka device handle; **never** launch apps from the
+   adapter (oka owns devices, emulators, processes).
+7. Update [ADR 0009](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs/decisions/0009_one_mcp_server_with_adapters.mdx)
+   only if the decision itself changes — otherwise extend README and this skill.
