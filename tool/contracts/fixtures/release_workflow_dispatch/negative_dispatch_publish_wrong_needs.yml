@@ -1,0 +1,50 @@
+name: Release binaries (toolkit)
+run-name: release-binaries ${{ inputs.release_tag }}
+
+# Manual escape hatch: build then publish via reusable workflows.
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: >-
+          Toolkit release tag (e.g. universal_automation_toolkit-v0.5.1), or when
+          dry_run is true a branch name or 40-character commit SHA.
+        required: true
+        type: string
+      dry_run:
+        description: >-
+          When true, build all platform artifacts and upload workflow artifacts only
+          (no GitHub Release upload). release_tag is interpreted as a git ref or SHA.
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    uses: ./.github/workflows/release_binaries_build.yml
+    with:
+      release_tag: ${{ inputs.release_tag }}
+      dry_run: ${{ inputs.dry_run }}
+      tooling_ref: ${{ github.sha }}
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+
+  publish:
+    needs: release-please
+    if: inputs.dry_run != true
+    uses: ./.github/workflows/release_binaries_publish.yml
+    permissions:
+      contents: write
+    with:
+      release_tag: ${{ needs.build.outputs.release_tag }}
+      version: ${{ needs.build.outputs.version }}
+      artifact_run_id: ${{ needs.build.outputs.artifact_run_id }}
+      tooling_ref: ${{ github.sha }}

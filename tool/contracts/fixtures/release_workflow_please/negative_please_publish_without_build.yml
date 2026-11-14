@@ -258,7 +258,10 @@ jobs:
       !cancelled() &&
       needs.release-please.result == 'success' &&
       needs.dispatch-package-publish.result == 'success' &&
-      needs.wait-package-publish.result == 'success'
+      (
+        needs.wait-package-publish.result == 'success' ||
+        needs.wait-package-publish.result == 'failure'
+      )
     runs-on: ubuntu-latest
     steps:
       - name: Checkout release tooling

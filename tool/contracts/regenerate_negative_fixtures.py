@@ -212,6 +212,12 @@ def main() -> None:
       t.replace("permissions:\n  contents: read", "permissions:\n  contents: write", 1),
   ))
 
+  specs.append((
+      "build",
+      "negative_build_wrong_needs",
+      t.replace("  build:\n    needs: prepare", "  build:\n    needs: []", 1),
+  ))
+
   # --- publish ---
   t = p()
   specs.append(("publish", "negative_fail_on_unmatched_false", t.replace("fail_on_unmatched_files: true", "fail_on_unmatched_files: false", 1)))
@@ -287,6 +293,17 @@ def main() -> None:
   t = d()
   specs.append((
       "dispatch",
+      "negative_dispatch_publish_wrong_needs",
+      t.replace("  publish:\n    needs: build", "  publish:\n    needs: release-please", 1),
+  ))
+  specs.append((
+      "dispatch",
+      "negative_dispatch_publish_wrong_if",
+      t.replace("    if: inputs.dry_run != true", "    if: always()", 1),
+  ))
+
+  specs.append((
+      "dispatch",
       "negative_secrets_inherit",
       re.sub(
           r"    secrets:\n(?:      \w+:.*\n){6}",
@@ -349,6 +366,28 @@ def main() -> None:
       "negative_please_publish_without_build",
       t.replace("needs: [release-please, release-binaries-build]", "needs: [release-please]", 1),
   ))
+  specs.append((
+      "publish",
+      "negative_publish_contents_write_postflight",
+      p().replace(
+          "  postflight:\n    permissions:\n      contents: read",
+          "  postflight:\n    permissions:\n      contents: write",
+          1,
+      ),
+  ))
+
+  specs.append((
+      "please",
+      "negative_please_audit_skips_on_wait_failure",
+      re.sub(
+          r"\(\n\s+needs\.wait-package-publish\.result == 'success' \|\|\n"
+          r"\s+needs\.wait-package-publish\.result == 'failure'\n\s+\)",
+          "needs.wait-package-publish.result == 'success'",
+          t,
+          count=1,
+      ),
+  ))
+
   specs.append((
       "please",
       "negative_please_wait_blocks_on_binaries",

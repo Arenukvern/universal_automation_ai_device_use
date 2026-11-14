@@ -625,9 +625,10 @@ List<String> _validateReleasePleaseFinalBinaryAudit(
       'release-please.yml: $releasePleaseAuditTrainJob if must include always()',
     );
   }
-  if (!auditIf.contains('wait-package-publish.result == \'success\'')) {
+  if (!auditIf.contains('wait-package-publish.result == \'success\'') ||
+      !auditIf.contains('wait-package-publish.result == \'failure\'')) {
     errors.add(
-      'release-please.yml: $releasePleaseAuditTrainJob if must require wait-package-publish success',
+      'release-please.yml: $releasePleaseAuditTrainJob if must run when wait-package-publish succeeds or fails',
     );
   }
   final steps = audit['steps'];
