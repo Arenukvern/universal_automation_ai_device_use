@@ -1,10 +1,5 @@
 # Changelog
 
-## Unreleased
-
-### Bug Fixes
-
-* **universal_browser_cdp:** monotonic observation clock for behavioral reaction floors (0.6.2 release train)
 
 ## [0.6.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.0...universal_browser_cdp-v0.6.1) (2026-11-10)
 
