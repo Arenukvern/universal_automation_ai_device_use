@@ -3,7 +3,7 @@
 # Every negative fixture must be actionlint-clean except fixtures listed in
 # ACTIONLINT_NOISE_RULES: their Dart contract violation is the same shape
 # that actionlint rejects (broken reusable ref, invalid needs graph, etc.).
-set -euo pipefail
+set -uo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fail() { echo "check_negative_actionlint: $*" >&2; exit 1; }
@@ -77,7 +77,7 @@ validate_noise_rules() {
   set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$yml" 2>&1)"
   st=$?
-  set -e
+  set +e
   if [[ "$st" -eq 0 ]] && [[ -z "$out" ]]; then
     echo "check_negative_actionlint: $base is on ACTIONLINT_NOISE_RULES but actionlint is clean" >&2
     return 2
@@ -101,7 +101,9 @@ validate_noise_rules() {
 }
 
 shopt -s nullglob
+set +e
 for negative in "$ROOT_DIR"/tool/contracts/fixtures/**/negative_*.yml; do
+  set +e
   name="$(basename "$negative")"
   set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$negative" 2>&1)"
@@ -134,6 +136,9 @@ if [[ "$meta_rc" -eq 0 ]]; then
 fi
 if [[ "$meta_rc" -eq 2 ]]; then
   fail "meta fixture must remain actionlint-noisy"
+fi
+if [[ "$meta_rc" -ne 1 ]]; then
+  fail "meta self-test: expected validate_noise_rules rc=1, got $meta_rc"
 fi
 
 ok "negative fixtures actionlint-clean (with documented exceptions)"
