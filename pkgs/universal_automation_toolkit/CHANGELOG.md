@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.5.1...universal_automation_toolkit-v0.6.0) (2026-11-14)
+
+
+### Features
+
+* **toolkit:** prebuilt universal-automation binaries on GitHub Releases ([93046a8](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/93046a826815d9f8ff30f69bcd2f3e70311c46f7))
+* **toolkit:** ship prebuilt MCP binaries on GitHub Releases ([4d0e8a3](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/4d0e8a3e03edb71414d6ea76c25a8774ed90470a))
+
 ## [0.5.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.5.0...universal_automation_toolkit-v0.5.1) (2026-11-10)
 
 
