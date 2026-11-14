@@ -9,7 +9,9 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 fail() { echo "check_negative_actionlint: $*" >&2; exit 1; }
 ok() { echo "check_negative_actionlint: $*"; }
 
-bash "$ROOT_DIR/tool/contracts/run_actionlint.sh" >/dev/null || fail "run_actionlint failed"
+RUN_ACTIONLINT_SH="${RUN_ACTIONLINT_SH:-$ROOT_DIR/tool/contracts/run_actionlint.sh}"
+bash "$RUN_ACTIONLINT_SH" >/dev/null || fail "run_actionlint failed"
+[[ -n "${CHECK_NEGATIVE_ACTIONLINT_HOOK_ONLY:-}" ]] && { ok "hook-only"; exit 0; }
 
 ACTIONLINT_VERSION="1.7.7"
 os="$(uname -s)"
@@ -73,7 +75,6 @@ validate_noise_rules() {
   if ! allowed="$(allowed_rules_for "$base")"; then
     fail "validate_noise_rules: $base not in ACTIONLINT_NOISE_RULES"
   fi
-  set +e
   out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$yml" 2>&1)"
   st=$?
   if [[ "$st" -eq 0 ]] && [[ -z "$out" ]]; then
@@ -136,23 +137,18 @@ if [[ "$meta_rc" -ne 1 ]]; then
   fail "meta self-test: expected validate_noise_rules rc=1, got $meta_rc"
 fi
 
-META_BROKEN="$ROOT_DIR/tool/contracts/fixtures/actionlint_meta/broken_workflow_actionlint.yml"
-if [[ ! -f "$META_BROKEN" ]]; then
-  fail "missing actionlint meta fixture: broken_workflow_actionlint.yml"
+META_STUB="$ROOT_DIR/tool/contracts/fixtures/actionlint_meta/run_actionlint_stub_fail.sh"
+if [[ ! -f "$META_STUB" ]]; then
+  fail "missing actionlint meta fixture: run_actionlint_stub_fail.sh"
 fi
-set +e
-(
-  set -uo pipefail
-  fail() { exit 1; }
-  "$BIN" -color -shellcheck= \
-    -ignore 'label "macos-15-intel" is unknown' \
-    "$META_BROKEN" >/dev/null 2>&1 || fail "run_actionlint failed"
-  exit 0
-)
+chmod +x "$META_STUB" 2>/dev/null || true
+hook_out="$(RUN_ACTIONLINT_SH="$META_STUB" CHECK_NEGATIVE_ACTIONLINT_HOOK_ONLY=1 bash "$0" 2>&1)"
 hook_rc=$?
-set +e
 if [[ "$hook_rc" -eq 0 ]]; then
-  fail "meta: workflow lint errors must make run_actionlint hook exit non-zero"
+  fail "meta: failing run_actionlint stub must make guard exit non-zero"
+fi
+if ! printf '%s\n' "$hook_out" | grep -qF 'run_actionlint failed'; then
+  fail "meta: expected run_actionlint failed message (got: $hook_out)"
 fi
 
 ok "negative fixtures actionlint-clean (with documented exceptions)"
