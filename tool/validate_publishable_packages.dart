@@ -1,12 +1,17 @@
 // Runs `dart analyze` and `dart test` for every package in publish_order.yaml
 // (same surface publish_package.yml exercises before publish).
+//
+// Release-please CI also runs `dart pub publish --dry-run` per package (workspace
+// resolution after root pub get) and fails on exit 65 warnings.
 
 import 'dart:io';
 
 import 'hosted_deps_resolve_lib.dart';
+import 'publish_dry_run_lib.dart';
 import 'workspace_pub_constraints_sync.dart';
 
 Future<void> main(List<String> args) async {
+  final dryRunGate = args.contains('--dry-run-gate');
   final repoRoot = findWorkspaceRepoRoot();
   final rootResolve = await Process.run(
     'dart',
@@ -46,22 +51,41 @@ Future<void> main(List<String> args) async {
     final testDir = Directory('${dir.path}/test');
     if (!testDir.existsSync()) {
       stdout.writeln('No test/; skipping tests for $name');
-      continue;
+    } else {
+      final test = await Process.run(
+        'dart',
+        ['test', '--concurrency=1'],
+        workingDirectory: dir.path,
+      );
+      if (test.exitCode != 0) {
+        stderr.write(test.stdout);
+        stderr.write(test.stderr);
+        failures++;
+        continue;
+      }
     }
-    final test = await Process.run(
-      'dart',
-      ['test', '--concurrency=1'],
-      workingDirectory: dir.path,
-    );
-    if (test.exitCode != 0) {
-      stderr.write(test.stdout);
-      stderr.write(test.stderr);
-      failures++;
+    if (dryRunGate) {
+      final dryRun = await Process.run(
+        'dart',
+        ['pub', 'publish', '--dry-run'],
+        workingDirectory: dir.path,
+      );
+      if (publishDryRunGateFailed(dryRun.exitCode)) {
+        stderr.write(
+          formatPublishDryRunGateFailure(
+            packageName: name,
+            exitCode: dryRun.exitCode,
+            combinedOutput: '${dryRun.stdout}${dryRun.stderr}',
+          ),
+        );
+        failures++;
+      }
     }
   }
   if (failures > 0) {
-    stderr.writeln('$failures publishable package(s) failed analyze/test');
+    stderr.writeln('$failures publishable package(s) failed analyze/test/dry-run');
     exit(1);
   }
-  stdout.writeln('All ${names.length} publishable packages passed analyze/test.');
+  final verbs = dryRunGate ? 'analyze/test/dry-run' : 'analyze/test';
+  stdout.writeln('All ${names.length} publishable packages passed $verbs.');
 }

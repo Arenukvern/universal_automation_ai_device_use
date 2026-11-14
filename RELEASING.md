@@ -3,7 +3,7 @@
 ## Zero-touch publish path (default)
 
 1. **Release Please** opens `release-please--branches--main` with version bumps and changelogs.
-2. **Green CI on that PR is the gate** — steward review on the release PR plus green `Validate`. CI mirrors the publisher: co-release resolve, manifest drift (`--release-pr`), **every publishable package** `dart analyze` + `dart test` via workspace resolution (`tool/validate_publishable_packages.dart`; publish dry-run stays on `publish_package.yml` after the exact-version dep wait), and `--audit-published --release-pr` (in-train versions count as pending; broken pub.dev-latest sibling edges in the release set warn instead of blocking).
+2. **Green CI on that PR is the gate** — steward review on the release PR plus green `Validate`. CI mirrors the publisher: co-release resolve, manifest drift (`--release-pr`), **every publishable package** `dart analyze` + `dart test` + workspace `dart pub publish --dry-run` (`validate_publishable_packages.dart --dry-run-gate`; fails on exit **65** warnings), and `--audit-published --release-pr` (in-train versions count as pending; pub.dev-latest drift warns only when the in-train dependency version actually satisfies the constraint). Tag publish still dry-runs after the exact-version dep wait in `publish_package.yml`.
 3. Merge the release PR to `main`. Release Please tags `universal_<package>-v<version>` for each released component.
 4. **`.github/workflows/release-please.yml`** dispatches **`.github/workflows/publish_package.yml`** once per tag (`workflow_dispatch` on the tag ref). **Pub.dev environment reviewers were removed** (Anton’s decision: zero-touch publishing). Human review is the **release PR** (second-steward review) plus green CI — not per-package deployment approvals. OIDC still mints a **fresh** token immediately before `dart pub publish --force`.
 5. **`wait-package-publish`** (180-minute job timeout) waits on each dispatched publish run, watching **new** `workflow_dispatch` runs only, **re-dispatches once** when the **publish** job actually failed (not skipped/cancelled/waiting), then runs **`check_hosted_deps_resolve.dart --audit-published`** as a blocking step. If an environment **approval gate is ever re-added** on `pub.dev`, publishes may still complete after this job times out red — treat **`post_publish_audit.yml`** as the authoritative final audit and re-run it manually when that happens.
@@ -12,6 +12,10 @@
 **Deployment policy:** GitHub can deploy only from tag refs matching `universal_*-v*`. Tags are **immutable** via the `release-tags-immutable` ruleset (Admin-only bypass). Do not move or recreate tags to “fix” constraint drift — land a new version instead.
 
 Constraint sync dispatches `validate.yml` on branch `release-please--branches--main` with `expected_sha` so CI verifies the exact synced commit (workflow_dispatch cannot target a bare SHA ref).
+
+### `Validate` on `main` vs release PR
+
+On **push to `main`**, `--audit-published` is **not** run (no in-train / `releaseSet`; strict audit would race the publish train right after merge). Blocking post-publish checks are **`wait-package-publish`** and manual **`post_publish_audit.yml`**. Non-blocking manifest drift + audit reports run on **ordinary pull requests** only.
 
 ### Manual publish recovery (single package)
 

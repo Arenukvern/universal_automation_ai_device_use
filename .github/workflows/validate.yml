@@ -69,8 +69,10 @@ jobs:
         continue-on-error: true
         run: dart run tool/check_hosted_deps_resolve.dart --manifest-drift-only --github-report --warn-manifest-behind-pub
 
+      # Main push: releaseSet empty (strict audit) can race the publish train —
+      # skip here; blocking audit is wait-package-publish + post_publish_audit.yml.
       - name: Report pub.dev audit (non-blocking)
-        if: ${{ env.IS_RELEASE_PLEASE != 'true' }}
+        if: ${{ env.IS_RELEASE_PLEASE != 'true' && github.event_name == 'pull_request' }}
         continue-on-error: true
         run: dart run tool/check_hosted_deps_resolve.dart --audit-published --github-report
 
@@ -78,9 +80,9 @@ jobs:
         if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
         run: dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
 
-      - name: Release-please PR — publishable packages analyze/test (blocking)
+      - name: Release-please PR — publishable packages analyze/test/dry-run (blocking)
         if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
-        run: dart run tool/validate_publishable_packages.dart
+        run: dart run tool/validate_publishable_packages.dart --dry-run-gate
 
       - name: Release-please PR — pub.dev audit (blocking)
         if: ${{ env.IS_RELEASE_PLEASE == 'true' }}
