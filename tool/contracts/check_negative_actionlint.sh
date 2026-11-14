@@ -128,11 +128,30 @@ META_EXTRA="$ROOT_DIR/tool/contracts/fixtures/actionlint_meta/publish_needs_post
 if [[ ! -f "$META_EXTRA" ]]; then
   fail "missing actionlint meta fixture: publish_needs_postflight_extra_actionlint.yml"
 fi
+PIN_BASE="negative_publish_needs_postflight.yml"
+if ! allowed="$(allowed_rules_for "$PIN_BASE")"; then
+  fail "meta self-test: $PIN_BASE not in ACTIONLINT_NOISE_RULES"
+fi
 set +e
-validate_noise_rules "$META_EXTRA" "negative_publish_needs_postflight.yml"
-meta_rc=$?
+meta_out="$("$BIN" -shellcheck= -ignore 'label "macos-15-intel" is unknown' "$META_EXTRA" 2>&1)"
 set -e
-if [[ "$meta_rc" -eq 0 ]]; then
+meta_rules="$(printf '%s\n' "$meta_out" | grep -oE '\[[-a-z0-9]+\]' | tr -d '[]' | sort -u)"
+meta_rejected_extra=0
+while IFS= read -r rule; do
+  [[ -z "$rule" ]] && continue
+  found=0
+  for allowed_rule in $allowed; do
+    if [[ "$rule" == "$allowed_rule" ]]; then
+      found=1
+      break
+    fi
+  done
+  if [[ "$found" -eq 0 ]]; then
+    meta_rejected_extra=1
+    break
+  fi
+done <<<"$meta_rules"
+if [[ "$meta_rejected_extra" -ne 1 ]]; then
   fail "noise rule pin must reject extra unrelated actionlint errors (meta fixture)"
 fi
 
