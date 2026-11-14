@@ -103,7 +103,97 @@ Future<void> main() async {
     exit(1);
   }
 
+  final toolkitTag = toolkitReleaseTag(outputs: outputs);
+  if (toolkitTag != null) {
+    stdout.writeln('Waiting for release_binaries.yml on $toolkitTag …');
+    final binaryOk = await _waitForReleaseBinariesWorkflow(
+      repo: repo,
+      releaseTag: toolkitTag,
+      env: env,
+    );
+    if (!binaryOk) {
+      stderr.writeln(
+        '::error::release_binaries workflow failed or timed out for $toolkitTag',
+      );
+      exit(1);
+    }
+  }
+
   exit(await _runStrictPostPublishAudit());
+}
+
+Future<bool> _waitForReleaseBinariesWorkflow({
+  required String repo,
+  required String releaseTag,
+  required Map<String, String> env,
+}) async {
+  final deadline = DateTime.now().add(defaultDispatchRunDiscoveryTimeout);
+  while (DateTime.now().isBefore(deadline)) {
+    final list = await Process.run(
+      'gh',
+      [
+        'run',
+        'list',
+        '--repo',
+        repo,
+        '--workflow',
+        releaseBinariesWorkflowFile,
+        '--branch',
+        'main',
+        '--event',
+        'workflow_dispatch',
+        '--json',
+        'databaseId,createdAt,status,conclusion,event',
+        '--limit',
+        '25',
+      ],
+      environment: env,
+    );
+    if (list.exitCode != 0) {
+      stderr.write(list.stderr);
+      return false;
+    }
+    final runs = parseGhWorkflowRunList(list.stdout as String);
+    for (final run in runs) {
+      final view = await Process.run(
+        'gh',
+        [
+          'run',
+          'view',
+          '${run.databaseId}',
+          '--repo',
+          repo,
+          '--json',
+          'event,conclusion,status,inputs',
+        ],
+        environment: env,
+      );
+      if (view.exitCode != 0) {
+        continue;
+      }
+      final decoded = jsonDecode(view.stdout as String) as Map<String, dynamic>;
+      final inputs = decoded['inputs'] as Map<String, dynamic>? ?? {};
+      final tagInput = inputs['release_tag'] as String? ?? '';
+      if (tagInput != releaseTag) {
+        continue;
+      }
+      final watch = await Process.run(
+        'gh',
+        [
+          'run',
+          'watch',
+          '${run.databaseId}',
+          '--repo',
+          repo,
+          '--exit-status',
+        ],
+        environment: env,
+      );
+      return watch.exitCode == 0;
+    }
+    await Future<void>.delayed(const Duration(seconds: 20));
+  }
+  return false;
 }
 
 Future<int> _runStrictPostPublishAudit() async {

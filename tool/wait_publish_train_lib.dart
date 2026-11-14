@@ -29,6 +29,23 @@ List<String> releasePleasePublishTags({
 
 const publishWorkflowJobName = 'Publish to pub.dev (OIDC)';
 
+const toolkitPackagePath = 'pkgs/universal_automation_toolkit';
+
+const releaseBinariesWorkflowFile = 'release_binaries.yml';
+
+/// Toolkit tag from release-please outputs when the toolkit was released.
+String? toolkitReleaseTag({required Map<String, dynamic> outputs}) {
+  final created = outputs['$toolkitPackagePath--release_created'];
+  if (created != true && created != 'true') {
+    return null;
+  }
+  final tag = outputs['$toolkitPackagePath--tag_name'] as String?;
+  if (tag == null || tag.isEmpty) {
+    return null;
+  }
+  return tag;
+}
+
 const defaultDispatchRunDiscoveryTimeout = Duration(minutes: 10);
 
 /// Strict main-mode post-publish audit (`--release-pr` omitted; errors block).

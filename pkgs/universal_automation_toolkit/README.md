@@ -203,8 +203,10 @@ exception). CLI: `screenshot --list-windows` / `--window-id` /
 
 Build note: the AOT binary **must** use `dart build cli` —
 `dart compile exe` silently drops the native code assets (the macOS
-driver dylib). `plugins/universal-automation/install.sh` builds and
-symlinks it.
+driver dylib). Prebuilt installs: `curl -fsSL …/install.sh | bash` from
+the repo root (see [RELEASING.md](../../RELEASING.md)); from source use
+[`plugin/install.sh`](../../plugin/install.sh). macOS release binaries are
+**preview (unsigned)** until signing secrets are configured.
 
 ## Non-claims
 

@@ -12,6 +12,7 @@ import '../composition/desktop_os_factory.dart';
 import '../mcp/mcp_server.dart' as mcp;
 import '../plan/checks.dart';
 import '../plan/plan.dart';
+import '../package_version.dart';
 import '../runner/registry.dart';
 import '../runner/runner.dart';
 
@@ -290,6 +291,11 @@ String? _named(String? value, String field) {
 
 Future<int> _dispatch(List<String> arguments) async {
   final parser = ArgParser(allowTrailingOptions: true)
+    ..addFlag(
+      'version',
+      negatable: false,
+      help: 'Print toolkit version and exit.',
+    )
     ..addFlag('help', abbr: 'h', negatable: false, help: 'Show usage.')
     ..addOption('cdp', help: 'CDP HTTP base (e.g. http://127.0.0.1:9222).')
     ..addOption(
@@ -500,6 +506,10 @@ Future<int> _dispatch(List<String> arguments) async {
     options = parser.parse(arguments);
   } on ArgParserException catch (error) {
     throw UsageException(error.message);
+  }
+  if (options['version'] == true) {
+    stdout.writeln(toolkitPackageVersion);
+    return exitOk;
   }
   final command = options.command;
   if (command == null) {
