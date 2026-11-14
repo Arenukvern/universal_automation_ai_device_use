@@ -22,6 +22,7 @@ OUT = {
     "dispatch": ROOT / "tool/contracts/fixtures/release_workflow_dispatch",
     "pr": ROOT / "tool/contracts/fixtures/release_workflow_pr",
     "please": ROOT / "tool/contracts/fixtures/release_workflow_please",
+    "caller": ROOT / "tool/contracts/fixtures/release_workflow_caller",
 }
 
 VALIDATOR = {
@@ -30,6 +31,7 @@ VALIDATOR = {
     "dispatch": "dispatch",
     "pr": "pr",
     "please": "please",
+    "caller": "caller",
 }
 
 
@@ -53,6 +55,14 @@ def dart_errors(kind: str, yml: Path) -> str:
             "run",
             str(ROOT / "tool/check_release_workflow.dart"),
             "--please-caller-workflow",
+            str(yml),
+        ]
+    elif kind == "caller":
+        cmd = [
+            "dart",
+            "run",
+            str(ROOT / "tool/check_release_workflow.dart"),
+            "--binary-reusable-caller-workflow",
             str(yml),
         ]
     else:
@@ -213,6 +223,26 @@ def main() -> None:
   ))
   specs.append((
       "build",
+      "negative_build_nested_publish",
+      t.replace(
+          "  build:\n    needs: prepare",
+          "  nested:\n    needs: prepare\n"
+          "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      version: 0.0.0\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  build:\n    needs: prepare",
+          1,
+      ),
+  ))
+  specs.append((
+      "build",
+      "negative_build_extra_job",
+      t + "\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bad\n",
+  ))
+  specs.append((
+      "build",
       "negative_workflow_contents_write",
       t.replace("permissions:\n  contents: read", "permissions:\n  contents: write", 1),
   ))
@@ -297,6 +327,26 @@ def main() -> None:
   ))
   specs.append((
       "publish",
+      "negative_publish_nested_build",
+      p().replace(
+          "  publish:\n    permissions:",
+          "  nested:\n    needs: []\n"
+          "    uses: ./.github/workflows/release_binaries_build.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      dry_run: true\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  publish:\n    permissions:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_extra_job",
+      p() + "\n  extra:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo bad\n",
+  ))
+  specs.append((
+      "publish",
       "negative_publish_no_download",
       re.sub(
           r"      - name: Download release artifacts from this workflow run\n.*?\n\n",
@@ -314,7 +364,13 @@ def main() -> None:
       "negative_dispatch_extra_publish_job",
       t.replace(
           "jobs:\n  build:",
-          "jobs:\n  extra-publish:\n    uses: ./.github/workflows/release_binaries_publish.yml\n  build:",
+          "jobs:\n  extra-publish:\n"
+          "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+          "    with:\n"
+          "      release_tag: universal_automation_toolkit-v0.0.0\n"
+          "      version: 0.0.0\n"
+          "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+          "  build:",
           1,
       ),
   ))
@@ -414,6 +470,49 @@ def main() -> None:
           count=1,
       ),
   ))
+
+  specs.append((
+      "please",
+      "negative_please_build_missing_permissions",
+      re.sub(
+          r"(  release-binaries-build:[\s\S]*?)\n    permissions:\n      contents: read\n",
+          r"\1\n",
+          pl(),
+          count=1,
+      ),
+  ))
+  specs.append((
+      "please",
+      "negative_please_publish_missing_permissions",
+      re.sub(
+          r"(  release-binaries-publish:[\s\S]*?)\n    permissions:\n      contents: write\n",
+          r"\1\n",
+          pl(),
+          count=1,
+      ),
+  ))
+  specs.append((
+      "please",
+      "negative_please_audit_write_all",
+      pl().replace(
+          "    permissions:\n      contents: read\n    steps:\n      - name: Checkout release tooling",
+          "    permissions: write-all\n    steps:\n      - name: Checkout release tooling",
+          1,
+      ),
+  ))
+
+  caller_dispatch = (
+      "name: ZZ new caller (negative fixture)\n"
+      "on:\n  workflow_dispatch:\n\n"
+      "permissions: read-all\n\n"
+      "jobs:\n  publish:\n"
+      "    uses: ./.github/workflows/release_binaries_publish.yml\n"
+      "    with:\n"
+      "      release_tag: universal_automation_toolkit-v0.0.0\n"
+      "      version: 0.0.0\n"
+      "      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef\n"
+  )
+  specs.append(("caller", "negative_zz_new_caller", caller_dispatch))
 
   specs.append((
       "please",

@@ -1,0 +1,13 @@
+name: ZZ new caller (negative fixture)
+on:
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  publish:
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: universal_automation_toolkit-v0.0.0
+      version: 0.0.0
+      tooling_ref: deadbeefdeadbeefdeadbeefdeadbeefdeadbeef

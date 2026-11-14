@@ -1,1 +1,1 @@
-negative_postflight_renamed.yml: must define publish and postflight jobs
+negative_postflight_renamed.yml: unexpected job postflight_check (allowed: publish, postflight)

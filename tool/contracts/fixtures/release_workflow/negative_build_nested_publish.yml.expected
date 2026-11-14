@@ -1,0 +1,1 @@
+negative_build_nested_publish.yml: job nested must not call another reusable workflow (uses:)

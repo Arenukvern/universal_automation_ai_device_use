@@ -1,0 +1,278 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: release-please-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    outputs:
+      paths_released: ${{ steps.release.outputs.paths_released }}
+      release_outputs_json: ${{ toJSON(steps.release.outputs) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Release Please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+  sync-release-pr-constraints:
+    needs: release-please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      # Nested checkout: sibling Dart workspace for package: resolution; cwd stays
+      # the release tree so findWorkspaceRepoRoot() reads pkgs/ and manifest there.
+      - name: Checkout trusted tooling (triggering main commit)
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          persist-credentials: false
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      # No `dart pub get` anywhere in this job before the constraint sync. It
+      # previously resolved the trusted checkout of the triggering main commit
+      # first — and that commit is transiently unresolvable exactly when
+      # constraint repair is needed (the documented fix()-before-release-merge
+      # flow), so the job died before the sync tool ever ran.
+
+      # Runs on push to main or workflow_dispatch from main (see release-please
+      # job `if`). Sync pushes to release-please--branches--main cannot re-enter
+      # this workflow via push; dispatch from non-main refs is refused.
+      - name: Sync intra-workspace pub constraints on release PR
+        id: sync_constraints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --heads origin release-please--branches--main | grep -q .; then
+            echo "No release-please branch; skipping constraint sync"
+            echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            echo "sync_commit_sha=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch origin release-please--branches--main
+          git checkout -B release-please--branches--main origin/release-please--branches--main
+          echo 'trusted/' >> .git/info/exclude
+          # Plain `dart`, NOT `dart run`: the release tree's stale sibling
+          # constraints are exactly what this tool repairs, so its success
+          # must not depend on package resolution at all — `dart run` does an
+          # implicit pub get whose failure is only advisory-tolerated on some
+          # SDK versions. The tool's entry chain is SDK-only; a test guards it.
+          dart trusted/tool/sync_workspace_pub_constraints.dart --write
+          # Needs package:pub_semver, so it resolves the release tree via
+          # `dart run`. Post-sync that tree resolves; a tree the sync could not
+          # repair fails loudly here instead of committing a broken state.
+          dart run trusted/tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
+          # Constraint sync commits stay `chore:` (no release-please bump). When
+          # a pub.dev-shipped package's universal_* pins change, land a scoped
+          # fix(<package>) on main so release-please bumps — see
+          # RELEASING.md "Intra-workspace constraint sync".
+          if git diff --quiet -- pkgs; then
+            echo "Workspace pub constraints already in sync"
+            echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
+            echo "sync_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          while IFS= read -r line; do
+            [ -z "$line" ] && continue
+            path="${line:3}"
+            case "$path" in
+              pkgs/*) ;;
+              *)
+                echo "Refusing to commit: change outside pkgs/: $path"
+                git status --porcelain
+                exit 1
+                ;;
+            esac
+          done < <(git status --porcelain)
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pkgs/*/pubspec.yaml
+          git commit -m "chore: sync intra-workspace pub dependency constraints"
+          git push origin HEAD:release-please--branches--main
+          echo "sync_pushed=true" >> "$GITHUB_OUTPUT"
+          echo "sync_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Dispatch CI on release PR branch
+        if: ${{ steps.sync_constraints.outputs.sync_commit_sha != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SYNC_SHA: ${{ steps.sync_constraints.outputs.sync_commit_sha }}
+        run: |
+          RELEASE_BRANCH=release-please--branches--main
+          echo "Dispatching Validate and tooling_runtime CI on ${RELEASE_BRANCH} @ ${SYNC_SHA}"
+          gh workflow run validate.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
+          gh workflow run tooling_runtime_ci.yml --repo "${GH_REPO}" --ref "${RELEASE_BRANCH}" \
+            -f expected_sha="${SYNC_SHA}"
+
+  release-binaries-build:
+    needs: release-please
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == true ||
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
+      )
+    uses: ./.github/workflows/release_binaries_build.yml
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    with:
+      release_tag: ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--tag_name'] }}
+      dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [release-please, release-binaries-build]
+    if: >-
+      github.ref == 'refs/heads/main' &&
+      (
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == true ||
+        fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] == 'true'
+      )
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
+      version: ${{ needs.release-binaries-build.outputs.version }}
+      tooling_ref: ${{ github.sha }}
+
+  dispatch-package-publish:
+    needs: release-please
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Dispatch pub.dev publish per released package
+        id: dispatch_publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+        run: dart run tool/dispatch_pub_dev_publish.dart
+
+  wait-package-publish:
+    needs:
+      - release-please
+      - dispatch-package-publish
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      needs.release-please.result == 'success' &&
+      needs.dispatch-package-publish.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Resolve workspace (tooling)
+        run: dart pub get
+
+      - name: Wait for publish runs, retry once, audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+        run: dart run tool/wait_publish_train.dart
+
+  # Pub.dev train must not wait on binary jobs. This job fails the workflow when
+  # the toolkit released but GitHub Release binaries did not succeed.
+  audit-release-train:
+    needs:
+      - release-please
+      - dispatch-package-publish
+      - wait-package-publish
+      - release-binaries-build
+      - release-binaries-publish
+    if: >-
+      always() &&
+      github.ref == 'refs/heads/main' &&
+      !cancelled() &&
+      needs.release-please.result == 'success' &&
+      needs.dispatch-package-publish.result == 'success' &&
+      (
+        needs.wait-package-publish.result == 'success' ||
+        needs.wait-package-publish.result == 'failure'
+      )
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout release tooling
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Assert toolkit GitHub Release binaries succeeded when required
+        env:
+          TOOLKIT_RELEASE_CREATED: >-
+            ${{ fromJSON(needs.release-please.outputs.release_outputs_json)['pkgs/universal_automation_toolkit--release_created'] }}
+          RELEASE_BINARIES_BUILD_RESULT: ${{ needs.release-binaries-build.result }}
+          RELEASE_BINARIES_PUBLISH_RESULT: ${{ needs.release-binaries-publish.result }}
+        run: bash tool/release/audit_release_binaries_train.sh

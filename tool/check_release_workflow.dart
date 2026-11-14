@@ -7,13 +7,43 @@
 import 'dart:io';
 
 import 'release_workflow_contract_lib.dart';
+import 'release_workflow_permissions_lib.dart';
 
 Future<void> main(List<String> args) async {
   final root = Directory.current;
   if (!args.contains('--workflow') &&
       !args.contains('--pr-smoke-workflow') &&
-      !args.contains('--please-caller-workflow')) {
+      !args.contains('--please-caller-workflow') &&
+      !args.contains('--binary-reusable-caller-workflow')) {
     await _validateAllReleaseWorkflowContracts(root.path);
+    return;
+  }
+  if (args.contains('--binary-reusable-caller-workflow')) {
+    final i = args.indexOf('--binary-reusable-caller-workflow');
+    if (i + 1 >= args.length) {
+      stderr.writeln('--binary-reusable-caller-workflow requires a path');
+      exit(2);
+    }
+    final workflowPath = args[i + 1];
+    final file = File(workflowPath);
+    if (!file.existsSync()) {
+      stderr.writeln('Missing workflow: $workflowPath');
+      exit(1);
+    }
+    final label = file.uri.pathSegments.last;
+    final errors = validateBinaryReusableCallerYaml(
+      await file.readAsString(),
+      label,
+      repoRoot: root.path,
+    );
+    if (errors.isNotEmpty) {
+      stderr.writeln('check_release_workflow failures:');
+      for (final e in errors) {
+        stderr.writeln('  - $e');
+      }
+      exit(1);
+    }
+    stdout.writeln('check_release_workflow: ${file.path} OK');
     return;
   }
   if (args.contains('--please-caller-workflow')) {
@@ -28,9 +58,16 @@ Future<void> main(List<String> args) async {
       stderr.writeln('Missing workflow: $workflowPath');
       exit(1);
     }
-    final errors = validateReleasePleaseBinariesCaller(
-      await file.readAsString(),
-    );
+    final yaml = await file.readAsString();
+    final label = file.uri.pathSegments.last;
+    final errors = [
+      ...validateReleasePleaseBinariesCaller(yaml),
+      ...validateReleasePleaseLocalJobPermissions(
+        root.path,
+        yamlText: yaml,
+        label: label,
+      ),
+    ];
     if (errors.isNotEmpty) {
       stderr.writeln('check_release_workflow failures:');
       for (final e in errors) {
@@ -53,10 +90,15 @@ Future<void> main(List<String> args) async {
       stderr.writeln('Missing workflow: $workflowPath');
       exit(1);
     }
-    final errors = validateReleaseBinariesPrWorkflowYaml(
-      await file.readAsString(),
-      label: file.uri.pathSegments.last,
-    );
+    final label = file.uri.pathSegments.last;
+    final yaml = await file.readAsString();
+    final errors = [
+      ...validateReleaseBinariesPrWorkflowYaml(
+        yaml,
+        label: label,
+      ),
+      ...validateBinaryReusableCallerYaml(yaml, label, repoRoot: root.path),
+    ];
     if (errors.isNotEmpty) {
       stderr.writeln('check_release_workflow failures:');
       for (final e in errors) {
@@ -93,8 +135,12 @@ Future<void> main(List<String> args) async {
       name == 'release_binaries_publish.yml') {
     errors = validateReleaseBinariesPublishWorkflowYaml(text, label: name);
   } else if (path.contains('release_workflow_dispatch') ||
+      path.contains('release_workflow_caller') ||
       name == 'release_binaries.yml') {
-    errors = validateReleaseBinariesDispatchWorkflowYaml(text, label: name);
+    errors = [
+      ...validateReleaseBinariesDispatchWorkflowYaml(text, label: name),
+      ...validateBinaryReusableCallerYaml(text, name, repoRoot: root.path),
+    ];
   } else {
     errors = validateReleaseBinariesBuildWorkflowYaml(text, label: name);
   }
@@ -141,6 +187,7 @@ Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
     ...validateReleasePleaseBinariesCaller(
       await File(paths[4]).readAsString(),
     ),
+    ...validateProductionReusablePermissionChains(rootPath),
   ];
 
   if (errors.isNotEmpty) {
