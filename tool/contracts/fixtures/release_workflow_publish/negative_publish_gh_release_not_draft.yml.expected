@@ -1,0 +1,1 @@
+publish action-gh-release must set draft: true before undrafting (immutable GitHub releases)

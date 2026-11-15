@@ -15,15 +15,33 @@ $PreviousFile = Join-Path $ShareRoot "previous"
 $CurrentLink = Join-Path $ShareRoot "current"
 $ProgramsBin = if ($env:UNIVERSAL_AUTOMATION_BIN_DIR) { $env:UNIVERSAL_AUTOMATION_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\universal-automation\bin" }
 
-function Resolve-LatestVersion {
-  $uri = "https://api.github.com/repos/$Repo/releases?per_page=30"
-  $releases = Invoke-RestMethod -Uri $uri -UseBasicParsing
-  foreach ($r in $releases) {
-    if ($r.tag_name -match '^universal_automation_toolkit-v(.+)$') {
-      return $Matches[1]
-    }
+function Import-ToolkitReleaseLib {
+  $scriptDir = $null
+  if ($PSScriptRoot) { $scriptDir = $PSScriptRoot }
+  elseif ($MyInvocation.MyCommand.Path) {
+    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
   }
-  return $null
+  $lib = if ($scriptDir) { Join-Path $scriptDir "tool\install\resolve_toolkit_release_lib.ps1" } else { $null }
+  if ($lib -and (Test-Path -LiteralPath $lib)) {
+    . $lib
+    return
+  }
+  $raw = "https://raw.githubusercontent.com/$Repo/main/tool/install/resolve_toolkit_release_lib.ps1"
+  $code = (Invoke-WebRequest -Uri $raw -UseBasicParsing).Content
+  Invoke-Expression $code
+}
+
+function Resolve-LatestVersion {
+  Import-ToolkitReleaseLib
+  $releases = $null
+  if ($env:UNIVERSAL_AUTOMATION_RELEASES_FIXTURE) {
+    $raw = Get-Content -Raw -LiteralPath $env:UNIVERSAL_AUTOMATION_RELEASES_FIXTURE
+    $releases = $raw | ConvertFrom-Json
+  } else {
+    $uri = "https://api.github.com/repos/$Repo/releases?per_page=30"
+    $releases = Invoke-RestMethod -Uri $uri -UseBasicParsing
+  }
+  return Resolve-LatestToolkitVersionFromReleases @($releases)
 }
 
 function Resolve-PhysicalRoot([string]$Path) {
@@ -154,7 +172,11 @@ if (-not $Version) {
   $Version = Resolve-LatestVersion
 }
 if (-not $Version) {
-  Write-Host "Specify -Version or build from source (plugin/install.sh on WSL or Dart SDK)." -ForegroundColor Red
+  Write-Host @"
+Specify -Version or build from source (plugin/install.sh on WSL or Dart SDK).
+The newest GitHub release may lack binaries (immutable release published before CI upload);
+installers skip assetless toolkit releases when resolving latest.
+"@ -ForegroundColor Red
   exit 1
 }
 

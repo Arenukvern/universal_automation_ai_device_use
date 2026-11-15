@@ -101,6 +101,20 @@ sibling workflows). Zero manual steps:
    and [download-artifact](https://github.com/actions/download-artifact)—by
    default the action downloads from the **current workflow run**, which includes
    artifacts from other reusable-workflow jobs in the same caller run).
+   **Immutable GitHub releases:** the repository enables immutable releases. Release
+   Please therefore creates the toolkit GitHub release as a **draft** with
+   **`force-tag-creation: true`** (see `release-please-config.json` and [release-please
+   manifest docs](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)).
+   The git tag exists immediately for `publish_package.yml` and pub.dev; the GitHub
+   release stays a draft so CI can upload assets. Publish asserts the release is still
+   a draft, uploads archives + `checksums.txt`, verifies the asset list, **then**
+   `gh release edit --draft=false`. Postflight downloads every archive from the
+   **published** release URL and verifies checksums. If publish runs against an
+   already-published release, it fails loudly (no silent assetless releases).
+   **Release Please anchor:** without `force-tag-creation`, draft releases use GitHub
+   “lazy” tags and the next `release-please` pass may open a duplicate release PR
+   (entire history re-listed). The tag ref is the anchor `release-pr` uses; draft
+   releases are skipped for “latest installer” resolution in `install.sh` / `install.ps1`.
 3. `wait-package-publish` waits on **pub.dev only**. `audit-release-train`
    runs when pub wait succeeds or fails and **fails the workflow** if the
    toolkit released but binary build/publish did not succeed.
@@ -134,7 +148,10 @@ Please tag). The workflow builds all four platform legs, runs architecture check
 writes `checksums.txt`, and uploads a single **workflow artifact** bundle.
 
 Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
-From-source path remains [`plugin/install.sh`](plugin/install.sh).
+**Latest** resolves to the newest **published** toolkit release whose asset set
+includes all four platform archives and `checksums.txt` (skips assetless releases
+such as `universal_automation_toolkit-v0.6.0`). Pin `--version` / `-Version` when
+needed. From-source path remains [`plugin/install.sh`](plugin/install.sh).
 
 Plugin bundle versions (`plugin/.cursor-plugin/plugin.json`,
 `plugin/.claude-plugin/plugin.json`) are Release Please **extra-files** on the

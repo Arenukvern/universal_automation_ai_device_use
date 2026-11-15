@@ -6,6 +6,7 @@
 
 import 'dart:io';
 
+import 'release_please_immutable_release_lib.dart';
 import 'release_please_toolkit_versions_lib.dart';
 import 'release_workflow_contract_lib.dart';
 import 'release_workflow_permissions_lib.dart';
@@ -15,8 +16,35 @@ Future<void> main(List<String> args) async {
   if (!args.contains('--workflow') &&
       !args.contains('--pr-smoke-workflow') &&
       !args.contains('--please-caller-workflow') &&
-      !args.contains('--binary-reusable-caller-workflow')) {
+      !args.contains('--binary-reusable-caller-workflow') &&
+      !args.contains('--release-please-config')) {
     await _validateAllReleaseWorkflowContracts(root.path);
+    return;
+  }
+  if (args.contains('--release-please-config')) {
+    final i = args.indexOf('--release-please-config');
+    if (i + 1 >= args.length) {
+      stderr.writeln('--release-please-config requires a path');
+      exit(2);
+    }
+    final configPath = args[i + 1];
+    final file = File(configPath);
+    if (!file.existsSync()) {
+      stderr.writeln('Missing config: $configPath');
+      exit(1);
+    }
+    final errors = validateToolkitImmutableReleaseReleasePleaseConfig(
+      root.path,
+      configText: file.readAsStringSync(),
+    );
+    if (errors.isNotEmpty) {
+      stderr.writeln('check_release_workflow failures:');
+      for (final e in errors) {
+        stderr.writeln('  - $e');
+      }
+      exit(1);
+    }
+    stdout.writeln('check_release_workflow: ${file.path} OK');
     return;
   }
   if (args.contains('--binary-reusable-caller-workflow')) {
@@ -190,6 +218,7 @@ Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
     ),
     ...validateProductionReusablePermissionChains(rootPath),
     ...validateToolkitVersionSurfacesReleasePlease(rootPath),
+    ...validateToolkitImmutableReleaseReleasePleaseConfig(rootPath),
   ];
 
   if (errors.isNotEmpty) {

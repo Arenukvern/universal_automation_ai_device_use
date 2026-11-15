@@ -54,4 +54,30 @@ run_negative_dir pr "$FIX/release_workflow_pr"
 run_negative_dir please "$FIX/release_workflow_please"
 run_negative_dir caller "$FIX/release_workflow_caller"
 
+run_negative_config() {
+  local dir="$1"
+  shopt -s nullglob
+  for negative in "$dir"/negative_*.json; do
+    name="$(basename "$negative")"
+    exp="${negative}.expected"
+    if [[ ! -f "$exp" ]]; then
+      fail "negative config missing .expected file: $name"
+    fi
+    want="$(tr -d '\n' <"$exp")"
+    set +e
+    out="$(dart run "$ROOT_DIR/tool/check_release_workflow.dart" --release-please-config "$negative" 2>&1)"
+    st=$?
+    set -e
+    if [[ "$st" -eq 0 ]]; then
+      fail "negative config must fail but passed: $name"
+    fi
+    if ! printf '%s\n' "$out" | grep -qF "$want"; then
+      fail "negative config $name: output must contain: $want (got: $out)"
+    fi
+    ok "negative config rejected: $name"
+  done
+}
+
+run_negative_config "$FIX/release_please_config"
+
 ok "release_binaries workflow structure OK"

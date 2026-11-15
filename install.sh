@@ -39,14 +39,32 @@ Testing: UA_RELEASE_BASE_URL or UNIVERSAL_AUTOMATION_BASE_URL (e.g. local file s
 USAGE
 }
 
+source_toolkit_release_lib() {
+  local script_dir="" lib raw
+  if [[ -n "${BASH_SOURCE[0]:-}" ]]; then
+    script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  fi
+  lib="${script_dir}/tool/install/resolve_toolkit_release_lib.sh"
+  if [[ -f "$lib" ]]; then
+    # shellcheck source=tool/install/resolve_toolkit_release_lib.sh
+    source "$lib"
+    return 0
+  fi
+  raw="https://raw.githubusercontent.com/${REPO}/main/tool/install/resolve_toolkit_release_lib.sh"
+  # shellcheck source=/dev/null
+  source <(curl -fsSL "$raw")
+}
+
 resolve_latest_release_version() {
-  local api_url="https://api.github.com/repos/${REPO}/releases"
-  local body tag
+  local body
+  source_toolkit_release_lib
   command -v curl >/dev/null 2>&1 || return 1
-  body="$(curl -fsSL "$api_url?per_page=30" 2>/dev/null)" || return 1
-  tag="$(sed -nE 's/.*"tag_name"[[:space:]]*:[[:space:]]*"universal_automation_toolkit-v([^"]+)".*/\1/p' <<<"$body" | head -n1)"
-  [[ -n "$tag" ]] || return 1
-  printf '%s' "$tag"
+  if [[ -n "${UNIVERSAL_AUTOMATION_RELEASES_FIXTURE:-}" ]]; then
+    body="$(cat "$UNIVERSAL_AUTOMATION_RELEASES_FIXTURE")"
+  else
+    body="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null)" || return 1
+  fi
+  resolve_latest_toolkit_version_from_releases_json <<<"$body"
 }
 
 resolve_cli_in_tree() {
@@ -163,9 +181,10 @@ fi
 
 if [[ -z "$VERSION" ]]; then
   cat >&2 <<EOF
-Unable to resolve install version.
+Unable to resolve install version (no published toolkit release with complete binaries).
 
-Specify --version, or build from source:
+The newest GitHub release may be assetless (e.g. immutable release published before CI upload).
+Specify --version <semver>, or build from source:
   ./plugin/install.sh
 EOF
   usage >&2

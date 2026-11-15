@@ -208,6 +208,12 @@ the repo root (see [RELEASING.md](../../RELEASING.md)); from source use
 [`plugin/install.sh`](../../plugin/install.sh). macOS release binaries are
 **preview (unsigned)** until signing secrets are configured.
 
+**GitHub binaries:** `v0.6.0` shipped on pub.dev but its GitHub release has
+**no prebuilt archives** (immutable release was published before CI could upload
+assets). **`v0.6.1` is the first release train with prebuilt binaries** under the
+draft-then-publish flow documented in [RELEASING.md](../../RELEASING.md). Until
+then, pin `--version` to a release with assets or use `plugin/install.sh`.
+
 ## Non-claims
 
 - The Flutter JIT tier binds through injected factories from

@@ -1,0 +1,1 @@
+action-gh-release upload must run before publish_github_release_from_draft.sh

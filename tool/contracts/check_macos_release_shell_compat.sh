@@ -15,6 +15,11 @@ SCRIPTS=(
   tool/release/check_release_assets_conflict.sh
   tool/release/resolve_release_tag.sh
   tool/release/assert_release_assets_complete.sh
+  tool/release/assert_release_assets_complete_on_draft.sh
+  tool/release/assert_github_release_is_draft.sh
+  tool/release/publish_github_release_from_draft.sh
+  tool/release/verify_release_assets_downloadable.sh
+  tool/install/resolve_toolkit_release_lib.sh
   tool/release/codesign_macos_bundle.sh
   tool/release/setup_signing_keychain.sh
   tool/release/cleanup_signing_keychain.sh
