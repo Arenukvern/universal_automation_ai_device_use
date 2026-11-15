@@ -5,6 +5,12 @@ wired through Dart native-assets build hooks — the ADR 0001 pattern
 (`hook/build.dart` compiles the Swift bridge with `swiftc`, registers a
 code asset, and Dart binds via `@Native`). **No Flutter plugin surface.**
 
+Intra-workspace `universal_screencast` constraints are synced on each
+release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
+macOS capture releases that adopt a new screencast line ship in the same
+release PR after `universal_screencast`.
+
 Part of the `universal_automation_*` family
 ([ADR 0037](../../docs/decisions/0037_universal_automation_family.md)).
 This is the OS-native tier of the family: it can observe and capture
