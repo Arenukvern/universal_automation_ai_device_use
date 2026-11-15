@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_screencast-v0.3.1...universal_screencast-v0.3.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* co-release README notes for CDP 0.6.2 train cascade ([fff11bd](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/fff11bdd999328b6d3ea84549aa3ab03c987ac37))
+* note co-release with universal_browser_cdp 0.6.2 train ([dd8072a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/dd8072a62af1e636e30a19bcde0456a202e9a9ec))
+
 ## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_screencast-v0.3.0...universal_screencast-v0.3.1) (2026-11-10)
 
 

@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [0.6.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.1...universal_browser_cdp-v0.6.2) (2026-11-15)
+
+
+### Bug Fixes
+
+* **toolkit,universal_browser_cdp:** discover version surfaces and tighten floor proof ([81a3911](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/81a3911ea7c08767b7e0efb2f8bb4ef8d999e558))
+* **universal_automation_toolkit:** release-please version surfaces + CDP reaction floor clock ([a3f2a0e](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/a3f2a0ea964a4b5e7463a24adc5c390915e49111))
+* **universal_browser_cdp:** monotonic observation clock for reaction floor ([7c9259e](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/7c9259ed72c053529ed4f5c22462cf7faf31b65e))
+
 ## [0.6.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.0...universal_browser_cdp-v0.6.1) (2026-11-10)
 
 

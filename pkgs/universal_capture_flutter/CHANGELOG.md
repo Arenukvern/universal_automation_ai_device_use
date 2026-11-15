@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.2.4](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.3...universal_capture_flutter-v0.2.4) (2026-11-15)
+
+
+### Bug Fixes
+
+* co-release README notes for CDP 0.6.2 train cascade ([fff11bd](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/fff11bdd999328b6d3ea84549aa3ab03c987ac37))
+* note co-release with universal_browser_cdp 0.6.2 train ([dd8072a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/dd8072a62af1e636e30a19bcde0456a202e9a9ec))
+
 ## [0.2.3](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.2...universal_capture_flutter-v0.2.3) (2026-11-10)
 
 
