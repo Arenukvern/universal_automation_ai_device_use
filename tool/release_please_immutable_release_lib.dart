@@ -26,9 +26,12 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
       '(release-please treats any other value as draft; got ${decoded['draft']})',
     );
   }
-  if (decoded['force-tag-creation'] == true) {
+  if (decoded.containsKey('force-tag-creation') &&
+      decoded['force-tag-creation'] != false) {
     errors.add(
-      'release-please-config.json: must not set top-level "force-tag-creation": true',
+      'release-please-config.json: top-level "force-tag-creation" must be JSON '
+      'false or absent (release-please treats any other value as enabled; '
+      'got ${decoded['force-tag-creation']})',
     );
   }
   final packages = decoded['packages'];
@@ -49,11 +52,11 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
       '"draft" to JSON boolean true exactly (immutable GitHub releases)',
     );
   }
-  if (toolkit['force-tag-creation'] != true) {
+  if (toolkit['force-tag-creation'] is! bool ||
+      toolkit['force-tag-creation'] != true) {
     errors.add(
       'release-please-config.json: $toolkitReleasePleasePackage must set '
-      '"force-tag-creation": true so release-please anchors on the git tag '
-      'while the GitHub release stays a draft (avoids duplicate release PRs)',
+      '"force-tag-creation" to JSON boolean true exactly',
     );
   }
 
@@ -69,10 +72,13 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
         'non-false draft (got $path with draft=${pkg['draft']})',
       );
     }
-    if (pkg is Map && pkg['force-tag-creation'] == true) {
+    if (pkg is Map &&
+        pkg.containsKey('force-tag-creation') &&
+        pkg['force-tag-creation'] != false) {
       errors.add(
         'release-please-config.json: only $toolkitReleasePleasePackage may set '
-        'force-tag-creation: true (got $path)',
+        'non-false force-tag-creation (got $path with '
+        'force-tag-creation=${pkg['force-tag-creation']})',
       );
     }
   }

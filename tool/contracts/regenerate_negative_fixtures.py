@@ -312,6 +312,69 @@ def main() -> None:
   ))
   specs.append((
       "publish",
+      "negative_publish_upload_arg_command_substitution",
+      t.replace(
+          '            "dist/release"',
+          '            "$(gh release edit $RELEASE_TAG --draft=f)"',
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_env_bash_env",
+      t.replace(
+          "          VERSION: ${{ inputs.version }}\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          "          VERSION: ${{ inputs.version }}\n          BASH_ENV: /tmp/evil\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_shell_bash_c",
+      t.replace(
+          "      - name: Upload assets to draft GitHub release\n        env:",
+          "      - name: Upload assets to draft GitHub release\n        shell: bash -c 'bash -e {0}'\n        env:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_env_tooling_path_override",
+      t.replace(
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n          VERSION: ${{ inputs.version }}\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n          VERSION: ${{ inputs.version }}\n          TOOLING_CHECKOUT_PATH: /tmp/evil\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_working_directory",
+      t.replace(
+          "      - name: Generate checksums",
+          "      - name: Generate checksums\n        working-directory: /tmp",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_job_if",
+      p().replace(
+          "  publish:\n    permissions:",
+          "  publish:\n    if: always()\n    permissions:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_job_strategy_matrix",
+      p().replace(
+          "    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    env:",
+          "    strategy:\n      matrix:\n        x: [1]\n    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    env:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
       "negative_publish_cross_run_download",
       t.replace(
           "      - name: Download release artifacts from this workflow run\n        uses: actions/download-artifact@v4\n        with:\n          path: dist/release",

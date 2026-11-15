@@ -1,1 +1,1 @@
-must set "force-tag-creation": true so release-please anchors on the git tag
+pkgs/universal_automation_toolkit must set "force-tag-creation" to JSON boolean true exactly

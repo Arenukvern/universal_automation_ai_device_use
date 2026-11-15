@@ -1,0 +1,1 @@
+release-please-config.json: only pkgs/universal_automation_toolkit may set non-false force-tag-creation (got pkgs/universal_automation_harness with force-tag-creation=true)

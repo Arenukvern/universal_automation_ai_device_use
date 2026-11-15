@@ -9,11 +9,24 @@ import 'dart:io';
 import 'release_please_immutable_release_lib.dart';
 import 'release_please_toolkit_versions_lib.dart';
 import 'release_workflow_contract_lib.dart';
-import 'release_workflow_publish_structure_lib.dart';
+import 'release_publish_script_pins_lib.dart';
 import 'release_workflow_permissions_lib.dart';
 
 Future<void> main(List<String> args) async {
   final root = Directory.current;
+  if (args.contains('--full-contract-script-overlay')) {
+    final i = args.indexOf('--full-contract-script-overlay');
+    if (i + 1 >= args.length) {
+      stderr.writeln('--full-contract-script-overlay requires a directory');
+      exit(2);
+    }
+    final overlay = args[i + 1];
+    await _validateAllReleaseWorkflowContracts(
+      root.path,
+      scriptOverlayDir: overlay,
+    );
+    return;
+  }
   if (!args.contains('--workflow') &&
       !args.contains('--pr-smoke-workflow') &&
       !args.contains('--please-caller-workflow') &&
@@ -186,7 +199,10 @@ Future<void> main(List<String> args) async {
   stdout.writeln('check_release_workflow: ${file.path} OK');
 }
 
-Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
+Future<void> _validateAllReleaseWorkflowContracts(
+  String rootPath, {
+  String? scriptOverlayDir,
+}) async {
   final paths = [
     '$rootPath/.github/workflows/release_binaries_build.yml',
     '$rootPath/.github/workflows/release_binaries_publish.yml',
@@ -220,7 +236,10 @@ Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
     ...validateProductionReusablePermissionChains(rootPath),
     ...validateToolkitVersionSurfacesReleasePlease(rootPath),
     ...validateToolkitImmutableReleaseReleasePleaseConfig(rootPath),
-    ...validateReleaseToolingScriptsUndraftPolicy(rootPath),
+    ...validateReleasePublishScriptClosure(
+      rootPath,
+      scriptOverlayDir: scriptOverlayDir,
+    ),
   ];
 
   if (errors.isNotEmpty) {
