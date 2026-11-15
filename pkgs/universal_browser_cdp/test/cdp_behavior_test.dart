@@ -124,6 +124,32 @@ void main() {
       await driver.close();
     });
 
+    test(
+      'scheduler never records negative drift when timers return early',
+      () async {
+        final session = await CdpBrowserSession.attach(server.httpBase);
+        final plan = BehaviorPlan(
+          steps: [
+            const PointerDownStep(plannedAtUs: 50_000, button: 'left'),
+            const PointerUpStep(plannedAtUs: 80_000, button: 'left'),
+          ],
+        );
+        final scheduler = CdpBehaviorScheduler(
+          page: session.page,
+          // Completes immediately regardless of requested duration,
+          // mimicking platform timers that fire before the deadline.
+          delay: (_) async {},
+        );
+        final outcome = await scheduler.dispatch(plan);
+        expect(outcome.verdict, BehaviorVerdict.complete);
+        expect(
+          outcome.dispatched.map((step) => step.driftUs).every((d) => d >= 0),
+          isTrue,
+        );
+        await session.close();
+      },
+    );
+
     test('humanPrior click animates: moves precede press, drift is sane',
         () async {
       final driver = await attachDriver();
