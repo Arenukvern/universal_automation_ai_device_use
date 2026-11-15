@@ -74,9 +74,9 @@ try {
 
   Remove-Item env:UNIVERSAL_AUTOMATION_TOOLKIT_TAGS_FIXTURE -ErrorAction SilentlyContinue
   $env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL = "http://127.0.0.1:9/unreachable"
-  $netLines = & $Install -Repo "test/repo" 2>&1
+  $netLines = & $Install -Repo "test/repo" *>&1
   $netExit = $LASTEXITCODE
-  $net = ($netLines | Out-String)
+  $net = (($netLines | ForEach-Object { "$_" }) -join "`n")
   if ($net -notmatch 'Network or TLS') {
     throw "expected network/TLS message from install.ps1 (got: $net)"
   }
