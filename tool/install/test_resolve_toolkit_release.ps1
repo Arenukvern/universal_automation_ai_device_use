@@ -30,12 +30,13 @@ $archive = "universal_automation_${ver}_windows-x64.zip"
 $fixtureRoot = Join-Path $env:TEMP "ua-resolve-e2e-$PID"
 $tagDir = Join-Path $fixtureRoot $tag
 if (Test-Path $fixtureRoot) { Remove-Item -LiteralPath $fixtureRoot -Recurse -Force }
-New-Item -ItemType Directory -Path (Join-Path $tagDir "bundle\bin") -Force | Out-Null
-$stubExe = Join-Path $tagDir "bundle\bin\universal_automation.exe"
+$pkg = Join-Path $tagDir "universal_automation_${ver}_windows-x64"
+New-Item -ItemType Directory -Path (Join-Path $pkg "bin") -Force | Out-Null
+$stubExe = Join-Path $pkg "bin\universal_automation.exe"
 New-MockCliExe -OutPath $stubExe -VersionLabel $ver
 $zipPath = Join-Path $tagDir $archive
 if (Test-Path $zipPath) { Remove-Item -LiteralPath $zipPath -Force }
-Compress-Archive -Path (Join-Path $tagDir "bundle\*") -DestinationPath $zipPath -Force
+Compress-Archive -Path $pkg -DestinationPath $zipPath -Force
 $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $zipPath).Hash.ToLower()
 Set-Content -Path (Join-Path $tagDir "checksums.txt") -Value "$hash  $archive" -Encoding ascii
 
