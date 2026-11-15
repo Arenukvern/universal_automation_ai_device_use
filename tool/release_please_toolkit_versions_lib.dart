@@ -119,9 +119,9 @@ bool jsonHasTopLevelSemverVersion(File file) {
   }
 }
 
-/// Top-level or static `const` whose identifier contains `version` and value is semver.
+/// Top-level or `static`/`final` const whose identifier contains `version` and value is semver.
 final dartVersionConstPattern = RegExp(
-  r"""(?:^|\n)\s*(?:static\s+)?const\s+(?:[A-Za-z_]\w*\s+)?([A-Za-z_]\w*)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*;""",
+  r"""(?:^|\n)\s*(?:(?:static|final)\s+)*const\s+(?:[A-Za-z_]\w*\s+)?([A-Za-z_]\w*)\s*=\s*(?:"([^"]*)"|'([^']*)')\s*;""",
   multiLine: true,
 );
 

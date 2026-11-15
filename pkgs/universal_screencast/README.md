@@ -4,6 +4,12 @@ Declarative frame pipeline: `FrameSource` → `FrameSink` with fail-closed
 composition validation and audience policies. Frames are read-only
 observations — `frames != semantics`.
 
+Intra-workspace `universal_browser_cdp` constraints are synced on each
+release-please train (see
+[RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md)).
+Screencast releases that adopt a new CDP minor (for example 0.6.2 after the
+behavior reaction-floor fix) ship in the same release PR as `universal_browser_cdp`.
+
 Part of the `universal_automation_*` family
 ([ADR 0037](../../docs/decisions/0037_universal_automation_family.md)).
 The invariants encode production-proven discipline
