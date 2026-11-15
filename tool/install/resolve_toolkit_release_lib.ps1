@@ -27,6 +27,15 @@ function Get-ToolkitReleaseTags([string]$Repo) {
     return Get-Content -LiteralPath $env:UNIVERSAL_AUTOMATION_TOOLKIT_TAGS_FIXTURE |
       Where-Object { $_ -and $_ -notmatch '^\s*#' }
   }
+  if ($env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL) {
+    $uri = $env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL
+    try {
+      $json = (Invoke-WebRequest -Uri $uri -UseBasicParsing).Content
+    } catch {
+      throw [System.InvalidOperationException]::new("UA_RESOLVE_NETWORK: $($_.Exception.Message)")
+    }
+    return Parse-MatchingRefsToolkitTags $json
+  }
   $git = Get-Command git -ErrorAction SilentlyContinue
   if ($git) {
     $remote = "https://github.com/$Repo.git"
@@ -40,11 +49,7 @@ function Get-ToolkitReleaseTags([string]$Repo) {
     }
     if ($tags.Count -gt 0) { return $tags }
   }
-  $uri = if ($env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL) {
-    $env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL
-  } else {
-    "https://api.github.com/repos/$Repo/git/matching-refs/tags/universal_automation_toolkit-v"
-  }
+  $uri = "https://api.github.com/repos/$Repo/git/matching-refs/tags/universal_automation_toolkit-v"
   try {
     $json = (Invoke-WebRequest -Uri $uri -UseBasicParsing).Content
   } catch {
