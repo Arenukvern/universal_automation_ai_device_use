@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.3.0...universal_automation_harness-v0.3.1) (2026-11-15)
+
+
+### Bug Fixes
+
+* **ci:** hook-only meta test for actionlint guard (no GNU timeout) ([0a588aa](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/0a588aa29bc183689690cf11cd30be6238f0bbbd))
+* **universal_automation_harness:** co-release docs for toolkit 0.6.0 train ([5d71e84](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/5d71e849acf7503c04a4380782935b6bdd5bf3cc))
+* **universal_automation_harness:** unblock release-please sync for toolkit 0.6.0 train ([49dfc69](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/49dfc6902d39371bdd7283a47d103f05a5aebb4d))
+
 ## [0.3.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.2.0...universal_automation_harness-v0.3.0) (2026-11-10)
 
 
