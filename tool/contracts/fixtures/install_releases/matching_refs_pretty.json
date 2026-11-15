@@ -1,0 +1,20 @@
+[
+  {
+    "ref": "refs/tags/universal_automation_toolkit-v0.6.0",
+    "node_id": "REF_060",
+    "object": {
+      "sha": "aaa",
+      "type": "commit",
+      "url": "https://api.github.com/git/commits/aaa"
+    }
+  },
+  {
+    "ref": "refs/tags/universal_automation_toolkit-v0.6.1",
+    "node_id": "REF_061",
+    "object": {
+      "sha": "bbb",
+      "type": "commit",
+      "url": "https://api.github.com/git/commits/bbb"
+    }
+  }
+]

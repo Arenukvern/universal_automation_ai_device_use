@@ -1,0 +1,1 @@
+negative_publish_extra_run_step.yml: publish job step `Extra run step` must be exactly one bash tool/release/<script>.sh invocation

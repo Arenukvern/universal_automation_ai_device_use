@@ -35,6 +35,8 @@
       "package-name": "universal_automation_toolkit",
       "include-component-in-tag": true,
       "bump-minor-pre-major": true,
+      "draft": true,
+      "force-tag-creation": true,
       "extra-files": [
         {
           "type": "json",

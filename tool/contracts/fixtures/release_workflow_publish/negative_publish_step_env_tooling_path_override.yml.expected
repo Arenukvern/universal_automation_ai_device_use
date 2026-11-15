@@ -1,0 +1,1 @@
+negative_publish_step_env_tooling_path_override.yml: publish job step `Upload assets to draft GitHub release` must not set env TOOLING_CHECKOUT_PATH

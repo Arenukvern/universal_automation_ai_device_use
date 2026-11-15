@@ -181,4 +181,5 @@ after_rb="$(readlink "$bin_dir/universal-automation")"
 [[ "$after_rb" == "$first_root" ]] || fail "rollback must restore prior binary"
 
 stop_http
+bash "$ROOT_DIR/tool/install/test_resolve_toolkit_release.sh"
 ok "install atomicity + rollback OK"

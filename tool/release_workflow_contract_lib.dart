@@ -1,5 +1,7 @@
 import 'package:yaml/yaml.dart';
 
+import 'release_workflow_publish_structure_lib.dart';
+
 /// gh 2.103.0 `gh run list --json` fields (from `gh help run list`, JSON FIELDS).
 const ghRunListJsonFieldsGh21030 = <String>[
   'attempt',
@@ -37,8 +39,16 @@ const requiredScriptStepsBuild = <String, String>{
 };
 
 const requiredScriptStepsPublish = <String, String>{
-  'assert_release_assets_complete.sh': 'postflight',
+  'generate_release_checksums_in_dist.sh': 'publish',
   'check_release_assets_conflict.sh': 'publish',
+  'assert_github_release_is_draft.sh': 'publish',
+  'validate_release_checksums_file.sh': 'publish',
+  'append_binary_install_notes_to_draft_release.sh': 'publish',
+  'upload_draft_github_release_assets.sh': 'publish',
+  'assert_release_assets_complete_on_draft.sh': 'publish',
+  'publish_github_release_from_draft.sh': 'publish',
+  'assert_release_assets_complete.sh': 'postflight',
+  'verify_release_assets_downloadable.sh': 'postflight',
 };
 
 const allowedBuildJobEnvSecretKeys = <String>{
@@ -218,6 +228,7 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
     return ['$label: root must be a mapping'];
   }
   final root = Map<dynamic, dynamic>.from(doc);
+  errors.addAll(validatePublishWorkflowRoot(root, label));
   final on = root['on'];
   if (on is! Map || !Map.from(on).containsKey('workflow_call')) {
     errors.add('$label: on.workflow_call is required');
@@ -241,14 +252,12 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
   errors.addAll(
     _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsPublish),
   );
-  errors.addAll(_validateGhReleaseAssets(jobsMap, label));
+  errors.addAll(validatePublishJobStructure(jobsMap, label));
+  errors.addAll(_validateImmutableReleasePostflight(jobsMap, label));
   errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
   errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
   errors.addAll(_validateSameRunArtifactDownload(jobsMap, label));
   errors.addAll(_validateNoInlineWorkflowExprsInRun(jobsMap, label));
-  if (!_publishUsesAppendBody(jobsMap['publish'])) {
-    errors.add('$label: publish job must set append_body: true on action-gh-release');
-  }
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
     final needs = postflight['needs'];
@@ -991,6 +1000,12 @@ List<String> _validateGhReleaseAssets(
     if (withMap['fail_on_unmatched_files'] != true) {
       errors.add('$label: action-gh-release must set fail_on_unmatched_files: true');
     }
+    if (withMap['draft'] != true) {
+      errors.add(
+        '$label: publish action-gh-release must set draft: true '
+        'before undrafting (immutable GitHub releases)',
+      );
+    }
     final files = withMap['files']?.toString() ?? '';
     for (final suffix in requiredGhReleaseAssetSuffixes) {
       if (!files.contains(suffix)) {
@@ -1287,28 +1302,38 @@ List<String> _validateSigningSecretsScope(
   return errors;
 }
 
-bool _publishUsesAppendBody(dynamic publishJob) {
-  if (publishJob is! Map) {
-    return false;
-  }
-  final steps = publishJob['steps'];
-  if (steps is! List) {
-    return false;
-  }
-  for (final step in steps) {
-    if (step is! Map) {
-      continue;
+List<String> _validateImmutableReleasePostflight(
+  Map<dynamic, dynamic> jobsMap,
+  String label,
+) {
+  final errors = <String>[];
+  final postflight = jobsMap['postflight'];
+  if (postflight is Map) {
+    final pfSteps = postflight['steps'];
+    if (pfSteps is List) {
+      var sawUndraftSibling = false;
+      for (final step in pfSteps) {
+        if (step is! Map) {
+          continue;
+        }
+        final run = step['run']?.toString() ?? '';
+        if (run.contains('publish_github_release_from_draft.sh')) {
+          errors.add(
+            '$label: publish_github_release_from_draft.sh must not run in postflight',
+          );
+        }
+        if (run.contains('verify_release_assets_downloadable.sh')) {
+          sawUndraftSibling = true;
+        }
+      }
+      if (!sawUndraftSibling) {
+        errors.add(
+          '$label: postflight must run verify_release_assets_downloadable.sh after publish',
+        );
+      }
     }
-    final uses = step['uses']?.toString() ?? '';
-    if (!uses.contains('action-gh-release')) {
-      continue;
-    }
-    final withMap = step['with'];
-    if (withMap is Map && withMap['append_body'] == true) {
-      return true;
-    }
   }
-  return false;
+  return errors;
 }
 
 bool _allCheckoutsPersistFalse(Map<dynamic, dynamic> jobsMap) {

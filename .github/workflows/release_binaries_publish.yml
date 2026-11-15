@@ -48,11 +48,8 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          set -euo pipefail
-          cd dist/release
-          shopt -s nullglob
-          files=(universal_automation_"${VERSION}"_*.tar.gz universal_automation_"${VERSION}"_*.zip)
-          sha256sum "${files[@]}" > checksums.txt
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/generate_release_checksums_in_dist.sh" \
+            "$VERSION"
 
       - name: Guard against conflicting GitHub release assets
         env:
@@ -65,41 +62,71 @@ jobs:
             "$RELEASE_TAG" \
             "$VERSION"
 
-      - name: Publish GitHub release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          append_body: true
-          body: |
-            ## Prebuilt `universal-automation` binaries
+      - name: Assert GitHub release is draft (immutable release policy)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_github_release_is_draft.sh" \
+            "$RELEASE_TAG"
 
-            macOS darwin archives are **signed with Developer ID** when the CI
-            **Sign macOS bundle** step runs (`HAS_SIGNING=true` on the build job);
-            otherwise they are **preview (unsigned)** (see [RELEASING.md](RELEASING.md)).
+      - name: Validate local checksums file
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/validate_release_checksums_file.sh" \
+            "$VERSION" \
+            "dist/release/checksums.txt"
 
-            Install without Dart:
+      - name: Append binary install notes to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+          GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/append_binary_install_notes_to_draft_release.sh" \
+            "$RELEASE_TAG"
 
-            ```sh
-            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash -s -- --version ${{ inputs.version }}
-            ```
+      - name: Upload assets to draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh" \
+            "$RELEASE_TAG" \
+            "dist/release"
 
-            ```powershell
-            irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
-            ```
-          files: |
-            dist/release/universal_automation_${{ inputs.version }}_darwin-arm64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_darwin-x64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_linux-x64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_windows-x64.zip
-            dist/release/checksums.txt
-          fail_on_unmatched_files: true
+      - name: Verify draft release asset set
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete_on_draft.sh" \
+            "$RELEASE_TAG" \
+            "$VERSION"
+
+      - name: Publish GitHub release (undraft)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/publish_github_release_from_draft.sh" \
+            "$RELEASE_TAG"
 
   postflight:
     permissions:
       contents: read
     runs-on: ubuntu-latest
     needs: [publish]
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - name: Checkout workflow tooling at caller commit
         uses: actions/checkout@v7
@@ -116,5 +143,16 @@ jobs:
           VERSION: ${{ inputs.version }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete.sh" \
+            "$RELEASE_TAG" \
+            "$VERSION"
+
+      - name: Download and verify published release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/verify_release_assets_downloadable.sh" \
             "$RELEASE_TAG" \
             "$VERSION"

@@ -1,0 +1,157 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "pkgs/universal_automation_conformance": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_automation_conformance",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_automation_harness": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_automation_harness",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_automation_interface": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_automation_interface",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_automation_semantics": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_automation_semantics",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_automation_toolkit": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_automation_toolkit",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true,
+      "draft": "true",
+      "force-tag-creation": true,
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "/plugin/.cursor-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "/plugin/.claude-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "/plugin/.codex-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "json",
+          "path": "/plugin/.zcode-plugin/plugin.json",
+          "jsonpath": "$.version"
+        },
+        {
+          "type": "generic",
+          "path": "lib/src/package_version.dart"
+        },
+        {
+          "type": "json",
+          "path": "server.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
+    "pkgs/universal_browser_cdp": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_browser_cdp",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_browser_webdriver": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_browser_webdriver",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_capture_flutter": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_capture_flutter",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_capture_macos": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_capture_macos",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_driver_flutter": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_driver_flutter",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_driver_linux": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_driver_linux",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_driver_macos": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_driver_macos",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_driver_windows": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_driver_windows",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_screencast": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_screencast",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_webrtc": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_webrtc",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_webrtc_raw": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_webrtc_raw",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    },
+    "pkgs/universal_tooling_runtime": {
+      "release-type": "dart",
+      "pull-request-title-pattern": "chore(${component}): release ${version}",
+      "package-name": "universal_tooling_runtime",
+      "include-component-in-tag": true,
+      "bump-minor-pre-major": true
+    }
+  }
+}

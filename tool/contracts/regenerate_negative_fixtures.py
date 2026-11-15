@@ -255,7 +255,10 @@ def main() -> None:
 
   # --- publish ---
   t = p()
-  specs.append(("publish", "negative_fail_on_unmatched_false", t.replace("fail_on_unmatched_files: true", "fail_on_unmatched_files: false", 1)))
+  undraft_run = (
+      '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/publish_github_release_from_draft.sh" \\\n'
+      '            "$RELEASE_TAG"'
+  )
   specs.append((
       "publish",
       "negative_assert_if_false",
@@ -309,6 +312,87 @@ def main() -> None:
   ))
   specs.append((
       "publish",
+      "negative_publish_upload_arg_command_substitution",
+      t.replace(
+          '            "dist/release"',
+          '            "$(gh release edit $RELEASE_TAG --draft=f)"',
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_env_bash_env",
+      t.replace(
+          "          VERSION: ${{ inputs.version }}\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          "          VERSION: ${{ inputs.version }}\n          BASH_ENV: /tmp/evil\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_toplevel_env_bash_env",
+      p().replace(
+          "env:\n  TOOLING_CHECKOUT_PATH: _tooling",
+          "env:\n  TOOLING_CHECKOUT_PATH: _tooling\n  BASH_ENV: /tmp/evil",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_toplevel_defaults",
+      p().replace(
+          "permissions:\n  contents: read\n\nenv:",
+          "permissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: bash\n\nenv:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_shell_bash_c",
+      t.replace(
+          "      - name: Upload assets to draft GitHub release\n        env:",
+          "      - name: Upload assets to draft GitHub release\n        shell: bash -c 'bash -e {0}'\n        env:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_env_tooling_path_override",
+      t.replace(
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n          VERSION: ${{ inputs.version }}\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n          VERSION: ${{ inputs.version }}\n          TOOLING_CHECKOUT_PATH: /tmp/evil\n        run: |\n          bash \"${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh\"",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_step_working_directory",
+      t.replace(
+          "      - name: Generate checksums",
+          "      - name: Generate checksums\n        working-directory: /tmp",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_job_if",
+      p().replace(
+          "  publish:\n    permissions:",
+          "  publish:\n    if: always()\n    permissions:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_job_strategy_matrix",
+      p().replace(
+          "    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    env:",
+          "    strategy:\n      matrix:\n        x: [1]\n    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    env:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
       "negative_publish_cross_run_download",
       t.replace(
           "      - name: Download release artifacts from this workflow run\n        uses: actions/download-artifact@v4\n        with:\n          path: dist/release",
@@ -318,11 +402,144 @@ def main() -> None:
   ))
   specs.append((
       "publish",
-      "negative_gh_release_missing_asset",
+      "negative_publish_undraft_gh_api_patch",
       t.replace(
-          "            dist/release/universal_automation_${{ inputs.version }}_windows-x64.zip\n",
-          "",
+          undraft_run,
+          "          gh api -X PATCH repos/$GITHUB_REPOSITORY/releases/$id -F draft=false",
           1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_undraft_gh_edit_multiline",
+      t.replace(
+          undraft_run,
+          '          gh release edit "$RELEASE_TAG" \\\n            --draft=false',
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_undraft_github_script",
+      t.replace(
+          "      - name: Generate checksums",
+          "      - name: Undraft via github-script\n"
+          "        uses: actions/github-script@v7\n"
+          "        with:\n"
+          "          script: |\n"
+          "            github.rest.repos.updateRelease({ draft: false });\n"
+          "      - name: Generate checksums",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_undraft_env_d_false",
+      t.replace(
+          '      - name: Publish GitHub release (undraft)\n        env:\n'
+          "          GH_TOKEN: ${{ github.token }}\n"
+          "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+          "          RELEASE_TAG: ${{ inputs.release_tag }}",
+          '      - name: Publish GitHub release (undraft)\n        env:\n'
+          "          GH_TOKEN: ${{ github.token }}\n"
+          "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+          '          D: "false"',
+          1,
+      ).replace(
+          undraft_run,
+          '          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft="$D"',
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_undraft_between_upload_verify",
+      t.replace(
+          "      - name: Verify draft release asset set",
+          "      - name: Early undraft\n"
+          "        env:\n"
+          "          GH_TOKEN: ${{ github.token }}\n"
+          "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+          "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+          "        run: |\n"
+          '          gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false\n'
+          "      - name: Verify draft release asset set",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_extra_run_step",
+      t.replace(
+          "      - name: Publish GitHub release (undraft)",
+          "      - name: Extra run step\n        run: echo extra\n      - name: Publish GitHub release (undraft)",
+          1,
+      ),
+  ))
+  tail_pair = (
+      "      - name: Verify draft release asset set\n"
+      "        env:\n"
+      "          GH_TOKEN: ${{ github.token }}\n"
+      "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+      "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+      "          VERSION: ${{ inputs.version }}\n"
+      "        run: |\n"
+      '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete_on_draft.sh" \\\n'
+      '            "$RELEASE_TAG" \\\n'
+      '            "$VERSION"\n\n'
+      "      - name: Publish GitHub release (undraft)\n"
+      "        env:\n"
+      "          GH_TOKEN: ${{ github.token }}\n"
+      "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+      "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+      "        run: |\n"
+      '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/publish_github_release_from_draft.sh" \\\n'
+      '            "$RELEASE_TAG"'
+  )
+  swapped_tail = (
+      "      - name: Publish GitHub release (undraft)\n"
+      "        env:\n"
+      "          GH_TOKEN: ${{ github.token }}\n"
+      "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+      "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+      "        run: |\n"
+      '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/publish_github_release_from_draft.sh" \\\n'
+      '            "$RELEASE_TAG"\n\n'
+      "      - name: Verify draft release asset set\n"
+      "        env:\n"
+      "          GH_TOKEN: ${{ github.token }}\n"
+      "          GITHUB_REPOSITORY: ${{ github.repository }}\n"
+      "          RELEASE_TAG: ${{ inputs.release_tag }}\n"
+      "          VERSION: ${{ inputs.version }}\n"
+      "        run: |\n"
+      '          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete_on_draft.sh" \\\n'
+      '            "$RELEASE_TAG" \\\n'
+      '            "$VERSION"'
+  )
+  specs.append((
+      "publish",
+      "negative_publish_undraft_not_last",
+      t.replace(tail_pair, swapped_tail, 1),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_uses_action_gh_release",
+      t.replace(
+          "      - name: Generate checksums",
+          "      - name: Bad gh-release action\n        uses: softprops/action-gh-release@v2\n      - name: Generate checksums",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_missing_draft_guard",
+      re.sub(
+          r"      - name: Assert GitHub release is draft \(immutable release policy\)\n.*?\n\n",
+          "",
+          t,
+          count=1,
+          flags=re.S,
       ),
   ))
   specs.append((

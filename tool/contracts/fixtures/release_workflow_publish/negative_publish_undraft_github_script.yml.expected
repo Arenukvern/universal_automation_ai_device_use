@@ -1,0 +1,1 @@
+negative_publish_undraft_github_script.yml: publish job step `Undraft via github-script` uses disallowed action: actions/github-script@v7
