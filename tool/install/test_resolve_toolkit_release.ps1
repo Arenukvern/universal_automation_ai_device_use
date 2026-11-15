@@ -74,12 +74,14 @@ try {
 
   Remove-Item env:UNIVERSAL_AUTOMATION_TOOLKIT_TAGS_FIXTURE -ErrorAction SilentlyContinue
   $env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL = "http://127.0.0.1:9/unreachable"
-  $net = & $Install -Repo "test/repo" 2>&1 | Out-String
+  $netLines = & $Install -Repo "test/repo" 2>&1
+  $netExit = $LASTEXITCODE
+  $net = ($netLines | Out-String)
   if ($net -notmatch 'Network or TLS') {
     throw "expected network/TLS message from install.ps1 (got: $net)"
   }
-  if ($LASTEXITCODE -ne 2) {
-    throw "expected exit 2 for network error (got $LASTEXITCODE)"
+  if ($netExit -ne 2) {
+    throw "expected exit 2 for network error (got $netExit)"
   }
 } finally {
   if ($py) { Stop-Process -Id $py.Id -Force -ErrorAction SilentlyContinue }
