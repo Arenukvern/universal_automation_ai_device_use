@@ -66,35 +66,55 @@ jobs:
             "$VERSION"
 
 
+      - name: Validate local checksums file
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/validate_release_checksums_file.sh" \
+            "$VERSION" \
+            "dist/release/checksums.txt"
+
+      - name: Append binary install notes to draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+          GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          notes="$(mktemp)"
+          trap 'rm -f "$notes"' EXIT
+          cat >"$notes" <<EOF
+          ## Prebuilt \`universal-automation\` binaries
+
+          macOS darwin archives are **signed with Developer ID** when the CI
+          **Sign macOS bundle** step runs (\`HAS_SIGNING=true\` on the build job);
+          otherwise they are **preview (unsigned)** (see [RELEASING.md](RELEASING.md)).
+
+          Install without Dart:
+
+          \`\`\`sh
+          curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/main/install.sh | bash -s -- --version ${VERSION}
+          \`\`\`
+
+          \`\`\`powershell
+          \$env:UNIVERSAL_AUTOMATION_VERSION='${VERSION}'; irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/main/install.ps1 | iex
+          \`\`\`
+          EOF
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/append_draft_release_binary_notes.sh" \
+            "$RELEASE_TAG" \
+            "$notes"
+
       - name: Upload assets to draft GitHub release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ inputs.release_tag }}
-          draft: true
-          append_body: true
-          body: |
-            ## Prebuilt `universal-automation` binaries
-
-            macOS darwin archives are **signed with Developer ID** when the CI
-            **Sign macOS bundle** step runs (`HAS_SIGNING=true` on the build job);
-            otherwise they are **preview (unsigned)** (see [RELEASING.md](RELEASING.md)).
-
-            Install without Dart:
-
-            ```sh
-            curl -fsSL https://raw.githubusercontent.com/${{ github.repository }}/main/install.sh | bash -s -- --version ${{ inputs.version }}
-            ```
-
-            ```powershell
-            $env:UNIVERSAL_AUTOMATION_VERSION='${{ inputs.version }}'; irm https://raw.githubusercontent.com/${{ github.repository }}/main/install.ps1 | iex
-            ```
-          files: |
-            dist/release/universal_automation_${{ inputs.version }}_darwin-arm64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_darwin-x64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_linux-x64.tar.gz
-            dist/release/universal_automation_${{ inputs.version }}_windows-x64.zip
-            dist/release/checksums.txt
-          fail_on_unmatched_files: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh" \
+            "$RELEASE_TAG" \
+            "dist/release"
 
       - name: Verify draft release asset set
         env:

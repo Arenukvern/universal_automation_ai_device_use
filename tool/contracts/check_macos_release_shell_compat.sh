@@ -20,6 +20,9 @@ SCRIPTS=(
   tool/release/publish_github_release_from_draft.sh
   tool/release/verify_release_assets_downloadable.sh
   tool/install/resolve_toolkit_release_lib.sh
+  tool/release/upload_draft_github_release_assets.sh
+  tool/release/append_draft_release_binary_notes.sh
+  tool/release/validate_release_checksums_file.sh
   tool/release/codesign_macos_bundle.sh
   tool/release/setup_signing_keychain.sh
   tool/release/cleanup_signing_keychain.sh

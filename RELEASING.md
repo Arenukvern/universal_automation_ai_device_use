@@ -148,10 +148,17 @@ Please tag). The workflow builds all four platform legs, runs architecture check
 writes `checksums.txt`, and uploads a single **workflow artifact** bundle.
 
 Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
-**Latest** resolves to the newest **published** toolkit release whose asset set
-includes all four platform archives and `checksums.txt` (skips assetless releases
-such as `universal_automation_toolkit-v0.6.0`). Pin `--version` / `-Version` when
-needed. From-source path remains [`plugin/install.sh`](plugin/install.sh).
+**Latest** walks toolkit **git tags** (newest semver first, skipping prereleases)
+and **HEAD-probes** all five download URLs (four archives + `checksums.txt`).
+No toolkit release on GitHub has ever shipped a full binary set yet
+(`v0.6.0` is assetless); **latest fails clearly** until `v0.6.1+` publishes
+assets. Pin `--version` / `-Version` after binaries exist. From-source:
+[`plugin/install.sh`](plugin/install.sh).
+
+**Partial draft upload recovery:** if `release-binaries-publish` fails mid-upload,
+delete the draft release’s **partial assets** in the GitHub UI (or re-run publish
+after removing conflicts via `check_release_assets_conflict.sh`); **never move or
+recreate tags** — re-run the workflow on the same tag ref.
 
 Plugin bundle versions (`plugin/.cursor-plugin/plugin.json`,
 `plugin/.claude-plugin/plugin.json`) are Release Please **extra-files** on the

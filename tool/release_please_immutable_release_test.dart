@@ -30,6 +30,21 @@ void main() {
     expect(errors.join('\n'), contains('draft'));
   });
 
+  test('mutation: top-level draft fails', () {
+    final live =
+        File('${repoRoot.path}/release-please-config.json').readAsStringSync();
+    final broken = live.replaceFirst(
+      '"packages": {',
+      '"draft": true,\n  "packages": {',
+    );
+    final errors = validateToolkitImmutableReleaseReleasePleaseConfig(
+      repoRoot.path,
+      configText: broken,
+    );
+    expect(errors, isNotEmpty);
+    expect(errors.join('\n'), contains('top-level'));
+  });
+
   test('mutation: toolkit missing force-tag-creation fails', () {
     final live =
         File('${repoRoot.path}/release-please-config.json').readAsStringSync();

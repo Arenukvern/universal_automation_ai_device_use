@@ -1,6 +1,4 @@
 #!/usr/bin/env bash
-# Postflight on a published release: download each archive + checksums from the
-# public asset URL and verify SHA-256 against checksums.txt.
 set -euo pipefail
 
 fail() { echo "verify_release_assets_downloadable: $*" >&2; exit 1; }
@@ -18,16 +16,13 @@ command -v curl >/dev/null 2>&1 || fail "curl required"
 command -v jq >/dev/null 2>&1 || fail "jq required"
 
 is_draft="$(gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft)"
-if [[ "$is_draft" == "true" ]]; then
-  fail "release $TAG is still a draft; publish before download verification"
-fi
+[[ "$is_draft" != "true" ]] || fail "release $TAG is still a draft"
 
-required=(
+archives=(
   "universal_automation_${VERSION}_darwin-arm64.tar.gz"
   "universal_automation_${VERSION}_darwin-x64.tar.gz"
   "universal_automation_${VERSION}_linux-x64.tar.gz"
   "universal_automation_${VERSION}_windows-x64.zip"
-  "checksums.txt"
 )
 
 work="$(mktemp -d)"
@@ -35,29 +30,40 @@ cleanup() { rm -rf "$work"; }
 trap cleanup EXIT
 
 assets_json="$(gh release view "$TAG" --repo "$REPO" --json assets)"
-for name in "${required[@]}"; do
-  url="$(echo "$assets_json" | jq -r --arg n "$name" '.assets[] | select(.name==$n) | .browser_download_url' | head -n1)"
+download_asset() {
+  local name="$1"
+  url="$(echo "$assets_json" | jq -r --arg n "$name" '.assets[] | select(.name==$n) | .url' | head -n1)"
   [[ -n "$url" && "$url" != "null" ]] || fail "missing release asset metadata for $name"
-
-  if ! curl -fsSL "$url" -o "$work/$name"; then
+  if ! curl -fsSL \
+    -H "Accept: application/octet-stream" \
+    -H "Authorization: Bearer ${GH_TOKEN:?GH_TOKEN required}" \
+    -H "X-GitHub-Api-Version: 2022-11-28" \
+    "$url" \
+    -o "$work/$name"; then
     fail "download failed for $name"
   fi
+}
+
+for name in "${archives[@]}"; do
+  download_asset "$name"
 done
+download_asset "checksums.txt"
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+bash "$script_dir/validate_release_checksums_file.sh" "$VERSION" "$work/checksums.txt"
 
 while IFS= read -r line; do
   [[ -n "$line" ]] || continue
   expected="${line%% *}"
   file="${line#* }"
-  file="${file# }"
+  file="$(printf '%s' "$file" | awk '{print $NF}')"
   [[ -f "$work/$file" ]] || fail "checksums.txt references missing file $file"
   if command -v sha256sum >/dev/null 2>&1; then
     actual="$(sha256sum "$work/$file" | awk '{print $1}')"
   else
     actual="$(shasum -a 256 "$work/$file" | awk '{print $1}')"
   fi
-  if [[ "$expected" != "$actual" ]]; then
-    fail "checksum mismatch for $file (expected $expected, got $actual)"
-  fi
+  [[ "$expected" == "$actual" ]] || fail "checksum mismatch for $file"
 done <"$work/checksums.txt"
 
-ok "downloaded and verified ${#required[@]} assets for $TAG"
+ok "downloaded and verified release assets for $TAG"

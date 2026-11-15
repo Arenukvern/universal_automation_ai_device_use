@@ -1,0 +1,16 @@
+# Projected release-please train (local simulation)
+
+After merging toolkit fix → Release Please bumps `universal_automation_toolkit` to **0.6.1** and
+`fix(universal_automation_harness)` bumps harness to **0.3.2**, constraint sync on the release PR
+rewrites sibling pins.
+
+Command (repo root, temporary manifest + toolkit pubspec set to 0.6.1 for simulation only):
+
+    dart tool/sync_workspace_pub_constraints.dart --write
+
+Observed harness pin change:
+
+    universal_automation_toolkit: ^0.6.0  →  ^0.6.1
+
+Harness manifest entry remains **0.3.1** on `main` until the harness fix commit is part of the train;
+Release Please then cuts **0.3.2** in the same release PR as toolkit **0.6.1**.

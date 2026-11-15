@@ -20,6 +20,18 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
   if (decoded is! Map<String, dynamic>) {
     return ['release-please-config.json: root must be an object'];
   }
+  if (decoded['draft'] == true) {
+    errors.add(
+      'release-please-config.json: must not set top-level "draft": true '
+      '(would draft every package release and break pub.dev tag dispatch; '
+      'only $toolkitReleasePleasePackage may be draft)',
+    );
+  }
+  if (decoded['force-tag-creation'] == true) {
+    errors.add(
+      'release-please-config.json: must not set top-level "force-tag-creation": true',
+    );
+  }
   final packages = decoded['packages'];
   if (packages is! Map) {
     return ['release-please-config.json: packages must be an object'];
