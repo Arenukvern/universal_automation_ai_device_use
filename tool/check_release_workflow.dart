@@ -9,6 +9,7 @@ import 'dart:io';
 import 'release_please_immutable_release_lib.dart';
 import 'release_please_toolkit_versions_lib.dart';
 import 'release_workflow_contract_lib.dart';
+import 'release_workflow_publish_structure_lib.dart';
 import 'release_workflow_permissions_lib.dart';
 
 Future<void> main(List<String> args) async {
@@ -219,6 +220,7 @@ Future<void> _validateAllReleaseWorkflowContracts(String rootPath) async {
     ...validateProductionReusablePermissionChains(rootPath),
     ...validateToolkitVersionSurfacesReleasePlease(rootPath),
     ...validateToolkitImmutableReleaseReleasePleaseConfig(rootPath),
+    ...validateReleaseToolingScriptsUndraftPolicy(rootPath),
   ];
 
   if (errors.isNotEmpty) {

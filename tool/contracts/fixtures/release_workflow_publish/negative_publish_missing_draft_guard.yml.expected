@@ -1,1 +1,1 @@
-job publish must have exactly one unconditional step running assert_github_release_is_draft.sh (found 0)
+negative_publish_missing_draft_guard.yml: job publish must have exactly one unconditional step running assert_github_release_is_draft.sh (found 0)

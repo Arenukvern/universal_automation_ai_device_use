@@ -259,6 +259,8 @@ jobs:
       needs.dispatch-package-publish.result == 'success' &&
       needs.wait-package-publish.result == 'success'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - name: Checkout release tooling
         uses: actions/checkout@v7

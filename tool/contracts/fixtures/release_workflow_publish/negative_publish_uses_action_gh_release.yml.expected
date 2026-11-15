@@ -1,1 +1,1 @@
-must not use action-gh-release
+negative_publish_uses_action_gh_release.yml: publish job step `Bad gh-release action` uses disallowed action: softprops/action-gh-release@v2

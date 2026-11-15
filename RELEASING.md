@@ -107,9 +107,11 @@ sibling workflows). Zero manual steps:
    manifest docs](https://github.com/googleapis/release-please/blob/main/docs/manifest-releaser.md)).
    The git tag exists immediately for `publish_package.yml` and pub.dev; the GitHub
    release stays a draft so CI can upload assets. Publish asserts the release is still
-   a draft, uploads archives + `checksums.txt`, verifies the asset list, **then**
-   `gh release edit --draft=false`. Postflight downloads every archive from the
-   **published** release URL and verifies checksums. If publish runs against an
+   a draft, uploads **exactly** the four platform archives plus `checksums.txt`
+   (`upload_draft_github_release_assets.sh`—explicit paths, no `dist/release/*` glob
+   and no `--clobber`), verifies the asset list on the draft, **then** undrafts via
+   `publish_github_release_from_draft.sh` only. Postflight downloads every archive from
+   the **published** release URL and verifies checksums. If publish runs against an
    already-published release, it fails loudly (no silent assetless releases).
    **Release Please anchor:** without `force-tag-creation`, draft releases use GitHub
    “lazy” tags and the next `release-please` pass may open a duplicate release PR
@@ -155,10 +157,13 @@ No toolkit release on GitHub has ever shipped a full binary set yet
 assets. Pin `--version` / `-Version` after binaries exist. From-source:
 [`plugin/install.sh`](plugin/install.sh).
 
-**Partial draft upload recovery:** if `release-binaries-publish` fails mid-upload,
-delete the draft release’s **partial assets** in the GitHub UI (or re-run publish
-after removing conflicts via `check_release_assets_conflict.sh`); **never move or
-recreate tags** — re-run the workflow on the same tag ref.
+**Partial draft upload / rerun:** if `release-binaries-publish` fails mid-upload,
+remove the draft release’s **partial assets** in the GitHub UI, confirm
+`check_release_assets_conflict.sh` is clean, then **re-run the same caller workflow**
+on the immutable tag ref (do not recreate or move tags). Because upload omits
+`--clobber`, a second run fails until conflicting asset names are deleted from the
+draft. Only `publish_github_release_from_draft.sh` may undraft; never patch a release
+from ad hoc `gh` steps in the workflow YAML.
 
 Plugin bundle versions (`plugin/.cursor-plugin/plugin.json`,
 `plugin/.claude-plugin/plugin.json`) are Release Please **extra-files** on the

@@ -1,0 +1,1 @@
+negative_publish_undraft_gh_edit_multiline.yml: job publish must have exactly one unconditional step running publish_github_release_from_draft.sh (found 0)

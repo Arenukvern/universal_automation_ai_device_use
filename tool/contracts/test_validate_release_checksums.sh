@@ -20,5 +20,6 @@ run_neg "three_of_four.txt"
 run_neg "empty.txt"
 run_neg "duplicate.txt"
 run_neg "traversal.txt"
+run_neg "garbage_line.txt"
 
 echo "test_validate_release_checksums: OK"

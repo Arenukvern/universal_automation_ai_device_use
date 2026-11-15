@@ -1,0 +1,1 @@
+release-please-config.json: top-level "draft" must be JSON false or absent (release-please treats any other value as draft; got 1)

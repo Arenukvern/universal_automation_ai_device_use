@@ -1,5 +1,7 @@
 import 'package:yaml/yaml.dart';
 
+import 'release_workflow_publish_structure_lib.dart';
+
 /// gh 2.103.0 `gh run list --json` fields (from `gh help run list`, JSON FIELDS).
 const ghRunListJsonFieldsGh21030 = <String>[
   'attempt',
@@ -37,14 +39,15 @@ const requiredScriptStepsBuild = <String, String>{
 };
 
 const requiredScriptStepsPublish = <String, String>{
-  'assert_release_assets_complete.sh': 'postflight',
-  'assert_release_assets_complete_on_draft.sh': 'publish',
-  'assert_github_release_is_draft.sh': 'publish',
-  'append_draft_release_binary_notes.sh': 'publish',
+  'generate_release_checksums_in_dist.sh': 'publish',
   'check_release_assets_conflict.sh': 'publish',
-  'publish_github_release_from_draft.sh': 'publish',
-  'upload_draft_github_release_assets.sh': 'publish',
+  'assert_github_release_is_draft.sh': 'publish',
   'validate_release_checksums_file.sh': 'publish',
+  'append_binary_install_notes_to_draft_release.sh': 'publish',
+  'upload_draft_github_release_assets.sh': 'publish',
+  'assert_release_assets_complete_on_draft.sh': 'publish',
+  'publish_github_release_from_draft.sh': 'publish',
+  'assert_release_assets_complete.sh': 'postflight',
   'verify_release_assets_downloadable.sh': 'postflight',
 };
 
@@ -248,9 +251,8 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
   errors.addAll(
     _validateRunBlocksBeforeScripts(jobsMap, label, requiredScriptStepsPublish),
   );
-  errors.addAll(_validatePublishForbidsGhReleaseAction(jobsMap, label));
-  errors.addAll(_validateImmutableReleasePublishOrder(jobsMap, label));
-  errors.addAll(_validateNoPrematureGithubReleaseUndraft(jobsMap, label));
+  errors.addAll(validatePublishJobStructure(jobsMap, label));
+  errors.addAll(_validateImmutableReleasePostflight(jobsMap, label));
   errors.addAll(_validateContentsWriteScope(jobsMap, root, label));
   errors.addAll(_validateSplitPublishNeeds(jobsMap, label));
   errors.addAll(_validateSameRunArtifactDownload(jobsMap, label));
@@ -1299,62 +1301,11 @@ List<String> _validateSigningSecretsScope(
   return errors;
 }
 
-List<String> _validateImmutableReleasePublishOrder(
+List<String> _validateImmutableReleasePostflight(
   Map<dynamic, dynamic> jobsMap,
   String label,
 ) {
   final errors = <String>[];
-  final publish = jobsMap['publish'];
-  if (publish is! Map) {
-    return errors;
-  }
-  final steps = publish['steps'];
-  if (steps is! List) {
-    return errors;
-  }
-  int indexFor(String suffix) {
-    for (var i = 0; i < steps.length; i++) {
-      final step = steps[i];
-      if (step is! Map) {
-        continue;
-      }
-      final run = step['run']?.toString() ?? '';
-      final uses = step['uses']?.toString() ?? '';
-      if (run.contains(suffix)) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  final draftGuard = indexFor('assert_github_release_is_draft.sh');
-  final upload = indexFor('upload_draft_github_release_assets.sh');
-  final onDraft = indexFor('assert_release_assets_complete_on_draft.sh');
-  final undraft = indexFor('publish_github_release_from_draft.sh');
-  if (draftGuard < 0 || upload < 0 || onDraft < 0 || undraft < 0) {
-    return errors;
-  }
-  if (draftGuard >= upload) {
-    errors.add(
-      '$label: assert_github_release_is_draft.sh must run before draft asset upload',
-    );
-  }
-  if (upload >= onDraft) {
-    errors.add(
-      '$label: draft asset upload must run before assert_release_assets_complete_on_draft.sh',
-    );
-  }
-  if (undraft <= upload) {
-    errors.add(
-      '$label: draft asset upload must run before publish_github_release_from_draft.sh',
-    );
-  }
-  if (onDraft >= undraft) {
-    errors.add(
-      '$label: draft asset verification must run before publish_github_release_from_draft.sh',
-    );
-  }
-
   final postflight = jobsMap['postflight'];
   if (postflight is Map) {
     final pfSteps = postflight['steps'];

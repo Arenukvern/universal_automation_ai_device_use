@@ -48,11 +48,8 @@ jobs:
         env:
           VERSION: ${{ inputs.version }}
         run: |
-          set -euo pipefail
-          cd dist/release
-          shopt -s nullglob
-          files=(universal_automation_"${VERSION}"_*.tar.gz universal_automation_"${VERSION}"_*.zip)
-          sha256sum "${files[@]}" > checksums.txt
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/generate_release_checksums_in_dist.sh" \
+            "$VERSION"
 
       - name: Guard against conflicting GitHub release assets
         env:
@@ -90,35 +87,15 @@ jobs:
           VERSION: ${{ inputs.version }}
           GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
         run: |
-          set -euo pipefail
-          notes="$(mktemp)"
-          trap 'rm -f "$notes"' EXIT
-          cat >"$notes" <<EOF
-          ## Prebuilt \`universal-automation\` binaries
-
-          macOS darwin archives are **signed with Developer ID** when the CI
-          **Sign macOS bundle** step runs (\`HAS_SIGNING=true\` on the build job);
-          otherwise they are **preview (unsigned)** (see [RELEASING.md](RELEASING.md)).
-
-          Install without Dart:
-
-          \`\`\`sh
-          curl -fsSL https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/main/install.sh | bash -s -- --version ${VERSION}
-          \`\`\`
-
-          \`\`\`powershell
-          \$env:UNIVERSAL_AUTOMATION_VERSION='${VERSION}'; irm https://raw.githubusercontent.com/${GITHUB_REPOSITORY_SLUG}/main/install.ps1 | iex
-          \`\`\`
-          EOF
-          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/append_draft_release_binary_notes.sh" \
-            "$RELEASE_TAG" \
-            "$notes"
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/append_binary_install_notes_to_draft_release.sh" \
+            "$RELEASE_TAG"
 
       - name: Upload assets to draft GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh" \
             "$RELEASE_TAG" \

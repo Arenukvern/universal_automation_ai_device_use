@@ -20,11 +20,10 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
   if (decoded is! Map<String, dynamic>) {
     return ['release-please-config.json: root must be an object'];
   }
-  if (decoded['draft'] == true) {
+  if (decoded.containsKey('draft') && decoded['draft'] != false) {
     errors.add(
-      'release-please-config.json: must not set top-level "draft": true '
-      '(would draft every package release and break pub.dev tag dispatch; '
-      'only $toolkitReleasePleasePackage may be draft)',
+      'release-please-config.json: top-level "draft" must be JSON false or absent '
+      '(release-please treats any other value as draft; got ${decoded['draft']})',
     );
   }
   if (decoded['force-tag-creation'] == true) {
@@ -44,10 +43,10 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
     );
     return errors;
   }
-  if (toolkit['draft'] != true) {
+  if (toolkit['draft'] is! bool || toolkit['draft'] != true) {
     errors.add(
       'release-please-config.json: $toolkitReleasePleasePackage must set '
-      '"draft": true (immutable GitHub releases: upload assets before publish)',
+      '"draft" to JSON boolean true exactly (immutable GitHub releases)',
     );
   }
   if (toolkit['force-tag-creation'] != true) {
@@ -64,10 +63,10 @@ List<String> validateToolkitImmutableReleaseReleasePleaseConfig(
       continue;
     }
     final pkg = entry.value;
-    if (pkg is Map && pkg['draft'] == true) {
+    if (pkg is Map && pkg.containsKey('draft') && pkg['draft'] != false) {
       errors.add(
         'release-please-config.json: only $toolkitReleasePleasePackage may set '
-        'draft: true (other packages have no GitHub binary assets; got $path)',
+        'non-false draft (got $path with draft=${pkg['draft']})',
       );
     }
     if (pkg is Map && pkg['force-tag-creation'] == true) {

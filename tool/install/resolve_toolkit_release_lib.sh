@@ -21,7 +21,8 @@ is_prerelease_version() {
 # matching-refs API JSON only — extract refs/tags/universal_automation_toolkit-v* refs.
 # Does not read /releases bodies (release notes can quote decoy "tag_name" strings).
 parse_matching_refs_toolkit_tags() {
-  sed -n 's/.*"ref"[[:space:]]*:[[:space:]]*"refs\/tags\/\(universal_automation_toolkit-v[^"]*\)".*/\1/p'
+  grep -oE '"ref"[[:space:]]*:[[:space:]]*"refs/tags/universal_automation_toolkit-v[^"]+"' \
+    | sed 's/.*refs\/tags\///; s/"$//'
 }
 
 # Print toolkit tags (unsorted), one per line.
@@ -34,8 +35,9 @@ list_toolkit_release_tags() {
   if command -v git >/dev/null 2>&1; then
     git ls-remote --tags "https://github.com/${repo}.git" 'refs/tags/universal_automation_toolkit-v*' 2>/dev/null \
       | awk '/\trefs\/tags\/universal_automation_toolkit-v/ {
-          sub(/^.*\trefs\/tags\//, "");
-          print
+          tag = $2
+          sub(/^refs\/tags\//, "", tag)
+          if (tag !~ /\^\{\}$/) print tag
         }'
     return 0
   fi

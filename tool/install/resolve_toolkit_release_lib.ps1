@@ -34,13 +34,22 @@ function Get-ToolkitReleaseTags([string]$Repo) {
     $tags = @()
     foreach ($line in $lines) {
       if ($line -match '\trefs/tags/(universal_automation_toolkit-v.+)$') {
-        $tags += $Matches[1]
+        $tagName = $Matches[1]
+        if ($tagName -notmatch '\^\{\}$') { $tags += $tagName }
       }
     }
     if ($tags.Count -gt 0) { return $tags }
   }
-  $uri = "https://api.github.com/repos/$Repo/git/matching-refs/tags/universal_automation_toolkit-v"
-  $json = (Invoke-WebRequest -Uri $uri -UseBasicParsing).Content
+  $uri = if ($env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL) {
+    $env:UNIVERSAL_AUTOMATION_MATCHING_REFS_URL
+  } else {
+    "https://api.github.com/repos/$Repo/git/matching-refs/tags/universal_automation_toolkit-v"
+  }
+  try {
+    $json = (Invoke-WebRequest -Uri $uri -UseBasicParsing).Content
+  } catch {
+    throw [System.InvalidOperationException]::new("UA_RESOLVE_NETWORK: $($_.Exception.Message)")
+  }
   return Parse-MatchingRefsToolkitTags $json
 }
 

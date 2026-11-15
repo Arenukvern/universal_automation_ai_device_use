@@ -52,11 +52,23 @@ got="$(resolve_latest_toolkit_version "test/repo")"
 [[ "$got" == "0.6.2" ]] || fail "expected 0.6.2, got ${got:-<empty>}"
 
 refs_dir="$ROOT_DIR/tool/contracts/fixtures/install_releases"
-for f in matching_refs_pretty.json matching_refs_minified.json matching_refs_reordered.json matching_refs_decoy_body.json; do
+check_refs_count() {
+  local f="$1" want="$2"
   [[ -f "$refs_dir/$f" ]] || fail "missing $f"
   got_tags="$(parse_matching_refs_toolkit_tags <"$refs_dir/$f" | sort -u | wc -l | tr -d ' ')"
-  [[ "$got_tags" -ge 1 ]] || fail "$f: expected toolkit refs, got $got_tags"
-done
+  [[ "$got_tags" == "$want" ]] || fail "$f: expected $want toolkit refs, got $got_tags"
+}
+check_refs_count matching_refs_pretty.json 2
+check_refs_count matching_refs_minified.json 2
+check_refs_count matching_refs_reordered.json 2
+check_refs_count matching_refs_decoy_body.json 1
+
+peeled_fixture="$refs_dir/ls_remote_peeled_lines.txt"
+[[ -f "$peeled_fixture" ]] || fail "missing ls_remote_peeled_lines.txt"
+peeled_tags="$(awk '/\trefs\/tags\/universal_automation_toolkit-v/ {
+  tag=$2; sub(/^refs\/tags\//,"",tag); if (tag !~ /\^\{\}$/) print tag
+}' "$peeled_fixture" | sort -u | wc -l | tr -d ' ')"
+[[ "$peeled_tags" == "1" ]] || fail "peeled fixture: expected 1 tag, got $peeled_tags"
 
 decoy="$(parse_matching_refs_toolkit_tags <"$refs_dir/matching_refs_decoy_body.json")"
 [[ "$decoy" == "universal_automation_toolkit-v0.6.1" ]] || fail "decoy JSON must only extract real ref, got: $decoy"

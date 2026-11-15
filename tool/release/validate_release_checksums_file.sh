@@ -24,7 +24,7 @@ BEGIN {
   for (i = 1; i <= nreq; i++) want[required[i]] = 1
   lines = 0
 }
-NF < 2 { next }
+NF < 2 { die("invalid checksum line (need hash and filename): " $0) }
 $1 !~ /^[0-9a-fA-F]{64}$/ { die("invalid checksum line: " $0) }
 {
   name = $NF

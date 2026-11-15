@@ -9,6 +9,10 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+if ($PSVersionTable.PSVersion.Major -le 5) {
+  [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+}
+
 $__UaScriptDir = $PSScriptRoot
 if (-not $__UaScriptDir -and $MyInvocation.MyCommand.Path) {
   $__UaScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -27,14 +31,22 @@ $CurrentLink = Join-Path $ShareRoot "current"
 $ProgramsBin = if ($env:UNIVERSAL_AUTOMATION_BIN_DIR) { $env:UNIVERSAL_AUTOMATION_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\universal-automation\bin" }
 
 function Resolve-LatestVersion {
-  if (-not (Get-Command Resolve-LatestToolkitVersion -ErrorAction SilentlyContinue)) {
-    $raw = "https://raw.githubusercontent.com/$Repo/main/tool/install/resolve_toolkit_release_lib.ps1"
-    $tmp = Join-Path $env:TEMP "ua-resolve-lib-$([guid]::NewGuid().ToString('N')).ps1"
-    (Invoke-WebRequest -Uri $raw -UseBasicParsing).Content | Set-Content -LiteralPath $tmp -Encoding UTF8
-    . $tmp
-    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+  try {
+    if (-not (Get-Command Resolve-LatestToolkitVersion -ErrorAction SilentlyContinue)) {
+      $raw = "https://raw.githubusercontent.com/$Repo/main/tool/install/resolve_toolkit_release_lib.ps1"
+      $tmp = Join-Path $env:TEMP "ua-resolve-lib-$([guid]::NewGuid().ToString('N')).ps1"
+      (Invoke-WebRequest -Uri $raw -UseBasicParsing).Content | Set-Content -LiteralPath $tmp -Encoding UTF8
+      . $tmp
+      Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+    }
+    return Resolve-LatestToolkitVersion $Repo
+  } catch {
+    $msg = $_.Exception.Message
+    if ($msg -match 'UA_RESOLVE_NETWORK:' -or $msg -match 'SSL|TLS|certificate|timed out|Unable to connect|Name resolution|Could not resolve|network') {
+      throw [System.InvalidOperationException]::new("Network or TLS error resolving latest release: $msg")
+    }
+    throw
   }
-  return Resolve-LatestToolkitVersion $Repo
 }
 
 function Resolve-PhysicalRoot([string]$Path) {
@@ -162,7 +174,12 @@ if ($Rollback) {
 }
 
 if (-not $Version) {
-  $Version = Resolve-LatestVersion
+  try {
+    $Version = Resolve-LatestVersion
+  } catch {
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    exit 2
+  }
 }
 if (-not $Version) {
   Write-Host @"
