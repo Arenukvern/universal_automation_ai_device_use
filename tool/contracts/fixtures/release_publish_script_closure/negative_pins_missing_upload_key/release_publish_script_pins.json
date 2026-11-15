@@ -1,0 +1,11 @@
+{
+  "tool/release/generate_release_checksums_in_dist.sh": "ff72dd1a1aa225cd9472f0d36d91210ab5faf21e26bccf6dbb18453940bdadb9",
+  "tool/release/check_release_assets_conflict.sh": "85e95557e2da31c20b31c45e994fac8ef176432142f914b9105e93ea52e4ebfa",
+  "tool/release/assert_github_release_is_draft.sh": "f6ddd2e0888bec869d598f0c90087595b1c332152cb00c76a67f0c352049ddeb",
+  "tool/release/validate_release_checksums_file.sh": "bf0f768c3fb9a9f4f0f1a92ebcc2cb45e94b59d800d8efe6bb7651e9204e648d",
+  "tool/release/append_binary_install_notes_to_draft_release.sh": "001e13d7223034272c64dd36decb75eb691b1d310a956c16196b3f7a857c5e3b",
+  "tool/release/append_draft_release_binary_notes.sh": "8a988da071e0209b36200f9d067acb546fe3e360024401f12ab0c4a5c91521a4",
+  "tool/release/assert_release_assets_complete_on_draft.sh": "31ba7245db0f41ab642a0226399e99f0cf39af51fc3b16ec65cfd50e98960346",
+  "tool/release/assert_release_assets_complete.sh": "4af7b8eb2376b3e5892877c425c000944721a6aed469377c84fce00aff6591be",
+  "tool/release/publish_github_release_from_draft.sh": "b247eef9a726d658ff395752d0b82558a2401d15e091075d96b6c72124f2cd1c"
+}

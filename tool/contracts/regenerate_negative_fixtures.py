@@ -330,6 +330,24 @@ def main() -> None:
   ))
   specs.append((
       "publish",
+      "negative_publish_toplevel_env_bash_env",
+      p().replace(
+          "env:\n  TOOLING_CHECKOUT_PATH: _tooling",
+          "env:\n  TOOLING_CHECKOUT_PATH: _tooling\n  BASH_ENV: /tmp/evil",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
+      "negative_publish_toplevel_defaults",
+      p().replace(
+          "permissions:\n  contents: read\n\nenv:",
+          "permissions:\n  contents: read\n\ndefaults:\n  run:\n    shell: bash\n\nenv:",
+          1,
+      ),
+  ))
+  specs.append((
+      "publish",
       "negative_publish_step_shell_bash_c",
       t.replace(
           "      - name: Upload assets to draft GitHub release\n        env:",

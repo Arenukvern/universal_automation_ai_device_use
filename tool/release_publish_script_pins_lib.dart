@@ -16,13 +16,26 @@ List<String> validateReleasePublishScriptClosure(
   String? scriptOverlayDir,
 }) {
   final errors = <String>[];
-  final pins = _loadPins('$repoRoot/$releasePublishScriptPinsRelPath');
+  final pinsPath = _resolvePinsPath(repoRoot, scriptOverlayDir);
+  final pins = _loadPins(pinsPath);
   if (pins == null) {
     return ['missing $releasePublishScriptPinsRelPath'];
   }
 
+  final required = releasePublishRequiredPinKeys();
+  final pinKeys = pins.keys.toSet();
+  if (!_pinKeySetsMatch(pinKeys, required)) {
+    for (final key in required.difference(pinKeys)) {
+      errors.add('release publish script pins missing key $key');
+    }
+    for (final key in pinKeys.difference(required)) {
+      errors.add('release publish script pins extra key $key');
+    }
+    return errors;
+  }
+
   final bodies = <String, String>{};
-  for (final rel in pins.keys) {
+  for (final rel in required) {
     bodies[rel] = _readScriptBody(repoRoot, rel, scriptOverlayDir);
     final digest = sha256.convert(utf8.encode(bodies[rel]!)).toString();
     if (digest != pins[rel]) {
@@ -36,6 +49,21 @@ List<String> validateReleasePublishScriptClosure(
   errors.addAll(_validatePublishScriptGhWritePolicy(bodies));
 
   return errors;
+}
+
+bool _pinKeySetsMatch(Set<String> pins, Set<String> required) =>
+    pins.length == required.length &&
+    pins.containsAll(required) &&
+    required.containsAll(pins);
+
+String _resolvePinsPath(String repoRoot, String? overlayDir) {
+  if (overlayDir != null) {
+    final overlay = '$overlayDir/release_publish_script_pins.json';
+    if (File(overlay).existsSync()) {
+      return overlay;
+    }
+  }
+  return '$repoRoot/$releasePublishScriptPinsRelPath';
 }
 
 Map<String, String>? _loadPins(String path) {

@@ -18,6 +18,48 @@ const publishJobRunScriptsInOrder = <String>[
 
 const undraftAllowedScript = 'publish_github_release_from_draft.sh';
 
+/// Closure scripts not invoked directly from the publish job YAML steps.
+const publishScriptClosureExtras = <String>[
+  'append_draft_release_binary_notes.sh',
+  'assert_release_assets_complete.sh',
+];
+
+const publishWorkflowRootEnvPins = <String, String>{
+  'TOOLING_CHECKOUT_PATH': '_tooling',
+};
+
+Set<String> releasePublishRequiredPinKeys() {
+  final keys = <String>{};
+  for (final name in publishJobRunScriptsInOrder) {
+    keys.add('tool/release/$name');
+  }
+  for (final name in publishScriptClosureExtras) {
+    keys.add('tool/release/$name');
+  }
+  return keys;
+}
+
+List<String> validatePublishWorkflowRoot(Map<dynamic, dynamic> root, String label) {
+  final errors = <String>[];
+  if (root.containsKey('defaults')) {
+    errors.add('$label: must not set top-level defaults');
+  }
+  final env = root['env'];
+  if (env is! Map) {
+    errors.add('$label: workflow env block is required');
+    return errors;
+  }
+  errors.addAll(
+    _validateEnvPins(
+      env,
+      publishWorkflowRootEnvPins,
+      label,
+      'workflow env',
+    ),
+  );
+  return errors;
+}
+
 const publishJobAllowedKeys = <String>{
   'permissions',
   'runs-on',

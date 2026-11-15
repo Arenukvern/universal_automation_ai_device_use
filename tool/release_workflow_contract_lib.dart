@@ -228,6 +228,7 @@ List<String> validateReleaseBinariesPublishWorkflowYaml(
     return ['$label: root must be a mapping'];
   }
   final root = Map<dynamic, dynamic>.from(doc);
+  errors.addAll(validatePublishWorkflowRoot(root, label));
   final on = root['on'];
   if (on is! Map || !Map.from(on).containsKey('workflow_call')) {
     errors.add('$label: on.workflow_call is required');
