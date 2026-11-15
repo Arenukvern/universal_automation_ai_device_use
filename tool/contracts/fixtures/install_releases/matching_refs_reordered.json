@@ -1,0 +1,10 @@
+[
+  {
+    "object": { "sha": "bbb", "type": "commit" },
+    "ref": "refs/tags/universal_automation_toolkit-v0.6.1"
+  },
+  {
+    "object": { "sha": "aaa", "type": "commit" },
+    "ref": "refs/tags/universal_automation_toolkit-v0.6.0"
+  }
+]

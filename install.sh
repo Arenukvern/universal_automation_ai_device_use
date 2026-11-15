@@ -56,15 +56,9 @@ source_toolkit_release_lib() {
 }
 
 resolve_latest_release_version() {
-  local body
   source_toolkit_release_lib
   command -v curl >/dev/null 2>&1 || return 1
-  if [[ -n "${UNIVERSAL_AUTOMATION_RELEASES_FIXTURE:-}" ]]; then
-    body="$(cat "$UNIVERSAL_AUTOMATION_RELEASES_FIXTURE")"
-  else
-    body="$(curl -fsSL "https://api.github.com/repos/${REPO}/releases?per_page=30" 2>/dev/null)" || return 1
-  fi
-  resolve_latest_toolkit_version_from_releases_json <<<"$body"
+  resolve_latest_toolkit_version "$REPO"
 }
 
 resolve_cli_in_tree() {
@@ -181,10 +175,10 @@ fi
 
 if [[ -z "$VERSION" ]]; then
   cat >&2 <<EOF
-Unable to resolve install version (no published toolkit release with complete binaries).
-
-The newest GitHub release may be assetless (e.g. immutable release published before CI upload).
-Specify --version <semver>, or build from source:
+Unable to resolve install version: no toolkit tag has all five release assets yet
+(HEAD probe). No historical GitHub toolkit release has shipped prebuilt binaries;
+until universal_automation_toolkit-v0.6.1 (or later) publishes assets, pin --version
+after binaries exist, or build from source:
   ./plugin/install.sh
 EOF
   usage >&2

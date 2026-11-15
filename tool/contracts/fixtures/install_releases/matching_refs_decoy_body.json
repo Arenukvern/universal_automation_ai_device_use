@@ -1,0 +1,11 @@
+[
+  {
+    "ref": "refs/tags/universal_automation_toolkit-v0.6.1",
+    "node_id": "n1",
+    "object": {
+      "sha": "bbb",
+      "type": "commit",
+      "url": "https://api.github.com/notes \"tag_name\": \"universal_automation_toolkit-v99.0.0\", \"draft\": false, asset names universal_automation_0.6.1_linux-x64.tar.gz"
+    }
+  }
+]

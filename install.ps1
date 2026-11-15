@@ -9,39 +9,32 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$__UaScriptDir = $PSScriptRoot
+if (-not $__UaScriptDir -and $MyInvocation.MyCommand.Path) {
+  $__UaScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+}
+if ($__UaScriptDir) {
+  $__UaLib = Join-Path $__UaScriptDir "tool\install\resolve_toolkit_release_lib.ps1"
+  if (Test-Path -LiteralPath $__UaLib) {
+    . $__UaLib
+  }
+}
+
 $ShareRoot = if ($env:UNIVERSAL_AUTOMATION_SHARE) { $env:UNIVERSAL_AUTOMATION_SHARE } else { Join-Path $env:LOCALAPPDATA "universal-automation" }
 $VersionsDir = Join-Path $ShareRoot "versions"
 $PreviousFile = Join-Path $ShareRoot "previous"
 $CurrentLink = Join-Path $ShareRoot "current"
 $ProgramsBin = if ($env:UNIVERSAL_AUTOMATION_BIN_DIR) { $env:UNIVERSAL_AUTOMATION_BIN_DIR } else { Join-Path $env:LOCALAPPDATA "Programs\universal-automation\bin" }
 
-function Import-ToolkitReleaseLib {
-  $scriptDir = $null
-  if ($PSScriptRoot) { $scriptDir = $PSScriptRoot }
-  elseif ($MyInvocation.MyCommand.Path) {
-    $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-  }
-  $lib = if ($scriptDir) { Join-Path $scriptDir "tool\install\resolve_toolkit_release_lib.ps1" } else { $null }
-  if ($lib -and (Test-Path -LiteralPath $lib)) {
-    . $lib
-    return
-  }
-  $raw = "https://raw.githubusercontent.com/$Repo/main/tool/install/resolve_toolkit_release_lib.ps1"
-  $code = (Invoke-WebRequest -Uri $raw -UseBasicParsing).Content
-  Invoke-Expression $code
-}
-
 function Resolve-LatestVersion {
-  Import-ToolkitReleaseLib
-  $releases = $null
-  if ($env:UNIVERSAL_AUTOMATION_RELEASES_FIXTURE) {
-    $raw = Get-Content -Raw -LiteralPath $env:UNIVERSAL_AUTOMATION_RELEASES_FIXTURE
-    $releases = $raw | ConvertFrom-Json
-  } else {
-    $uri = "https://api.github.com/repos/$Repo/releases?per_page=30"
-    $releases = Invoke-RestMethod -Uri $uri -UseBasicParsing
+  if (-not (Get-Command Resolve-LatestToolkitVersion -ErrorAction SilentlyContinue)) {
+    $raw = "https://raw.githubusercontent.com/$Repo/main/tool/install/resolve_toolkit_release_lib.ps1"
+    $tmp = Join-Path $env:TEMP "ua-resolve-lib-$([guid]::NewGuid().ToString('N')).ps1"
+    (Invoke-WebRequest -Uri $raw -UseBasicParsing).Content | Set-Content -LiteralPath $tmp -Encoding UTF8
+    . $tmp
+    Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
   }
-  return Resolve-LatestToolkitVersionFromReleases @($releases)
+  return Resolve-LatestToolkitVersion $Repo
 }
 
 function Resolve-PhysicalRoot([string]$Path) {
@@ -174,8 +167,7 @@ if (-not $Version) {
 if (-not $Version) {
   Write-Host @"
 Specify -Version or build from source (plugin/install.sh on WSL or Dart SDK).
-The newest GitHub release may lack binaries (immutable release published before CI upload);
-installers skip assetless toolkit releases when resolving latest.
+No toolkit tag has all five release assets yet (HEAD probe); pin -Version after 0.6.1 binaries ship.
 "@ -ForegroundColor Red
   exit 1
 }

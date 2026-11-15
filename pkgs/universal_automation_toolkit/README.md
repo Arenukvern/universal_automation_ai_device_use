@@ -211,8 +211,9 @@ the repo root (see [RELEASING.md](../../RELEASING.md)); from source use
 **GitHub binaries:** `v0.6.0` shipped on pub.dev but its GitHub release has
 **no prebuilt archives** (immutable release was published before CI could upload
 assets). **`v0.6.1` is the first release train with prebuilt binaries** under the
-draft-then-publish flow documented in [RELEASING.md](../../RELEASING.md). Until
-then, pin `--version` to a release with assets or use `plugin/install.sh`.
+draft-then-publish flow documented in [RELEASING.md](../../RELEASING.md). Until **0.6.1** binaries ship, `install.sh` / `install.ps1` **latest** fails clearly
+(no prior toolkit release has ever had GitHub binaries). Pin `--version` once assets
+exist, or use `plugin/install.sh`.
 
 ## Non-claims
 
