@@ -10,6 +10,13 @@ release-please train (see
 Screencast releases that adopt a new CDP minor (for example 0.6.2 after the
 behavior reaction-floor fix) ship in the same release PR as `universal_browser_cdp`.
 
+## Requirements
+
+`CdpScreencastFrameSource` and CDP-backed pacing assume **`universal_browser_cdp`
+0.6.3 or newer** for the monotonic pause / drift fix in behavior timing. Hosted
+`pubspec.yaml` pins are updated by the release-please constraint sync when
+screencast enters a train; they are not edited by hand on `main`.
+
 Part of the `universal_automation_*` family
 ([ADR 0037](../../docs/decisions/0037_universal_automation_family.md)).
 The invariants encode production-proven discipline
