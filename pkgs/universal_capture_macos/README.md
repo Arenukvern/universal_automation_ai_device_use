@@ -32,6 +32,9 @@ apps that never opted into any protocol.
 
 ## Requirements
 
+- **`universal_screencast` 0.3.3 or newer** when composing captures into the
+  frame pipeline (hosted pins via release-please constraint sync, not
+  hand-edited on `main`).
 - macOS 13+ (built for arm64 and x64).
 - `swiftc` + Xcode command line tools at build time (the hook runs on
   `dart pub get`).
