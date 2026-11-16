@@ -2,8 +2,13 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:meta/meta.dart';
+import 'package:path/path.dart' as p;
 
 import 'release_workflow_publish_structure_lib.dart';
+
+const releasePublishScriptClosureFixturesRel =
+    'tool/contracts/fixtures/release_publish_script_closure';
 
 const releasePublishScriptPinsRelPath =
     'tool/release_publish_script_pins.json';
@@ -57,8 +62,8 @@ bool _pinKeySetsMatch(Set<String> pins, Set<String> required) =>
     required.containsAll(pins);
 
 String _resolvePinsPath(String repoRoot, String? overlayDir) {
-  if (overlayDir != null && _overlayAllowsPinsReplacement(repoRoot, overlayDir)) {
-    final overlay = '$overlayDir/release_publish_script_pins.json';
+  if (overlayDir != null && _overlayAllowsClosureFixtureDir(repoRoot, overlayDir)) {
+    final overlay = p.join(overlayDir, 'release_publish_script_pins.json');
     if (File(overlay).existsSync()) {
       return overlay;
     }
@@ -66,14 +71,43 @@ String _resolvePinsPath(String repoRoot, String? overlayDir) {
   return '$repoRoot/$releasePublishScriptPinsRelPath';
 }
 
-bool _overlayAllowsPinsReplacement(String repoRoot, String overlayDir) {
-  final allowed =
-      Directory('$repoRoot/tool/contracts/fixtures/release_publish_script_closure')
-          .absolute
-          .path;
-  final absOverlay = Directory(overlayDir).absolute.path;
-  return absOverlay == allowed ||
-      absOverlay.startsWith('$allowed${Platform.pathSeparator}');
+String? _resolvedClosureFixtureRoot(String repoRoot) {
+  try {
+    final allowed = Directory(p.join(repoRoot, releasePublishScriptClosureFixturesRel));
+    if (!allowed.existsSync()) {
+      return null;
+    }
+    return p.normalize(allowed.resolveSymbolicLinksSync());
+  } on IOException {
+    return null;
+  }
+}
+
+bool _overlayAllowsClosureFixtureDir(String repoRoot, String overlayDir) {
+  final allowed = _resolvedClosureFixtureRoot(repoRoot);
+  if (allowed == null) {
+    return false;
+  }
+  return isOverlayWithinAllowedRoot(allowed, overlayDir);
+}
+
+/// Whether [overlayDir] resolves inside [allowedRoot] (fixture overlay gate).
+@visibleForTesting
+bool isOverlayWithinAllowedRoot(String allowedRoot, String overlayDir) {
+  final normalizedAllowed = p.normalize(allowedRoot);
+  try {
+    final overlay = Directory(overlayDir);
+    if (!overlay.existsSync()) {
+      return false;
+    }
+    final resolved = p.normalize(overlay.resolveSymbolicLinksSync());
+    if (p.equals(resolved, normalizedAllowed)) {
+      return true;
+    }
+    return p.isWithin(normalizedAllowed, resolved);
+  } on IOException {
+    return false;
+  }
 }
 
 Map<String, String>? _loadPins(String path) {
@@ -89,8 +123,8 @@ Map<String, String>? _loadPins(String path) {
 }
 
 String _readScriptBody(String repoRoot, String rel, String? overlayDir) {
-  if (overlayDir != null) {
-    final overlay = '$overlayDir/${rel.split('/').last}';
+  if (overlayDir != null && _overlayAllowsClosureFixtureDir(repoRoot, overlayDir)) {
+    final overlay = p.join(overlayDir, rel.split('/').last);
     if (File(overlay).existsSync()) {
       return File(overlay).readAsStringSync();
     }

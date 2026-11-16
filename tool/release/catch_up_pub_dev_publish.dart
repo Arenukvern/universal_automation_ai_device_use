@@ -8,10 +8,21 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:meta/meta.dart';
+
 import 'catch_up_pub_dev_publish_lib.dart';
 import '../tool_cli.dart';
 
 Future<void> main(List<String> args) async {
+  exit(await runCatchUpPubDevPublish(args));
+}
+
+/// CLI entry; returns a process exit code (testable).
+@visibleForTesting
+Future<int> runCatchUpPubDevPublish(
+  List<String> args, {
+  PubDevPackageClient? pubDevOverride,
+}) async {
   requireOnlyKnownFlags(
     args,
     flags: {'--dry-run', '--help', '-h', '--repo-root'},
@@ -20,7 +31,7 @@ Future<void> main(List<String> args) async {
   );
   if (args.contains('--help') || args.contains('-h')) {
     _usage();
-    exit(0);
+    return 0;
   }
   final dryRun = args.contains('--dry-run');
   final repoRootIdx = args.indexOf('--repo-root');
@@ -33,7 +44,7 @@ Future<void> main(List<String> args) async {
     final raw = Platform.environment['RELEASE_PLEASE_OUTPUTS'];
     if (raw == null || raw.isEmpty) {
       stderr.writeln('RELEASE_PLEASE_OUTPUTS is empty');
-      exit(2);
+      return 2;
     }
     releaseOutputs = jsonDecode(raw) as Map<String, dynamic>;
   } else {
@@ -46,18 +57,25 @@ Future<void> main(List<String> args) async {
   final dedupe = releasePleaseTagsDispatchedThisRun(releaseOutputs);
   final packages = loadReleasePleasePublishablePackages(repoRoot: repoRoot);
   final tags = await listGitTags(repoRoot: repoRoot);
-  final client = HttpPubDevPackageClient();
+  final client = pubDevOverride ?? HttpPubDevPackageClient();
 
   CatchUpPubDevPublishPlan plan;
   try {
-    plan = await planCatchUpPubDevPublish(
-      packages: packages,
-      allGitTags: tags,
-      dedupeTags: dedupe,
-      pubDev: client,
-    );
+    try {
+      plan = await planCatchUpPubDevPublish(
+        packages: packages,
+        allGitTags: tags,
+        dedupeTags: dedupe,
+        pubDev: client,
+      );
+    } on StateError catch (e) {
+      stderr.writeln('::error::catch-up pub.dev lookup failed: ${e.message}');
+      return 1;
+    }
   } finally {
-    client.close(force: true);
+    if (client is HttpPubDevPackageClient) {
+      client.close(force: true);
+    }
   }
 
   for (final warning in plan.neverPublishedPackageWarnings) {
@@ -74,14 +92,14 @@ Future<void> main(List<String> args) async {
     for (final tag in plan.dispatchTags) {
       stdout.writeln(tag);
     }
-    exit(0);
+    return 0;
   }
 
   final repo = Platform.environment['GH_REPO'];
   final token = Platform.environment['GH_TOKEN'];
   if (repo == null || token == null) {
     stderr.writeln('GH_REPO and GH_TOKEN required');
-    exit(2);
+    return 2;
   }
 
   var dispatched = <String>[];
@@ -104,7 +122,7 @@ Future<void> main(List<String> args) async {
       stderr.writeln('::error::gh workflow run failed for catch-up $tag');
       stderr.write(result.stdout);
       stderr.write(result.stderr);
-      exit(1);
+      return 1;
     }
     dispatched.add(tag);
   }
@@ -120,6 +138,7 @@ Future<void> main(List<String> args) async {
       mode: FileMode.append,
     );
   }
+  return 0;
 }
 
 void _usage() {

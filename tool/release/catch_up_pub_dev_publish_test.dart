@@ -1,7 +1,9 @@
 import 'package:test/test.dart';
 
+import 'catch_up_pub_dev_publish.dart';
 import 'catch_up_pub_dev_publish_lib.dart';
 import '../pub_dev_version_listed_lib.dart';
+import '../workspace_pub_constraints_sync.dart';
 
 final class FakePubDevClient implements PubDevPackageClient {
   FakePubDevClient(this._responses);
@@ -119,6 +121,18 @@ void main() {
       ),
       '${pkgA}-v1.0.1',
     );
+  });
+
+  test('runCatchUpPubDevPublish exits 1 on pub.dev network error', () async {
+    final repoRoot = findWorkspaceRepoRoot().path;
+    final code = await runCatchUpPubDevPublish(
+      ['--dry-run', '--repo-root', repoRoot],
+      pubDevOverride: FakePubDevClient({
+        for (final pkg in loadReleasePleasePublishablePackages(repoRoot: repoRoot))
+          pkg.packageName: PubDevPackageFetchError('network timeout'),
+      }),
+    );
+    expect(code, 1);
   });
 
   test('pubDevPackageApiListsVersion object-shaped versions', () {
