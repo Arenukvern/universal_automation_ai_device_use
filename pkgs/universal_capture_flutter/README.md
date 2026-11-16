@@ -11,6 +11,13 @@ release-please train (see
 capture releases that adopt a new screencast line ship in the same release
 PR after `universal_screencast`.
 
+## Requirements
+
+`ToolkitFrameSource` and pipeline composition assume **`universal_screencast`
+0.3.3 or newer**. Hosted `pubspec.yaml` pins are updated by the
+release-please constraint sync when capture_flutter enters a train; they
+are not edited by hand on `main`.
+
 Part of the `universal_automation_*` family
 ([ADR 0037](../../docs/decisions/0037_universal_automation_family.md),
 capture split in [ADR 0038](../../docs/decisions/0038_automation_kernel_unification.md)).

@@ -6,7 +6,16 @@ through the WebRTC data channel. Intra-workspace `universal_screencast`
 constraints are synced on each release-please train (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 WebRTC releases that adopt a new screencast line ship in the same release
-PR after `universal_screencast`. Cross-platform wherever cargo runs;
+PR after `universal_screencast`.
+
+## Requirements
+
+`WebrtcDataChannelSink` and peer bring-up over screencast frames assume
+**`universal_screencast` 0.3.3 or newer**. Hosted `pubspec.yaml` pins are
+updated by the release-please constraint sync when WebRTC enters a train;
+they are not edited by hand on `main`.
+
+Cross-platform wherever cargo runs;
 WebRTC from day one with the media plane separated from signaling
 (media-plane discipline).
 
