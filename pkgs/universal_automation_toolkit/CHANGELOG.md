@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.6.0...universal_automation_toolkit-v0.6.1) (2026-11-16)
+
+
+### Bug Fixes
+
+* **install:** resolve latest via git tags and asset HEAD probes ([d742bee](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/d742bee6e6ba9432c805d8c6b15921614e7e0734))
+* **universal_automation_toolkit:** draft GitHub release flow for immutable binaries ([f8868a8](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f8868a8a3887f95a9417cf24a22fc7c0b48a4176))
+
 ## [0.6.0](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.5.1...universal_automation_toolkit-v0.6.0) (2026-11-15)
 
 

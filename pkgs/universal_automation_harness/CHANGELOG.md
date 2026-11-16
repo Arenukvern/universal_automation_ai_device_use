@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.3.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.3.1...universal_automation_harness-v0.3.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* **universal_automation_harness:** co-release note for toolkit 0.6.1 train ([76af98a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/76af98ac440c5b8688aaf3dd611840cf97cf0350))
+
 ## [0.3.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_harness-v0.3.0...universal_automation_harness-v0.3.1) (2026-11-15)
 
 

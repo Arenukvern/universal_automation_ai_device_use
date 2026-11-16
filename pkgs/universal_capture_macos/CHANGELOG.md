@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.3.4](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_macos-v0.3.3...universal_capture_macos-v0.3.4) (2026-11-16)
+
+
+### Bug Fixes
+
+* screencast CDP 0.6.3 train + cascade dependents (README only; sync writes constraints) ([f09c4e2](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f09c4e25cfc0f6ea0044622042bf0709fb13337a))
+* **universal_capture_macos:** require universal_screencast 0.3.3 ([26e31dc](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/26e31dce94e2f68ee0b8c6f7ad4ca0eea44d987e))
+
 ## [0.3.3](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_macos-v0.3.2...universal_capture_macos-v0.3.3) (2026-11-15)
 
 

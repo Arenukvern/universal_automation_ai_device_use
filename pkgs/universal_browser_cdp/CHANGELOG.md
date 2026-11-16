@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.6.3](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.2...universal_browser_cdp-v0.6.3) (2026-11-16)
+
+
+### Bug Fixes
+
+* **universal_browser_cdp:** never dispatch a behavior step before its planned time ([1833d2a](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1833d2aa2fc8ce969bd160c76275db6afaa1337e))
+
 ## [0.6.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_browser_cdp-v0.6.1...universal_browser_cdp-v0.6.2) (2026-11-15)
 
 
