@@ -130,8 +130,8 @@ void main() {
         final session = await CdpBrowserSession.attach(server.httpBase);
         final plan = BehaviorPlan(
           steps: [
-            const PointerDownStep(plannedAtUs: 50_000, button: 'left'),
-            const PointerUpStep(plannedAtUs: 80_000, button: 'left'),
+            const PointerDownStep(plannedAtUs: 50_000),
+            const PointerUpStep(plannedAtUs: 80_000),
           ],
         );
         final scheduler = CdpBehaviorScheduler(
