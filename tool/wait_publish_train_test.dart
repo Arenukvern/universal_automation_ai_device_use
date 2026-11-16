@@ -10,6 +10,21 @@ void main() {
     });
   });
 
+  group('publishTrainTagsToWait', () {
+    test('merges catch-up dispatches with release-please tags', () {
+      final tags = publishTrainTagsToWait(
+        releaseOutputs: {
+          'paths_released': '["pkgs/universal_foo"]',
+          'pkgs/universal_foo--release_created': 'true',
+          'pkgs/universal_foo--tag_name': 'universal_foo-v2.0.0',
+        },
+        catchUpDispatchedTagsJson:
+            '["universal_bar-v1.0.0","universal_foo-v2.0.0"]',
+      );
+      expect(tags, ['universal_bar-v1.0.0', 'universal_foo-v2.0.0']);
+    });
+  });
+
   group('releasePleasePublishTags', () {
     test('reads paths_released', () {
       final tags = releasePleasePublishTags(

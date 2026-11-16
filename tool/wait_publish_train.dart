@@ -18,7 +18,11 @@ Future<void> main() async {
   }
 
   final outputs = jsonDecode(raw) as Map<String, dynamic>;
-  final tags = releasePleasePublishTags(outputs: outputs);
+  final catchUpJson = Platform.environment['CATCH_UP_DISPATCHED_TAGS'];
+  final tags = publishTrainTagsToWait(
+    releaseOutputs: outputs,
+    catchUpDispatchedTagsJson: catchUpJson,
+  );
   if (tags.isEmpty) {
     stdout.writeln('No release tags; skipping publish waits');
     exit(await _runStrictPostPublishAudit());

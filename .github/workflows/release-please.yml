@@ -183,10 +183,13 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       actions: write
+    outputs:
+      catch_up_dispatched_tags: ${{ steps.catch_up.outputs.dispatched_tags_json }}
     steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
+          fetch-depth: 0
           persist-credentials: false
 
       - name: Setup Dart SDK
@@ -204,6 +207,14 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
         run: dart run tool/dispatch_pub_dev_publish.dart
+
+      - name: Catch up pub.dev publish for tagged gaps
+        id: catch_up
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+        run: dart run tool/release/catch_up_pub_dev_publish.dart
 
   wait-package-publish:
     needs:
@@ -240,6 +251,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_PLEASE_OUTPUTS: ${{ needs.release-please.outputs.release_outputs_json }}
+          CATCH_UP_DISPATCHED_TAGS: ${{ needs.dispatch-package-publish.outputs.catch_up_dispatched_tags }}
         run: dart run tool/wait_publish_train.dart
 
   # Pub.dev train must not wait on binary jobs. This job fails the workflow when

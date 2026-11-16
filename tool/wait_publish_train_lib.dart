@@ -1,5 +1,25 @@
 import 'dart:convert';
 
+/// Tags to wait on: release-please this run plus catch-up dispatches.
+List<String> publishTrainTagsToWait({
+  required Map<String, dynamic> releaseOutputs,
+  String? catchUpDispatchedTagsJson,
+}) {
+  final tags = releasePleasePublishTags(outputs: releaseOutputs).toSet();
+  if (catchUpDispatchedTagsJson != null &&
+      catchUpDispatchedTagsJson.isNotEmpty) {
+    final decoded = jsonDecode(catchUpDispatchedTagsJson);
+    if (decoded is List) {
+      for (final entry in decoded) {
+        if (entry is String && entry.isNotEmpty) {
+          tags.add(entry);
+        }
+      }
+    }
+  }
+  return tags.toList()..sort();
+}
+
 /// Tags to watch from release-please `paths_released` outputs.
 List<String> releasePleasePublishTags({
   required Map<String, dynamic> outputs,
