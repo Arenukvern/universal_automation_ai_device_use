@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.3.4](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.3.3...universal_webrtc-v0.3.4) (2026-11-16)
+
+
+### Bug Fixes
+
+* screencast CDP 0.6.3 train + cascade dependents (README only; sync writes constraints) ([f09c4e2](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f09c4e25cfc0f6ea0044622042bf0709fb13337a))
+* **universal_webrtc:** require universal_screencast 0.3.3 ([1c7cb1c](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/1c7cb1c5df034c546e9059bb21dfc42a4fbef7f8))
+
 ## [0.3.3](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_webrtc-v0.3.2...universal_webrtc-v0.3.3) (2026-11-15)
 
 

@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.2.5](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.4...universal_capture_flutter-v0.2.5) (2026-11-16)
+
+
+### Bug Fixes
+
+* screencast CDP 0.6.3 train + cascade dependents (README only; sync writes constraints) ([f09c4e2](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f09c4e25cfc0f6ea0044622042bf0709fb13337a))
+* **universal_capture_flutter:** require universal_screencast 0.3.3 ([408ae73](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/408ae733a1fbffc88511968b888bcbce9b35bc6b))
+
 ## [0.2.4](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_capture_flutter-v0.2.3...universal_capture_flutter-v0.2.4) (2026-11-15)
 
 

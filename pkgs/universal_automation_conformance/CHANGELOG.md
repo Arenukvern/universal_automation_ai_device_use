@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_conformance-v0.4.1...universal_automation_conformance-v0.4.2) (2026-11-16)
+
+
+### Bug Fixes
+
+* screencast CDP 0.6.3 train + cascade dependents (README only; sync writes constraints) ([f09c4e2](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/f09c4e25cfc0f6ea0044622042bf0709fb13337a))
+* **universal_automation_conformance:** require universal_screencast 0.3.3 ([10cfc09](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/10cfc09d44bc415300b9a12ceb171b148415f2d4))
+
 ## [0.4.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_conformance-v0.4.0...universal_automation_conformance-v0.4.1) (2026-11-15)
 
 
