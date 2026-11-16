@@ -57,13 +57,23 @@ bool _pinKeySetsMatch(Set<String> pins, Set<String> required) =>
     required.containsAll(pins);
 
 String _resolvePinsPath(String repoRoot, String? overlayDir) {
-  if (overlayDir != null) {
+  if (overlayDir != null && _overlayAllowsPinsReplacement(repoRoot, overlayDir)) {
     final overlay = '$overlayDir/release_publish_script_pins.json';
     if (File(overlay).existsSync()) {
       return overlay;
     }
   }
   return '$repoRoot/$releasePublishScriptPinsRelPath';
+}
+
+bool _overlayAllowsPinsReplacement(String repoRoot, String overlayDir) {
+  final allowed =
+      Directory('$repoRoot/tool/contracts/fixtures/release_publish_script_closure')
+          .absolute
+          .path;
+  final absOverlay = Directory(overlayDir).absolute.path;
+  return absOverlay == allowed ||
+      absOverlay.startsWith('$allowed${Platform.pathSeparator}');
 }
 
 Map<String, String>? _loadPins(String path) {
