@@ -113,16 +113,28 @@ class BehavioralCdpDriver extends CdpDriver implements BehavioralDriver {
   }
 }
 
+/// Injectable sleep used by [CdpBehaviorScheduler]; overridable in tests.
+@visibleForTesting
+typedef CdpBehaviorDelay = Future<void> Function(Duration duration);
+
 /// Client-side scheduler materializing a plan onto one CDP page.
 final class CdpBehaviorScheduler {
   /// Creates a scheduler over [page].
-  CdpBehaviorScheduler({required this.page, this.timeout});
+  CdpBehaviorScheduler({
+    required this.page,
+    this.timeout,
+    @visibleForTesting this.delay,
+  });
 
   /// The page to dispatch onto.
   final CdpPage page;
 
   /// Overall deadline for the whole dispatch; `null` means unbounded.
   final Duration? timeout;
+
+  /// Wait primitive; defaults to [Future.delayed].
+  @visibleForTesting
+  final CdpBehaviorDelay? delay;
 
   /// Dispatches [plan] and reports actual timing per step.
   Future<BehaviorOutcome> dispatch(BehaviorPlan plan) async {
@@ -160,10 +172,7 @@ final class CdpBehaviorScheduler {
         cause = interrupted;
         break;
       }
-      final remainingUs = step.plannedAtUs - watch.elapsedMicroseconds;
-      if (remainingUs > 0) {
-        await Future<void>.delayed(Duration(microseconds: remainingUs));
-      }
+      await _pauseUntilPlanned(watch, step.plannedAtUs);
       // The surface may have navigated while waiting.
       if (page.revision != revisionAtStart) {
         verdict = dispatched.isEmpty
@@ -264,6 +273,14 @@ final class CdpBehaviorScheduler {
       dispatched: dispatched,
       cause: cause,
     );
+  }
+
+  Future<void> _pauseUntilPlanned(Stopwatch monotonic, int plannedAtUs) async {
+    final wait = delay ?? Future<void>.delayed;
+    while (monotonic.elapsedMicroseconds < plannedAtUs) {
+      final remainingUs = plannedAtUs - monotonic.elapsedMicroseconds;
+      await wait(Duration(microseconds: remainingUs));
+    }
   }
 }
 
