@@ -3,12 +3,15 @@
   "run_conclusion": "failure",
   "jobs": [
     {
-      "id": 134432176802,
+      "id": 134334621644,
       "name": "build (darwin-arm64, macos-15)",
       "conclusion": "cancelled",
       "steps": [],
       "runner_id": 0,
-      "runner_name": ""
+      "runner_name": "",
+      "created_at": "2026-11-17T20:11:53Z",
+      "started_at": "2026-11-17T20:11:53Z",
+      "completed_at": "2026-11-17T20:26:54Z"
     },
     {
       "id": 134432176901,
@@ -18,11 +21,13 @@
         {"name": "Build", "conclusion": "success"}
       ],
       "runner_id": 1000000042,
-      "runner_name": "GitHub Actions 3"
+      "runner_name": "GitHub Actions 3",
+      "created_at": "2026-11-17T20:11:50Z",
+      "completed_at": "2026-11-17T20:15:00Z"
     }
   ],
   "annotations_by_job_id": {
-    "134432176802": [
+    "134334621644": [
       {
         "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
       },

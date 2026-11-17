@@ -1,0 +1,15 @@
+{
+  "jobs": [
+    {
+      "id": 5002,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": null,
+      "runner_name": null,
+      "created_at": "2026-01-01T12:00:00Z",
+      "completed_at": "2026-01-01T12:01:30Z"
+    }
+  ],
+  "annotations_by_job_id": {}
+}

@@ -51,5 +51,8 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           RUN_ID: ${{ github.event.workflow_run.id }}
           RUN_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          WORKFLOW_ID: ${{ github.event.workflow_run.workflow_id }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          RUN_CREATED_AT: ${{ github.event.workflow_run.created_at }}
           RETRY_BACKOFF_SECONDS: '180'
         run: dart run tool/release_runner_acquisition_retry.dart

@@ -1,7 +1,8 @@
 // Classify a completed workflow run and optionally rerun failed jobs when
 // every failure was a hosted runner acquisition loss.
 //
-// Env: GITHUB_REPOSITORY, RUN_ID, RUN_ATTEMPT, GH_TOKEN
+// Env: GITHUB_REPOSITORY, RUN_ID, RUN_ATTEMPT, GH_TOKEN,
+//      WORKFLOW_ID, HEAD_BRANCH, RUN_CREATED_AT
 // Optional: RETRY_BACKOFF_SECONDS (default 180), MAX_RUN_ATTEMPT (default 3)
 
 import 'dart:convert';
@@ -11,15 +12,24 @@ import 'release_runner_acquisition_lib.dart';
 
 Future<void> main(List<String> args) async {
   final repo = Platform.environment['GITHUB_REPOSITORY'] ?? '';
-  final runId = Platform.environment['RUN_ID'] ?? '';
+  final runIdRaw = Platform.environment['RUN_ID'] ?? '';
   final runAttemptRaw = Platform.environment['RUN_ATTEMPT'] ?? '';
   final token = Platform.environment['GH_TOKEN'] ?? '';
+  final workflowId = Platform.environment['WORKFLOW_ID'] ?? '';
+  final headBranch = Platform.environment['HEAD_BRANCH'] ?? '';
+  final runCreatedAtRaw = Platform.environment['RUN_CREATED_AT'] ?? '';
 
-  if (repo.isEmpty || runId.isEmpty || runAttemptRaw.isEmpty || token.isEmpty) {
+  if (repo.isEmpty || runIdRaw.isEmpty || runAttemptRaw.isEmpty || token.isEmpty) {
     stderr.writeln(
       'release_runner_acquisition_retry: need GITHUB_REPOSITORY, RUN_ID, '
       'RUN_ATTEMPT, GH_TOKEN',
     );
+    exit(2);
+  }
+
+  final runId = int.tryParse(runIdRaw);
+  if (runId == null) {
+    stderr.writeln('release_runner_acquisition_retry: invalid RUN_ID');
     exit(2);
   }
 
@@ -33,25 +43,54 @@ Future<void> main(List<String> args) async {
       int.tryParse(Platform.environment['MAX_RUN_ATTEMPT'] ?? '') ?? 3;
   final backoff = int.tryParse(Platform.environment['RETRY_BACKOFF_SECONDS'] ?? '') ?? 180;
 
-  final jobs = await _listJobs(repo, runId, token);
+  DateTime? runCreatedAt;
+  if (runCreatedAtRaw.isNotEmpty) {
+    try {
+      runCreatedAt = DateTime.parse(runCreatedAtRaw).toUtc();
+    } catch (_) {
+      stderr.writeln('release_runner_acquisition_retry: invalid RUN_CREATED_AT');
+      exit(2);
+    }
+  }
+
+  final jobs = await _listJobs(repo, runIdRaw, token);
   final annotationsByJobId = await _loadAnnotations(repo, jobs, token);
+
+  List<Map<String, dynamic>>? siblingRuns;
+  if (workflowId.isNotEmpty && headBranch.isNotEmpty && runCreatedAt != null) {
+    siblingRuns = await _listSiblingRuns(
+      repo: repo,
+      workflowId: workflowId,
+      headBranch: headBranch,
+      token: token,
+    );
+  }
+
   final decision = classifyRunnerAcquisitionRetry(
     jobs: jobs,
     annotationsByJobId: annotationsByJobId,
     runAttempt: runAttempt,
     maxRunAttempt: maxAttempt,
+    triggerRunId: runCreatedAt != null ? runId : null,
+    triggerRunCreatedAt: runCreatedAt,
+    siblingRunsOnRef: siblingRuns,
   );
 
   final summary = StringBuffer()
     ..writeln('## Release runner acquisition retry')
-  ..writeln()
+    ..writeln()
     ..writeln(retryDecisionSummary(decision))
     ..writeln()
-    ..writeln('Workflow run: `$runId` attempt $runAttempt on `$repo`.')
+    ..writeln('Workflow run: `$runIdRaw` attempt $runAttempt on `$repo`.')
     ..writeln(
       'Failed/cancelled jobs: '
       '${jobs.where(jobIsFailedOrCancelled).map((j) => j['name']).join(', ')}',
     );
+  if (siblingRuns != null) {
+    summary.writeln(
+      'Sibling runs on ref `$headBranch`: ${siblingRuns.length} listed.',
+    );
+  }
 
   await _writeStepSummary(summary.toString());
   stdout.writeln(summary.toString());
@@ -69,7 +108,7 @@ Future<void> main(List<String> args) async {
     [
       'run',
       'rerun',
-      runId,
+      runIdRaw,
       '--repo',
       repo,
       '--failed',
@@ -81,7 +120,7 @@ Future<void> main(List<String> args) async {
     stderr.writeln(rerun.stderr);
     fail('gh run rerun failed (exit ${rerun.exitCode})');
   }
-  ok('dispatched gh run rerun --failed for $runId');
+  ok('dispatched gh run rerun --failed for $runIdRaw');
 }
 
 void ok(String message) => stdout.writeln('release_runner_acquisition_retry: $message');
@@ -97,6 +136,44 @@ Future<void> _writeStepSummary(String markdown) async {
     return;
   }
   await File(path).writeAsString(markdown, mode: FileMode.append);
+}
+
+Future<List<Map<String, dynamic>>> _listSiblingRuns({
+  required String repo,
+  required String workflowId,
+  required String headBranch,
+  required String token,
+}) async {
+  final result = await Process.run(
+    'gh',
+    [
+      'api',
+      'repos/$repo/actions/workflows/$workflowId/runs',
+      '-f',
+      'branch=$headBranch',
+      '-f',
+      'per_page=30',
+    ],
+    environment: {'GH_TOKEN': token},
+    runInShell: false,
+  );
+  if (result.exitCode != 0) {
+    stderr.writeln(result.stderr);
+    fail('gh api list workflow runs failed (exit ${result.exitCode})');
+  }
+
+  final decoded = jsonDecode(result.stdout.toString());
+  if (decoded is! Map<String, dynamic>) {
+    return const [];
+  }
+  final runs = decoded['workflow_runs'];
+  if (runs is! List) {
+    return const [];
+  }
+  return runs
+      .whereType<Map>()
+      .map((e) => Map<String, dynamic>.from(e))
+      .toList();
 }
 
 Future<List<Map<String, dynamic>>> _listJobs(

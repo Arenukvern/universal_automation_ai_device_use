@@ -7,12 +7,14 @@ import 'release_runner_acquisition_lib.dart';
 
 void main() {
   group('jobLooksLikeRunnerNotAcquired', () {
-    test('annotation not acquired by Runner', () {
+    test('annotation not acquired by Runner (primary signal)', () {
       final job = <String, dynamic>{
         'conclusion': 'cancelled',
         'steps': <dynamic>[],
         'runner_id': null,
         'runner_name': null,
+        'created_at': '2026-01-01T00:00:00Z',
+        'completed_at': '2026-01-01T00:01:00Z',
       };
       final annotations = [
         {
@@ -23,14 +25,28 @@ void main() {
       expect(jobLooksLikeRunnerNotAcquired(job, annotations), isTrue);
     });
 
-    test('zero steps without runner assignment', () {
+    test('zero steps without runner after long queue (no annotation)', () {
       final job = <String, dynamic>{
         'conclusion': 'failure',
         'steps': <dynamic>[],
         'runner_id': 0,
         'runner_name': '',
+        'created_at': '2026-01-01T00:00:00Z',
+        'completed_at': '2026-01-01T00:11:01Z',
       };
       expect(jobLooksLikeRunnerNotAcquired(job, const []), isTrue);
+    });
+
+    test('zero steps short queue without annotation is not acquisition loss', () {
+      final job = <String, dynamic>{
+        'conclusion': 'cancelled',
+        'steps': <dynamic>[],
+        'runner_id': 0,
+        'runner_name': '',
+        'created_at': '2026-01-01T00:00:00Z',
+        'completed_at': '2026-01-01T00:02:00Z',
+      };
+      expect(jobLooksLikeRunnerNotAcquired(job, const []), isFalse);
     });
 
     test('real failure with steps', () {
@@ -46,55 +62,73 @@ void main() {
     });
   });
 
+  group('isRunSupersededOnRef', () {
+    test('fixture: superseded_run', () {
+      final fixture = _loadFixture('superseded_run.json');
+      expect(
+        isRunSupersededOnRef(
+          triggerRunId: fixture.runId!,
+          triggerRunCreatedAt: fixture.runCreatedAt!,
+          siblingRunsOnRef: fixture.siblingRunsOnRef!,
+        ),
+        isTrue,
+      );
+    });
+  });
+
   group('classifyRunnerAcquisitionRetry', () {
-    test('fixture: not-acquired cancelled', () {
-      final fixture = _loadFixture('not_acquired_cancelled.json');
-      final decision = classifyRunnerAcquisitionRetry(
+    RunnerAcquisitionRetryDecision classify(_Fixture fixture, {int attempt = 1}) {
+      return classifyRunnerAcquisitionRetry(
         jobs: fixture.jobs,
         annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 1,
+        runAttempt: attempt,
+        triggerRunId: fixture.runId,
+        triggerRunCreatedAt: fixture.runCreatedAt,
+        siblingRunsOnRef: fixture.siblingRunsOnRef,
       );
-      expect(decision, RunnerAcquisitionRetryDecision.rerunFailedJobs);
+    }
+
+    test('fixture: not-acquired cancelled', () {
+      expect(classify(_loadFixture('not_acquired_cancelled.json')),
+          RunnerAcquisitionRetryDecision.rerunFailedJobs);
     });
 
-    test('fixture: zero-step unassigned', () {
-      final fixture = _loadFixture('zero_step_unassigned.json');
-      final decision = classifyRunnerAcquisitionRetry(
-        jobs: fixture.jobs,
-        annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 1,
-      );
-      expect(decision, RunnerAcquisitionRetryDecision.rerunFailedJobs);
+    test('fixture: zero-step unassigned (>=10m queue)', () {
+      expect(classify(_loadFixture('zero_step_unassigned.json')),
+          RunnerAcquisitionRetryDecision.rerunFailedJobs);
     });
 
     test('fixture: real build failure', () {
-      final fixture = _loadFixture('real_build_failure.json');
-      final decision = classifyRunnerAcquisitionRetry(
-        jobs: fixture.jobs,
-        annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 1,
-      );
-      expect(decision, RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
+      expect(classify(_loadFixture('real_build_failure.json')),
+          RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
     });
 
     test('fixture: mixed acquisition and real failure', () {
-      final fixture = _loadFixture('mixed_failures.json');
-      final decision = classifyRunnerAcquisitionRetry(
-        jobs: fixture.jobs,
-        annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 1,
-      );
-      expect(decision, RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
+      expect(classify(_loadFixture('mixed_failures.json')),
+          RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
+    });
+
+    test('fixture: concurrency cancel short queue', () {
+      expect(classify(_loadFixture('concurrency_cancel_short.json')),
+          RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
+    });
+
+    test('fixture: manual cancel short queue', () {
+      expect(classify(_loadFixture('manual_cancel_short.json')),
+          RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
+    });
+
+    test('fixture: superseded run with acquisition-shaped job', () {
+      expect(classify(_loadFixture('superseded_run.json')),
+          RunnerAcquisitionRetryDecision.supersededRun);
     });
 
     test('attempt cap blocks retry', () {
       final fixture = _loadFixture('not_acquired_cancelled.json');
-      final decision = classifyRunnerAcquisitionRetry(
-        jobs: fixture.jobs,
-        annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 3,
+      expect(
+        classify(fixture, attempt: 3),
+        RunnerAcquisitionRetryDecision.attemptCapReached,
       );
-      expect(decision, RunnerAcquisitionRetryDecision.attemptCapReached);
     });
 
     test('fixture: mcp_flutter run 44166682686 darwin-arm64 not acquired', () {
@@ -103,16 +137,15 @@ void main() {
       final darwin = fixture.jobs.firstWhere(
         (j) => (j['name'] as String?)?.contains('darwin-arm64') ?? false,
       );
+      expect(darwin['id'], 134334621644);
       expect(darwin['conclusion'], 'cancelled');
       expect(darwin['steps'], isEmpty);
       expect(darwin['runner_id'], 0);
       expect(darwin['runner_name'], '');
-      final decision = classifyRunnerAcquisitionRetry(
-        jobs: fixture.jobs,
-        annotationsByJobId: fixture.annotationsByJobId,
-        runAttempt: 1,
-      );
-      expect(decision, RunnerAcquisitionRetryDecision.rerunFailedJobs);
+      final queue = jobQueueDuration(darwin);
+      expect(queue, isNotNull);
+      expect(queue!.inSeconds, greaterThanOrEqualTo(minRunnerAcquisitionQueueSeconds));
+      expect(classify(fixture), RunnerAcquisitionRetryDecision.rerunFailedJobs);
     });
   });
 }
@@ -123,15 +156,20 @@ class _Fixture {
     this.annotationsByJobId, {
     this.runConclusion,
     this.runId,
+    this.runCreatedAt,
+    this.siblingRunsOnRef,
   });
   final List<Map<String, dynamic>> jobs;
   final Map<int, List<Map<String, dynamic>>> annotationsByJobId;
   final String? runConclusion;
   final int? runId;
+  final DateTime? runCreatedAt;
+  final List<Map<String, dynamic>>? siblingRunsOnRef;
 }
 
 _Fixture _loadFixture(String name) {
-  final path = '${Directory.current.path}/tool/contracts/fixtures/release_runner_acquisition/$name';
+  final path =
+      '${Directory.current.path}/tool/contracts/fixtures/release_runner_acquisition/$name';
   final file = File(path);
   final root = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
   final jobs = (root['jobs'] as List)
@@ -146,10 +184,24 @@ _Fixture _loadFixture(String name) {
         .toList();
     ann[id] = list;
   }
+  DateTime? runCreatedAt;
+  final createdRaw = root['run_created_at'] as String?;
+  if (createdRaw != null) {
+    runCreatedAt = DateTime.parse(createdRaw).toUtc();
+  }
+  List<Map<String, dynamic>>? siblings;
+  final rawSiblings = root['sibling_runs_on_ref'];
+  if (rawSiblings is List) {
+    siblings = rawSiblings
+        .map((e) => Map<String, dynamic>.from(e as Map))
+        .toList();
+  }
   return _Fixture(
     jobs,
     ann,
     runConclusion: root['run_conclusion'] as String?,
     runId: root['run_id'] as int?,
+    runCreatedAt: runCreatedAt,
+    siblingRunsOnRef: siblings,
   );
 }
