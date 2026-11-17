@@ -8,6 +8,7 @@ const publishJobAllowedUses = <String>[
 const publishJobRunScriptsInOrder = <String>[
   'generate_release_checksums_in_dist.sh',
   'check_release_assets_conflict.sh',
+  'assert_github_release_exists.sh',
   'assert_github_release_is_draft.sh',
   'validate_release_checksums_file.sh',
   'append_binary_install_notes_to_draft_release.sh',
@@ -118,6 +119,11 @@ const publishRunStepEnvPins = <String, Map<String, String>>{
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
+  },
+  'assert_github_release_exists.sh': {
+    'GH_TOKEN': r'${{ github.token }}',
+    'GITHUB_REPOSITORY': r'${{ github.repository }}',
+    'RELEASE_TAG': r'${{ inputs.release_tag }}',
   },
   'assert_github_release_is_draft.sh': {
     'GH_TOKEN': r'${{ github.token }}',

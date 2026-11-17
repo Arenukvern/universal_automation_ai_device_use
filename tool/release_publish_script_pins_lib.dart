@@ -179,6 +179,22 @@ List<String> _validatePublishScriptGhWritePolicy(Map<String, String> bodies) {
       }
       continue;
     }
+    if (name == 'assert_github_release_exists.sh') {
+      if (!RegExp(r'gh\s+api\s+--paginate\s+"repos/', caseSensitive: false)
+          .hasMatch(body)) {
+        errors.add(
+          'assert_github_release_exists.sh must list releases via '
+          'paginated gh api (draft-safe)',
+        );
+      }
+      if (RegExp(r'\bgh\s+release\s+(edit|create|delete)\b', caseSensitive: false)
+          .hasMatch(body)) {
+        errors.add(
+          'assert_github_release_exists.sh must not mutate GitHub releases',
+        );
+      }
+      continue;
+    }
     if (name == 'append_draft_release_binary_notes.sh') {
       if (hasReleaseEdit &&
           RegExp(r'--draft\s*=', caseSensitive: false).hasMatch(body)) {

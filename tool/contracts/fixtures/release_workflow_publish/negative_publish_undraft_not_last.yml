@@ -62,6 +62,15 @@ jobs:
             "$RELEASE_TAG" \
             "$VERSION"
 
+      - name: Verify GitHub release exists (draft or published)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_github_release_exists.sh" \
+            "$RELEASE_TAG"
+
       - name: Assert GitHub release is draft (immutable release policy)
         env:
           GH_TOKEN: ${{ github.token }}
