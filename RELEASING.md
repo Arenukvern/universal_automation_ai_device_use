@@ -78,6 +78,7 @@ Reads `tool/publish_order.yaml`, publishes in dependency order, waits for each v
 The **sync-release-pr-constraints** job writes sibling pins on the release-please branch. Constraint-only commits use `chore:` so release-please does not treat them as releasable churn. Sync **pushes** use `secrets.RELEASE_PLEASE_TOKEN` when configured so GitHub attributes them to a trusted actor and `pull_request` workflows start on synchronize. Without that PAT, the push uses `github.token` (github-actions bot) and the job **dispatches** Validate and tooling_runtime at the synced SHA (`gh workflow run validate.yml --ref <sha>`) instead—bot pushes often leave those PR checks in *action required*.
 
 Re-run Release Please from **`main`** only (`workflow_dispatch` / push), never from unreviewed branches.
+If **sync-release-pr-constraints** fails at checkout or push, rotate **`RELEASE_PLEASE_TOKEN`**: an expired or under-scoped PAT fails the job (there is no silent fallback to `github.token` on that checkout).
 
 See [ADR 0001](docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx) for publish order rationale.
 
@@ -109,11 +110,19 @@ sibling workflows). Zero manual steps:
    The git tag exists immediately for `publish_package.yml` and pub.dev; the GitHub
    release stays a draft so CI can upload assets. Publish asserts the release is still
    a draft, uploads **exactly** the four platform archives plus `checksums.txt`
-   (`upload_draft_github_release_assets.sh`—explicit paths, no `dist/release/*` glob
-   and no `--clobber`), verifies the asset list on the draft, **then** undrafts via
+   (`upload_draft_github_release_assets.sh`—explicit paths, no `dist/release/*` glob,
+   `gh release upload --clobber` on drafts only), verifies the asset list on the draft, **then** undrafts via
    `publish_github_release_from_draft.sh` only. Postflight downloads every archive from
-   the **published** release URL and verifies checksums. If publish runs against an
-   already-published release, it fails loudly (no silent assetless releases).
+   the **published** release URL and verifies checksums. On the release train, if assets
+   already exist with **matching** `checksums.txt`, publish is a no-op; without a match,
+   `check_release_assets_conflict.sh` still refuses (no silent overwrite).
+
+   **Hosted runner acquisition:** macOS legs can be **cancelled** after ~15 minutes with
+   annotation *The job was not acquired by Runner of type hosted even after multiple
+   attempts*. **`release_runner_retry.yml`** watches **Release Please**, **Release
+   binaries build**, and **Release binaries (toolkit)**; when **every** failed/cancelled
+   job is an acquisition loss, it waits three minutes and runs `gh run rerun --failed`
+   (cap: run attempt &lt; 3). Real test/build failures are never auto-retried.
    **Release Please anchor:** without `force-tag-creation`, draft releases use GitHub
    “lazy” tags and the next `release-please` pass may open a duplicate release PR
    (entire history re-listed). The tag ref is the anchor `release-pr` uses; draft
@@ -129,9 +138,15 @@ sibling workflows). Zero manual steps:
 SHA (or `github.sha` on `main`), and **no secrets**. Fork PRs get unsigned
 macOS builds. Publish never runs on PRs.
 
-### Manual escape hatch (`workflow_dispatch`)
+### Manual recovery (`workflow_dispatch` and re-run)
 
-**`release_binaries.yml`** chains build → publish for operators:
+**`release_binaries.yml`** chains build → publish for operators (publish runs in
+**recovery mode**: allows same-name assets, `--clobber` on drafts, and when the release
+is **already published** verifies all five assets and matching checksums then succeeds
+without re-drafting):
+
+On a failed **Release Please** or **Release binaries build** run, prefer **Re-run failed
+jobs** in the GitHub UI when only macOS legs were not acquired (or wait for the auto-retry).
 
 ```bash
 gh workflow run release_binaries.yml \
@@ -158,12 +173,11 @@ No toolkit release on GitHub has ever shipped a full binary set yet
 assets. Pin `--version` / `-Version` after binaries exist. From-source:
 [`plugin/install.sh`](plugin/install.sh).
 
-**Partial draft upload / rerun:** if `release-binaries-publish` fails mid-upload,
-remove the draft release’s **partial assets** in the GitHub UI, confirm
-`check_release_assets_conflict.sh` is clean, then **re-run the same caller workflow**
-on the immutable tag ref (do not recreate or move tags). Because upload omits
-`--clobber`, a second run fails until conflicting asset names are deleted from the
-draft. Only `publish_github_release_from_draft.sh` may undraft; never patch a release
+**Partial draft upload / rerun:** if `release-binaries-publish` fails mid-upload on the
+release train, delete **partial** assets from the draft in the GitHub UI if needed, then
+re-run the caller on the immutable tag ref (do not recreate or move tags). **`workflow_dispatch`
+release_binaries.yml`** with the toolkit tag enables recovery upload (`--clobber`). Only
+`publish_github_release_from_draft.sh` may undraft on the train; never patch a release
 from ad hoc `gh` steps in the workflow YAML.
 
 Plugin bundle versions (`plugin/.cursor-plugin/plugin.json`,
