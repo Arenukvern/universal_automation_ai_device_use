@@ -12,6 +12,8 @@ SCRIPTS=(
   tool/release/build_release_artifacts.sh
   tool/release/verify_release_source_checkout.sh
   tool/release/assert_release_tag.sh
+  tool/release/assert_release_git_tag_at_sha.sh
+  tool/release/assert_github_release_exists.sh
   tool/release/check_release_assets_conflict.sh
   tool/release/resolve_release_tag.sh
   tool/release/assert_release_assets_complete.sh

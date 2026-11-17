@@ -1,6 +1,7 @@
 {
   "tool/release/generate_release_checksums_in_dist.sh": "ff72dd1a1aa225cd9472f0d36d91210ab5faf21e26bccf6dbb18453940bdadb9",
   "tool/release/check_release_assets_conflict.sh": "85e95557e2da31c20b31c45e994fac8ef176432142f914b9105e93ea52e4ebfa",
+  "tool/release/assert_github_release_exists.sh": "c34264e92c5d27dd8ac524d5b3e7e6d7495dab166235529b7546f89e4ea3afcd",
   "tool/release/assert_github_release_is_draft.sh": "f6ddd2e0888bec869d598f0c90087595b1c332152cb00c76a67f0c352049ddeb",
   "tool/release/validate_release_checksums_file.sh": "bf0f768c3fb9a9f4f0f1a92ebcc2cb45e94b59d800d8efe6bb7651e9204e648d",
   "tool/release/append_binary_install_notes_to_draft_release.sh": "001e13d7223034272c64dd36decb75eb691b1d310a956c16196b3f7a857c5e3b",

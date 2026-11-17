@@ -14,6 +14,8 @@ void main() {
     expect(text, isNot(contains('run-id:')));
     expect(text, isNot(contains('github-token:')));
     expect(text, isNot(contains('action-gh-release')));
+    expect(text, contains('assert_release_git_tag_at_sha.sh'));
+    expect(text, isNot(contains('assert_github_release_exists.sh')));
   });
 
   test('release_binaries_publish uses same-run artifact download', () {
@@ -24,6 +26,7 @@ void main() {
     expect(errors, isEmpty, reason: errors.join('; '));
     expect(text, isNot(contains('run-id:')));
     expect(text, isNot(contains('github-token:')));
+    expect(text, contains('assert_github_release_exists.sh'));
   });
 
   test('release_binaries_publish fixture forbids cross-run download', () {

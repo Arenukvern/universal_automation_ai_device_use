@@ -1,0 +1,1 @@
+negative_build_prepare_github_release_exists.yml: prepare must not call assert_github_release_exists.sh (draft releases are invisible to contents:read)

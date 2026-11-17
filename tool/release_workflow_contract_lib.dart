@@ -41,6 +41,7 @@ const requiredScriptStepsBuild = <String, String>{
 const requiredScriptStepsPublish = <String, String>{
   'generate_release_checksums_in_dist.sh': 'publish',
   'check_release_assets_conflict.sh': 'publish',
+  'assert_github_release_exists.sh': 'publish',
   'assert_github_release_is_draft.sh': 'publish',
   'validate_release_checksums_file.sh': 'publish',
   'append_binary_install_notes_to_draft_release.sh': 'publish',
@@ -200,6 +201,7 @@ List<String> validateReleaseBinariesBuildWorkflowYaml(
   errors.addAll(_validateBuildMatrix(jobsMap, label));
   errors.addAll(_validateReadOnlyPermissions(jobsMap, root, label));
   errors.addAll(_validateBuildHasNoReleasePublishSteps(yamlText, label));
+  errors.addAll(_validatePrepareUsesGitTagNotGithubRelease(yamlText, label));
   errors.addAll(_validateNoInlineWorkflowExprsInRun(jobsMap, label));
 
   return errors;
@@ -1062,6 +1064,25 @@ List<String> _validateBuildHasNoReleasePublishSteps(String yamlText, String labe
   if (RegExp(r'assert_release_assets_complete\.sh').hasMatch(yamlText)) {
     errors.add(
       '$label: must not run assert_release_assets_complete.sh (postflight is publish reusable)',
+    );
+  }
+  return errors;
+}
+
+List<String> _validatePrepareUsesGitTagNotGithubRelease(
+  String yamlText,
+  String label,
+) {
+  final errors = <String>[];
+  if (yamlText.contains('assert_github_release_exists.sh')) {
+    errors.add(
+      '$label: prepare must not call assert_github_release_exists.sh '
+      '(draft releases are invisible to contents:read)',
+    );
+  }
+  if (!yamlText.contains('assert_release_git_tag_at_sha.sh')) {
+    errors.add(
+      '$label: prepare must verify the git tag via assert_release_git_tag_at_sha.sh',
     );
   }
   return errors;

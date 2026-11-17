@@ -112,14 +112,15 @@ jobs:
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_tag.sh" \
             "$RELEASE_TAG"
 
-      - name: Verify GitHub release exists
+      - name: Verify release git tag points at release SHA
         if: inputs.dry_run != true
         env:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ steps.resolve.outputs.release_tag }}
+          RELEASE_SHA: ${{ steps.release_sha.outputs.sha }}
         run: |
-          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_github_release_exists.sh" \
+          bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_git_tag_at_sha.sh" \
             "$RELEASE_TAG"
 
   build:
