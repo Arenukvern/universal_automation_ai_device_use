@@ -208,12 +208,23 @@ the repo root (see [RELEASING.md](../../RELEASING.md)); from source use
 [`plugin/install.sh`](../../plugin/install.sh). macOS release binaries are
 **preview (unsigned)** until signing secrets are configured.
 
-**GitHub binaries:** `v0.6.0` shipped on pub.dev but its GitHub release has
-**no prebuilt archives** (immutable release was published before CI could upload
-assets). **`v0.6.1` is the first release train with prebuilt binaries** under the
-draft-then-publish flow documented in [RELEASING.md](../../RELEASING.md). Until **0.6.1** binaries ship, `install.sh` / `install.ps1` **latest** fails clearly
-(no prior toolkit release has ever had GitHub binaries). Pin `--version` once assets
-exist, or use `plugin/install.sh`.
+## Release binaries (GitHub)
+
+From **0.6.2** onward, each toolkit release train attaches four platform
+archives plus `checksums.txt` to the GitHub release (draft-then-publish
+in [RELEASING.md](../../RELEASING.md)). After the release-please PR merges,
+Release Please tags toolkit on `main` and `release-please.yml` runs
+`release-binaries-build` then `release-binaries-publish` on that push.
+
+**0.6.1** is on pub.dev but its GitHub release is a **draft with no binary
+assets** — prepare failed because a read-only token cannot see draft
+releases ([#54](https://github.com/Arenukvern/universal_automation_ai_device_use/pull/54):
+prepare now verifies the git tag via ls-remote only, and draft-aware GitHub
+release lookup using a paginated releases list runs in the publish job with
+`contents: write`). **`0.6.0`** also has no
+GitHub archives (immutable publish before CI could upload). For binary
+installs, pin **`0.6.2` or later** (`install.sh --version …` / `install.ps1
+-Version …`), or use [`plugin/install.sh`](../../plugin/install.sh) from source.
 
 ## Non-claims
 
