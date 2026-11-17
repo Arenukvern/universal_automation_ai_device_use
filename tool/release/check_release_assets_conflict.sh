@@ -8,6 +8,8 @@ ok() { echo "check_release_assets_conflict: $*"; }
 TAG="${1:-}"
 VERSION="${2:-}"
 REPO="${GITHUB_REPOSITORY:-${3:-}}"
+RELEASE_RECOVERY_MODE="${RELEASE_RECOVERY_MODE:-false}"
+CHECKSUMS_FILE="${CHECKSUMS_FILE:-}"
 
 [[ -n "$TAG" && -n "$VERSION" && -n "$REPO" ]] || \
   fail "usage: GITHUB_REPOSITORY=owner/repo check_release_assets_conflict.sh <tag> <version>"
@@ -58,4 +60,17 @@ if [[ ${#conflicts[@]} -eq 0 ]]; then
   exit 0
 fi
 
-fail "release $TAG on $REPO already has: ${conflicts[*]}. Delete assets manually or use a new tag — workflow does not overwrite."
+if [[ "$RELEASE_RECOVERY_MODE" == "true" ]]; then
+  ok "recovery dispatch: existing assets allowed (upload uses --clobber)"
+  exit 0
+fi
+
+if [[ -n "$CHECKSUMS_FILE" && -f "$CHECKSUMS_FILE" ]]; then
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if bash "$script_dir/compare_remote_checksums_with_local.sh" "$TAG" "$CHECKSUMS_FILE" "$REPO"; then
+    ok "existing assets on $TAG match local checksums (idempotent)"
+    exit 0
+  fi
+fi
+
+fail "release $TAG on $REPO already has: ${conflicts[*]}. Delete assets manually or use a new tag — workflow does not overwrite unless checksums match or recovery dispatch."

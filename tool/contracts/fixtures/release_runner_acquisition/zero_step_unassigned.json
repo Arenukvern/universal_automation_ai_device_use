@@ -1,0 +1,13 @@
+{
+  "jobs": [
+    {
+      "id": 2002,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "failure",
+      "steps": [],
+      "runner_id": 0,
+      "runner_name": ""
+    }
+  ],
+  "annotations_by_job_id": {}
+}

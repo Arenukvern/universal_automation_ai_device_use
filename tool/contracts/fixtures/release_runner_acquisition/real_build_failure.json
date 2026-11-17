@@ -1,0 +1,15 @@
+{
+  "jobs": [
+    {
+      "id": 3003,
+      "name": "build (linux-x64, ubuntu-latest)",
+      "conclusion": "failure",
+      "steps": [
+        {"name": "Build", "conclusion": "failure"}
+      ],
+      "runner_id": 99,
+      "runner_name": "GitHub Actions 42"
+    }
+  ],
+  "annotations_by_job_id": {}
+}

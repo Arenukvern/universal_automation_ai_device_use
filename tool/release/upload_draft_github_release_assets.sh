@@ -15,7 +15,13 @@ REPO="${GITHUB_REPOSITORY:-${4:-}}"
 command -v gh >/dev/null 2>&1 || fail "gh CLI required"
 
 is_draft="$(gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null || true)"
-[[ "$is_draft" == "true" ]] || fail "expected draft release for tag $TAG (immutable upload path)"
+if [[ "$is_draft" != "true" ]]; then
+  if [[ "${RELEASE_RECOVERY_MODE:-false}" == "true" ]]; then
+    ok "release $TAG already published; skipping upload"
+    exit 0
+  fi
+  fail "expected draft release for tag $TAG (immutable upload path)"
+fi
 
 [[ -d "$ASSETS_DIR" ]] || fail "assets dir missing: $ASSETS_DIR"
 
@@ -30,6 +36,6 @@ for f in "${assets[@]}"; do
   [[ -f "$f" ]] || fail "missing asset file: $f"
 done
 
-gh release upload "$TAG" --repo "$REPO" "${assets[@]}"
+gh release upload "$TAG" --repo "$REPO" "${assets[@]}" --clobber
 
 ok "uploaded assets to draft $TAG"
