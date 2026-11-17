@@ -154,7 +154,7 @@ Installers: root [`install.sh`](install.sh) / [`install.ps1`](install.ps1).
 **Latest** walks toolkit **git tags** (newest semver first, skipping prereleases)
 and **HEAD-probes** all five download URLs (four archives + `checksums.txt`).
 No toolkit release on GitHub has ever shipped a full binary set yet
-(`v0.6.0` is assetless); **latest fails clearly** until `v0.6.1+` publishes
+(`v0.6.0` is assetless); **latest fails clearly** until `v0.6.2+` publishes
 assets. Pin `--version` / `-Version` after binaries exist. From-source:
 [`plugin/install.sh`](plugin/install.sh).
 

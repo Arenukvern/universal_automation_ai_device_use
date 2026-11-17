@@ -177,7 +177,7 @@ if [[ -z "$VERSION" ]]; then
   cat >&2 <<EOF
 Unable to resolve install version: no toolkit tag has all five release assets yet
 (HEAD probe). No historical GitHub toolkit release has shipped prebuilt binaries;
-until universal_automation_toolkit-v0.6.1 (or later) publishes assets, pin --version
+until universal_automation_toolkit-v0.6.2 (or later) publishes assets, pin --version
 after binaries exist, or build from source:
   ./plugin/install.sh
 EOF
