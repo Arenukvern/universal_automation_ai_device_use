@@ -19,18 +19,36 @@ fi
 command -v git >/dev/null 2>&1 || fail "git required"
 
 remote_url="${RELEASE_GIT_REMOTE:-}"
-if [[ -z "$remote_url" ]]; then
-  command -v gh >/dev/null 2>&1 || fail "gh CLI required"
+remote_label=""
+if [[ -n "$remote_url" ]]; then
+  if [[ "$remote_url" == *'@'* ]]; then
+    fail "RELEASE_GIT_REMOTE must not embed credentials"
+  fi
+  remote_label="$remote_url"
+else
   [[ -n "${GH_TOKEN:-}" ]] || fail "GH_TOKEN required for authenticated ls-remote"
-  remote_url="https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git"
+  remote_url="https://github.com/${REPO}.git"
+  remote_label="$REPO"
 fi
 
 ls_out="$(mktemp)"
 trap 'rm -f "$ls_out"' EXIT
 
-if ! GIT_TERMINAL_PROMPT=0 git ls-remote "$remote_url" \
-  "refs/tags/${TAG}" "refs/tags/${TAG}^{}" >"$ls_out"; then
-  fail "git ls-remote failed for $remote_url (auth or network)"
+run_ls_remote() {
+  if [[ -n "${RELEASE_GIT_REMOTE:-}" ]]; then
+    GIT_TERMINAL_PROMPT=0 git ls-remote "$remote_url" \
+      "refs/tags/${TAG}" "refs/tags/${TAG}^{}"
+    return
+  fi
+  local auth_b64
+  auth_b64="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 | tr -d '\n')"
+  GIT_TERMINAL_PROMPT=0 git \
+    -c "http.extraheader=AUTHORIZATION: basic ${auth_b64}" \
+    ls-remote "$remote_url" "refs/tags/${TAG}" "refs/tags/${TAG}^{}"
+}
+
+if ! run_ls_remote >"$ls_out"; then
+  fail "git ls-remote failed for $remote_label (auth or network)"
 fi
 
 peeled_sha=""
@@ -52,11 +70,15 @@ if [[ -n "$peeled_sha" ]]; then
 elif [[ -n "$plain_sha" ]]; then
   tag_commit="$plain_sha"
 else
-  fail "git tag $TAG not found on remote (ls-remote refs/tags/${TAG})"
+  fail "git tag $TAG not found on $remote_label (ls-remote refs/tags/${TAG})"
 fi
 
 if [[ "$tag_commit" != "$EXPECTED_SHA" ]]; then
   fail "tag $TAG ($tag_commit) != expected release SHA ($EXPECTED_SHA)"
 fi
 
-ok "git tag $TAG points at $EXPECTED_SHA"
+if [[ -n "${RELEASE_GIT_REMOTE:-}" ]]; then
+  ok "git tag $TAG points at $EXPECTED_SHA (remote $remote_label)"
+else
+  ok "git tag $TAG points at $EXPECTED_SHA on $REPO"
+fi
