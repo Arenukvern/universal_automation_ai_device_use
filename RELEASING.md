@@ -75,7 +75,7 @@ Reads `tool/publish_order.yaml`, publishes in dependency order, waits for each v
 
 ### Release-please constraint sync
 
-The **sync-release-pr-constraints** job writes sibling pins on the release-please branch. When it pushes, CI is dispatched at the **exact synced commit SHA** (`gh workflow run validate.yml --ref <sha>`). Constraint-only commits use `chore:` so release-please does not treat them as releasable churn.
+The **sync-release-pr-constraints** job writes sibling pins on the release-please branch. Constraint-only commits use `chore:` so release-please does not treat them as releasable churn. Sync **pushes** use `secrets.RELEASE_PLEASE_TOKEN` when configured so GitHub attributes them to a trusted actor and `pull_request` workflows start on synchronize. Without that PAT, the push uses `github.token` (github-actions bot) and the job **dispatches** Validate and tooling_runtime at the synced SHA (`gh workflow run validate.yml --ref <sha>`) instead—bot pushes often leave those PR checks in *action required*.
 
 Re-run Release Please from **`main`** only (`workflow_dispatch` / push), never from unreviewed branches.
 
