@@ -10,6 +10,8 @@ dart run "$ROOT_DIR/tool/check_release_workflow.dart"
 
 dart test "$ROOT_DIR/tool/release_runner_acquisition_test.dart"
 
+bash "$ROOT_DIR/tool/contracts/test_release_publish_recovery_published.sh"
+
 bash "$ROOT_DIR/tool/contracts/test_validate_release_checksums.sh"
 
 bash "$ROOT_DIR/tool/contracts/test_assert_release_git_tag_at_sha.sh"

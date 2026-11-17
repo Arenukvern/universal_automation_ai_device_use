@@ -7,7 +7,7 @@
   "tool/release/append_binary_install_notes_to_draft_release.sh": "5027fddc36d7524bc08d60f52e648f2e867e505083816e37461f218a5f8813c9",
   "tool/release/append_draft_release_binary_notes.sh": "8a988da071e0209b36200f9d067acb546fe3e360024401f12ab0c4a5c91521a4",
   "tool/release/upload_draft_github_release_assets.sh": "9bc38daae14193dffee1b1afae66cd3e55e7c0fc07ffd1db69972d5c8d44e581",
-  "tool/release/assert_release_assets_complete_on_draft.sh": "31ba7245db0f41ab642a0226399e99f0cf39af51fc3b16ec65cfd50e98960346",
+  "tool/release/assert_release_assets_complete_on_draft.sh": "59fbfe04484cf05101ba003735ca9ec1d484512a16201e4dfb9f07b769ca1943",
   "tool/release/assert_release_assets_complete.sh": "4af7b8eb2376b3e5892877c425c000944721a6aed469377c84fce00aff6591be",
   "tool/release/publish_github_release_from_draft.sh": "b247eef9a726d658ff395752d0b82558a2401d15e091075d96b6c72124f2cd1c",
   "tool/release/compare_remote_checksums_with_local.sh": "0e82f22e274819af742b974344ce99316a56fb1a5864cf4248d1af7b162d1fc5"

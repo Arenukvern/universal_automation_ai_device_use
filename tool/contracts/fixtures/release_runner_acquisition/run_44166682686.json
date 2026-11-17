@@ -1,0 +1,34 @@
+{
+  "run_id": 44166682686,
+  "run_conclusion": "failure",
+  "jobs": [
+    {
+      "id": 134432176802,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": 0,
+      "runner_name": ""
+    },
+    {
+      "id": 134432176901,
+      "name": "build (linux-x64, ubuntu-latest)",
+      "conclusion": "success",
+      "steps": [
+        {"name": "Build", "conclusion": "success"}
+      ],
+      "runner_id": 1000000042,
+      "runner_name": "GitHub Actions 3"
+    }
+  ],
+  "annotations_by_job_id": {
+    "134432176802": [
+      {
+        "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
+      },
+      {
+        "message": "Due to capacity constraints, jobs targeting macOS arm64 runners may experience longer queue times."
+      }
+    ]
+  }
+}

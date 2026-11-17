@@ -160,6 +160,8 @@ const publishRunStepEnvPins = <String, Map<String, String>>{
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
+    'CHECKSUMS_FILE': 'dist/release/checksums.txt',
   },
   'publish_github_release_from_draft.sh': {
     'GH_TOKEN': r'${{ github.token }}',

@@ -96,13 +96,38 @@ void main() {
       );
       expect(decision, RunnerAcquisitionRetryDecision.attemptCapReached);
     });
+
+    test('fixture: mcp_flutter run 44166682686 darwin-arm64 not acquired', () {
+      final fixture = _loadFixture('run_44166682686.json');
+      expect(fixture.runConclusion, 'failure');
+      final darwin = fixture.jobs.firstWhere(
+        (j) => (j['name'] as String?)?.contains('darwin-arm64') ?? false,
+      );
+      expect(darwin['conclusion'], 'cancelled');
+      expect(darwin['steps'], isEmpty);
+      expect(darwin['runner_id'], 0);
+      expect(darwin['runner_name'], '');
+      final decision = classifyRunnerAcquisitionRetry(
+        jobs: fixture.jobs,
+        annotationsByJobId: fixture.annotationsByJobId,
+        runAttempt: 1,
+      );
+      expect(decision, RunnerAcquisitionRetryDecision.rerunFailedJobs);
+    });
   });
 }
 
 class _Fixture {
-  _Fixture(this.jobs, this.annotationsByJobId);
+  _Fixture(
+    this.jobs,
+    this.annotationsByJobId, {
+    this.runConclusion,
+    this.runId,
+  });
   final List<Map<String, dynamic>> jobs;
   final Map<int, List<Map<String, dynamic>>> annotationsByJobId;
+  final String? runConclusion;
+  final int? runId;
 }
 
 _Fixture _loadFixture(String name) {
@@ -121,5 +146,10 @@ _Fixture _loadFixture(String name) {
         .toList();
     ann[id] = list;
   }
-  return _Fixture(jobs, ann);
+  return _Fixture(
+    jobs,
+    ann,
+    runConclusion: root['run_conclusion'] as String?,
+    runId: root['run_id'] as int?,
+  );
 }
