@@ -45,6 +45,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || github.token }}
 
       # Nested checkout: sibling Dart workspace for package: resolution; cwd stays
       # the release tree so findWorkspaceRepoRoot() reads pkgs/ and manifest there.
@@ -68,13 +69,23 @@ jobs:
 
       # Runs on push to main or workflow_dispatch from main (see release-please
       # job `if`). Sync pushes to release-please--branches--main cannot re-enter
-      # this workflow via push; dispatch from non-main refs is refused.
+      # this workflow via push; dispatch from non-main refs is refused. When
+      # secrets.RELEASE_PLEASE_TOKEN is set, Checkout above persists that PAT so
+      # git push uses a trusted actor and pull_request workflows start on
+      # synchronize; without the PAT, push uses github.token and Dispatch CI
+      # below is the fallback.
       - name: Sync intra-workspace pub constraints on release PR
         id: sync_constraints
         env:
           GH_TOKEN: ${{ github.token }}
+          HAS_PAT: ${{ secrets.RELEASE_PLEASE_TOKEN != '' }}
         run: |
           set -euo pipefail
+          if [[ "${HAS_PAT}" == "true" ]]; then
+            echo "release_please_pat_set=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "release_please_pat_set=false" >> "$GITHUB_OUTPUT"
+          fi
           if ! git ls-remote --heads origin release-please--branches--main | grep -q .; then
             echo "No release-please branch; skipping constraint sync"
             echo "sync_pushed=false" >> "$GITHUB_OUTPUT"
@@ -124,8 +135,12 @@ jobs:
           echo "sync_pushed=true" >> "$GITHUB_OUTPUT"
           echo "sync_commit_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
+      # Fallback when no RELEASE_PLEASE_TOKEN: bot pushes do not reliably start PR
+      # checks; PAT pushes trigger pull_request synchronize (do not dispatch too).
       - name: Dispatch CI on release PR branch
-        if: ${{ steps.sync_constraints.outputs.sync_commit_sha != '' }}
+        if: >-
+          steps.sync_constraints.outputs.sync_pushed == 'true' &&
+          steps.sync_constraints.outputs.release_please_pat_set != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
