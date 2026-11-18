@@ -87,6 +87,80 @@ String? parseCaretFloorFromConstraint(String constraintPart) {
   return match?.group(1);
 }
 
+/// Drift when a hand-raised caret floor exceeds the sibling workspace version.
+String? workspaceSiblingFloorAboveDriftMessage({
+  required String depName,
+  required String constraintPart,
+  required String siblingVersion,
+}) {
+  final floor = parseCaretFloorFromConstraint(constraintPart);
+  if (floor == null) {
+    return null;
+  }
+  final floorV = parseSemVerTriple(floor);
+  final siblingV = parseSemVerTriple(siblingVersion);
+  if (floorV == null || siblingV == null) {
+    return null;
+  }
+  if (floorV.compareTo(siblingV) > 0) {
+    return 'floor ^$floor is above workspace $depName $siblingVersion';
+  }
+  return null;
+}
+
+List<String> collectHandRaisedFloorDrifts(
+  String content,
+  Map<String, String> workspaceVersions,
+) {
+  final messages = <String>[];
+  var inDeps = false;
+  var depsIndent = 0;
+
+  for (final line in content.split('\n')) {
+    final trimmed = line.trimLeft();
+    if (trimmed.startsWith('dependencies:') ||
+        trimmed.startsWith('dev_dependencies:')) {
+      inDeps = true;
+      depsIndent = line.length - trimmed.length;
+      continue;
+    }
+
+    if (!inDeps) {
+      continue;
+    }
+    if (trimmed.isEmpty) {
+      continue;
+    }
+    final indent = line.length - trimmed.length;
+    if (indent <= depsIndent) {
+      inDeps = false;
+      continue;
+    }
+
+    final depMatch = RegExp(r'^([a-zA-Z0-9_]+):\s+(.+)$').firstMatch(trimmed);
+    if (depMatch == null) {
+      continue;
+    }
+    final depName = depMatch.group(1)!;
+    final siblingVersion = workspaceVersions[depName];
+    if (siblingVersion == null) {
+      continue;
+    }
+    final rest = depMatch.group(2)!;
+    final comment = RegExp(r'^(.*?)(\s+#.*)$').firstMatch(rest);
+    final constraintPart = comment != null ? comment.group(1)! : rest;
+    final msg = workspaceSiblingFloorAboveDriftMessage(
+      depName: depName,
+      constraintPart: constraintPart,
+      siblingVersion: siblingVersion,
+    );
+    if (msg != null) {
+      messages.add(msg);
+    }
+  }
+  return messages;
+}
+
 /// Rewrites a dependency line for a workspace package; preserves trailing comments.
 ///
 /// Raises the caret floor only when the existing constraint does not admit the
@@ -217,9 +291,14 @@ int runWorkspacePubConstraintSync({required bool write}) {
   }
 
   var changed = false;
+  var handRaisedDrift = false;
   for (final path in pubspecPaths) {
     final file = File(path);
     final original = file.readAsStringSync();
+    for (final msg in collectHandRaisedFloorDrifts(original, versions)) {
+      handRaisedDrift = true;
+      stderr.writeln(msg);
+    }
     final updated = syncPubspecContent(original, versions);
     if (updated != original) {
       changed = true;
@@ -230,7 +309,7 @@ int runWorkspacePubConstraintSync({required bool write}) {
     }
   }
 
-  if (check && changed) {
+  if (check && (changed || handRaisedDrift)) {
     stderr.writeln(
       'Workspace pub constraints are out of sync with package versions.\n'
       'Run: dart run tool/sync_workspace_pub_constraints.dart --write',

@@ -79,7 +79,7 @@ description: nested name: fake
       );
     });
 
-    test('hand-raised floor preserved', () {
+    test('hand-raised floor preserved on write', () {
       const versions = {'universal_automation_toolkit': '0.6.2'};
       expect(
         syncDependencyLine(
@@ -105,6 +105,36 @@ description: nested name: fake
       expect(
         syncDependencyLine('  meta: ^1.19.0', const {}),
         '  meta: ^1.19.0',
+      );
+    });
+  });
+
+  group('hand-raised floor drift', () {
+    test('flags floor above workspace sibling version', () {
+      expect(
+        workspaceSiblingFloorAboveDriftMessage(
+          depName: 'universal_automation_toolkit',
+          constraintPart: '^0.6.9',
+          siblingVersion: '0.6.2',
+        ),
+        'floor ^0.6.9 is above workspace universal_automation_toolkit 0.6.2',
+      );
+    });
+
+    test('collectHandRaisedFloorDrifts finds dependency lines', () {
+      const pubspec = '''
+name: consumer
+version: 1.0.0
+dependencies:
+  universal_automation_toolkit: ^0.6.9
+''';
+      expect(
+        collectHandRaisedFloorDrifts(pubspec, const {
+          'universal_automation_toolkit': '0.6.2',
+        }),
+        [
+          'floor ^0.6.9 is above workspace universal_automation_toolkit 0.6.2',
+        ],
       );
     });
   });
