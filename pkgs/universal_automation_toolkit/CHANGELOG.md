@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.6.1...universal_automation_toolkit-v0.6.2) (2026-11-18)
+
+
+### Bug Fixes
+
+* **universal_automation_toolkit:** document 0.6.2+ GitHub binaries after 0.6.1 gap ([7918565](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/79185657715752eac6161f14b33b020ab90c1b49))
+* **universal_automation_toolkit:** document 0.6.2+ GitHub binaries after 0.6.1 gap ([485be69](https://github.com/Arenukvern/universal_automation_ai_device_use/commit/485be6973515f88655fa7adadf9ef87d25e7f97c))
+
 ## [0.6.1](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.6.0...universal_automation_toolkit-v0.6.1) (2026-11-16)
 
 
