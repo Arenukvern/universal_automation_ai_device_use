@@ -77,6 +77,8 @@ Reads `tool/publish_order.yaml`, publishes in dependency order, waits for each v
 
 The **sync-release-pr-constraints** job writes sibling pins on the release-please branch. Constraint-only commits use `chore:` so release-please does not treat them as releasable churn. Sync **pushes** use `secrets.RELEASE_PLEASE_TOKEN` when configured so GitHub attributes them to a trusted actor and `pull_request` workflows start on synchronize. Without that PAT, the push uses `github.token` (github-actions bot) and the job **dispatches** Validate and tooling_runtime at the synced SHA (`gh workflow run validate.yml --ref <sha>`) instead—bot pushes often leave those PR checks in *action required*.
 
+`tool/sync_workspace_pub_constraints.dart` raises a sibling `^` floor **only** when the existing caret range no longer admits the sibling’s new version (pub caret semantics: below 1.0, `^0.x.y` admits `<0.(x+1).0`; at 1.0+, `^x.y.z` admits `<(x+1).0.0`). Patch bumps within the same caret range leave constraints untouched. Hand-raised floors in a PR are never lowered. That policy avoids forced fake co-releases (for example bumping harness **0.3.3** only to satisfy a blind `^0.6.2` rewrite when harness **0.3.2** on pub.dev still satisfies the train).
+
 Re-run Release Please from **`main`** only (`workflow_dispatch` / push), never from unreviewed branches.
 If **sync-release-pr-constraints** fails at checkout or push, rotate **`RELEASE_PLEASE_TOKEN`**: an expired or under-scoped PAT fails the job (there is no silent fallback to `github.token` on that checkout).
 

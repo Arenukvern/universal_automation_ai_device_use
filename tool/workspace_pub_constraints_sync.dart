@@ -28,7 +28,143 @@ class PubspecHeader {
   final String version;
 }
 
+class _SemVerTriple implements Comparable<_SemVerTriple> {
+  _SemVerTriple(this.major, this.minor, this.patch);
+
+  final int major;
+  final int minor;
+  final int patch;
+
+  @override
+  int compareTo(_SemVerTriple other) {
+    if (major != other.major) {
+      return major.compareTo(other.major);
+    }
+    if (minor != other.minor) {
+      return minor.compareTo(other.minor);
+    }
+    return patch.compareTo(other.patch);
+  }
+}
+
+_SemVerTriple? parseSemVerTriple(String version) {
+  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)').firstMatch(version.trim());
+  if (match == null) {
+    return null;
+  }
+  return _SemVerTriple(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+  );
+}
+
+/// Upper exclusive bound for a caret floor (pub semantics).
+_SemVerTriple caretUpperExclusive(_SemVerTriple floor) {
+  if (floor.major == 0) {
+    return _SemVerTriple(0, floor.minor + 1, 0);
+  }
+  return _SemVerTriple(floor.major + 1, 0, 0);
+}
+
+/// Whether [caretFloor] `^x.y.z` admits [targetVersion] on pub.dev.
+bool caretConstraintAdmits(String caretFloor, String targetVersion) {
+  final floor = parseSemVerTriple(caretFloor);
+  final target = parseSemVerTriple(targetVersion);
+  if (floor == null || target == null) {
+    return false;
+  }
+  if (target.compareTo(floor) < 0) {
+    return false;
+  }
+  final upper = caretUpperExclusive(floor);
+  return target.compareTo(upper) < 0;
+}
+
+String? parseCaretFloorFromConstraint(String constraintPart) {
+  final trimmed = constraintPart.trim();
+  final match = RegExp(r'^\^(\d+\.\d+\.\d+)').firstMatch(trimmed);
+  return match?.group(1);
+}
+
+/// Drift when a hand-raised caret floor exceeds the sibling workspace version.
+String? workspaceSiblingFloorAboveDriftMessage({
+  required String depName,
+  required String constraintPart,
+  required String siblingVersion,
+}) {
+  final floor = parseCaretFloorFromConstraint(constraintPart);
+  if (floor == null) {
+    return null;
+  }
+  final floorV = parseSemVerTriple(floor);
+  final siblingV = parseSemVerTriple(siblingVersion);
+  if (floorV == null || siblingV == null) {
+    return null;
+  }
+  if (floorV.compareTo(siblingV) > 0) {
+    return 'floor ^$floor is above workspace $depName $siblingVersion';
+  }
+  return null;
+}
+
+List<String> collectHandRaisedFloorDrifts(
+  String content,
+  Map<String, String> workspaceVersions,
+) {
+  final messages = <String>[];
+  var inDeps = false;
+  var depsIndent = 0;
+
+  for (final line in content.split('\n')) {
+    final trimmed = line.trimLeft();
+    if (trimmed.startsWith('dependencies:') ||
+        trimmed.startsWith('dev_dependencies:')) {
+      inDeps = true;
+      depsIndent = line.length - trimmed.length;
+      continue;
+    }
+
+    if (!inDeps) {
+      continue;
+    }
+    if (trimmed.isEmpty) {
+      continue;
+    }
+    final indent = line.length - trimmed.length;
+    if (indent <= depsIndent) {
+      inDeps = false;
+      continue;
+    }
+
+    final depMatch = RegExp(r'^([a-zA-Z0-9_]+):\s+(.+)$').firstMatch(trimmed);
+    if (depMatch == null) {
+      continue;
+    }
+    final depName = depMatch.group(1)!;
+    final siblingVersion = workspaceVersions[depName];
+    if (siblingVersion == null) {
+      continue;
+    }
+    final rest = depMatch.group(2)!;
+    final comment = RegExp(r'^(.*?)(\s+#.*)$').firstMatch(rest);
+    final constraintPart = comment != null ? comment.group(1)! : rest;
+    final msg = workspaceSiblingFloorAboveDriftMessage(
+      depName: depName,
+      constraintPart: constraintPart,
+      siblingVersion: siblingVersion,
+    );
+    if (msg != null) {
+      messages.add(msg);
+    }
+  }
+  return messages;
+}
+
 /// Rewrites a dependency line for a workspace package; preserves trailing comments.
+///
+/// Raises the caret floor only when the existing constraint does not admit the
+/// sibling package version (pub caret rules). Never lowers a hand-raised floor.
 String syncDependencyLine(
   String line,
   Map<String, String> workspaceVersions,
@@ -38,17 +174,32 @@ String syncDependencyLine(
     return line;
   }
   final name = match.group(2)!;
-  final version = workspaceVersions[name];
-  if (version == null) {
+  final siblingVersion = workspaceVersions[name];
+  if (siblingVersion == null) {
     return line;
   }
   final indent = match.group(1)!;
   final rest = match.group(3)!;
   final comment = RegExp(r'^(.*?)(\s+#.*)$').firstMatch(rest);
-  if (comment != null) {
-    return '$indent$name: ^$version${comment.group(2)!}';
+  final constraintPart = comment != null ? comment.group(1)! : rest;
+  final suffix = comment?.group(2) ?? '';
+
+  final floor = parseCaretFloorFromConstraint(constraintPart);
+  if (floor != null) {
+    if (caretConstraintAdmits(floor, siblingVersion)) {
+      return line;
+    }
+    final floorV = parseSemVerTriple(floor);
+    final siblingV = parseSemVerTriple(siblingVersion);
+    if (floorV != null &&
+        siblingV != null &&
+        floorV.compareTo(siblingV) > 0) {
+      return line;
+    }
   }
-  return '$indent$name: ^$version';
+
+  final updated = '$indent$name: ^$siblingVersion$suffix';
+  return updated;
 }
 
 String syncPubspecContent(
@@ -140,9 +291,14 @@ int runWorkspacePubConstraintSync({required bool write}) {
   }
 
   var changed = false;
+  var handRaisedDrift = false;
   for (final path in pubspecPaths) {
     final file = File(path);
     final original = file.readAsStringSync();
+    for (final msg in collectHandRaisedFloorDrifts(original, versions)) {
+      handRaisedDrift = true;
+      stderr.writeln(msg);
+    }
     final updated = syncPubspecContent(original, versions);
     if (updated != original) {
       changed = true;
@@ -153,7 +309,7 @@ int runWorkspacePubConstraintSync({required bool write}) {
     }
   }
 
-  if (check && changed) {
+  if (check && (changed || handRaisedDrift)) {
     stderr.writeln(
       'Workspace pub constraints are out of sync with package versions.\n'
       'Run: dart run tool/sync_workspace_pub_constraints.dart --write',
