@@ -12,9 +12,15 @@ and the interface, never redefines them. Intra-workspace `universal_automation_t
 constraints are synced on each release-please train (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 harness releases that adopt a new toolkit version ship in the same release PR after toolkit.
-**Co-release train:** with toolkit **0.6.1** (first GitHub binary release after the immutable-release
-draft upload path), harness **0.3.2** bumps the `universal_automation_toolkit` constraint from
-`^0.6.0` to `^0.6.1` via release-please constraint sync.
+
+**Pub dependency:** match `universal_automation_toolkit` to the harness version you depend on —
+`^0.6.1` for harness **0.3.2** on pub.dev today; **`^0.6.2` or newer** for harness **0.3.3+**
+after the toolkit **0.6.2** co-release train.
+
+**Co-release train:** toolkit **0.6.2** documents the GitHub binary distribution path for CLI/serve
+artifacts (after the **0.6.1** immutable-draft upload train). Harness **0.3.3** bumps the
+`universal_automation_toolkit` constraint from `^0.6.1` to `^0.6.2` via release-please constraint
+sync in the same release PR as toolkit.
 The relation to oka's `resource_composition` is recorded in ADR 0004 — components here are
 structurally compatible with its `Component` values; the hosted
 dependency flips when that package publishes (the assembly/validation
