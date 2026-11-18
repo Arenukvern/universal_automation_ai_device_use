@@ -76,6 +76,37 @@ void main() {
     });
   });
 
+  group('toolkitTagRecoveryEligibility', () {
+    test('draft release is incomplete', () {
+      expect(
+        toolkitTagRecoveryEligibility(
+          releaseTag: 'universal_automation_toolkit-v0.6.2',
+          releaseView: const {'isDraft': true, 'assets': []},
+        ),
+        ToolkitTagRecoveryEligibility.incomplete,
+      );
+    });
+
+    test('published with all assets is complete', () {
+      expect(
+        toolkitTagRecoveryEligibility(
+          releaseTag: 'universal_automation_toolkit-v0.6.2',
+          releaseView: {
+            'isDraft': false,
+            'assets': [
+              {'name': 'universal_automation_0.6.2_darwin-arm64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_darwin-x64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_linux-x64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_windows-x64.zip'},
+              {'name': 'checksums.txt'},
+            ],
+          },
+        ),
+        ToolkitTagRecoveryEligibility.complete,
+      );
+    });
+  });
+
   group('classifyRunnerAcquisitionRetry', () {
     RunnerAcquisitionRetryDecision classify(_Fixture fixture, {int attempt = 1}) {
       return classifyRunnerAcquisitionRetry(
@@ -85,6 +116,7 @@ void main() {
         triggerRunId: fixture.runId,
         triggerRunCreatedAt: fixture.runCreatedAt,
         siblingRunsOnRef: fixture.siblingRunsOnRef,
+        tagRecoveryEligibility: fixture.tagRecoveryEligibility,
       );
     }
 
@@ -118,9 +150,30 @@ void main() {
           RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
     });
 
-    test('fixture: superseded run with acquisition-shaped job', () {
+    test('fixture: superseded run with non-binary failed job', () {
       expect(classify(_loadFixture('superseded_run.json')),
           RunnerAcquisitionRetryDecision.supersededRun);
+    });
+
+    test('tag-scoped: binaries-only + newer run + incomplete tag reruns', () {
+      expect(
+        classify(_loadFixture('tag_scoped_binaries_incomplete_superseded.json')),
+        RunnerAcquisitionRetryDecision.rerunFailedJobs,
+      );
+    });
+
+    test('tag-scoped: binaries-only + complete published tag skips', () {
+      expect(
+        classify(_loadFixture('tag_scoped_binaries_complete_superseded.json')),
+        RunnerAcquisitionRetryDecision.releaseTagAlreadyComplete,
+      );
+    });
+
+    test('mixed failure with newer run skips (non-acquisition)', () {
+      expect(
+        classify(_loadFixture('mixed_failures_superseded.json')),
+        RunnerAcquisitionRetryDecision.nonAcquisitionFailure,
+      );
     });
 
     test('attempt cap blocks retry', () {
@@ -158,6 +211,7 @@ class _Fixture {
     this.runId,
     this.runCreatedAt,
     this.siblingRunsOnRef,
+    this.tagRecoveryEligibility,
   });
   final List<Map<String, dynamic>> jobs;
   final Map<int, List<Map<String, dynamic>>> annotationsByJobId;
@@ -165,6 +219,7 @@ class _Fixture {
   final int? runId;
   final DateTime? runCreatedAt;
   final List<Map<String, dynamic>>? siblingRunsOnRef;
+  final ToolkitTagRecoveryEligibility? tagRecoveryEligibility;
 }
 
 _Fixture _loadFixture(String name) {
@@ -196,6 +251,13 @@ _Fixture _loadFixture(String name) {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
+  ToolkitTagRecoveryEligibility? tagRecovery;
+  final tagRaw = root['tag_recovery_eligibility'] as String?;
+  if (tagRaw == 'incomplete') {
+    tagRecovery = ToolkitTagRecoveryEligibility.incomplete;
+  } else if (tagRaw == 'complete') {
+    tagRecovery = ToolkitTagRecoveryEligibility.complete;
+  }
   return _Fixture(
     jobs,
     ann,
@@ -203,5 +265,6 @@ _Fixture _loadFixture(String name) {
     runId: root['run_id'] as int?,
     runCreatedAt: runCreatedAt,
     siblingRunsOnRef: siblings,
+    tagRecoveryEligibility: tagRecovery,
   );
 }

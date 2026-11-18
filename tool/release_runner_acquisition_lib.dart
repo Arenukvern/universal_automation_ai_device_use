@@ -129,10 +129,92 @@ DateTime? _runCreatedAt(Map<String, dynamic> run) {
   }
 }
 
+/// Whether the toolkit GitHub release for a tag still needs binary recovery.
+enum ToolkitTagRecoveryEligibility {
+  /// Draft, missing release, or published without full asset set / checksums.txt.
+  incomplete,
+
+  /// Published with all five expected binary assets including checksums.txt.
+  complete,
+}
+
+final toolkitReleaseTagPattern =
+    RegExp(r'^universal_automation_toolkit-v(\d+\.\d+\.\d+)$');
+
+List<String> expectedToolkitReleaseAssetNames(String version) => [
+      'universal_automation_${version}_darwin-arm64.tar.gz',
+      'universal_automation_${version}_darwin-x64.tar.gz',
+      'universal_automation_${version}_linux-x64.tar.gz',
+      'universal_automation_${version}_windows-x64.zip',
+      'checksums.txt',
+    ];
+
+String? toolkitVersionFromReleaseTag(String? tag) {
+  if (tag == null || tag.isEmpty) {
+    return null;
+  }
+  final match = toolkitReleaseTagPattern.firstMatch(tag);
+  return match?.group(1);
+}
+
+ToolkitTagRecoveryEligibility toolkitTagRecoveryEligibility({
+  required String? releaseTag,
+  Map<String, dynamic>? releaseView,
+}) {
+  final version = toolkitVersionFromReleaseTag(releaseTag);
+  if (version == null) {
+    return ToolkitTagRecoveryEligibility.incomplete;
+  }
+  if (releaseView == null) {
+    return ToolkitTagRecoveryEligibility.incomplete;
+  }
+  final isDraft = releaseView['isDraft'];
+  if (isDraft == true || isDraft == 'true') {
+    return ToolkitTagRecoveryEligibility.incomplete;
+  }
+  final assets = releaseView['assets'];
+  if (assets is! List) {
+    return ToolkitTagRecoveryEligibility.incomplete;
+  }
+  final names = <String>{};
+  for (final asset in assets) {
+    if (asset is Map && asset['name'] is String) {
+      names.add(asset['name'] as String);
+    }
+  }
+  for (final required in expectedToolkitReleaseAssetNames(version)) {
+    if (!names.contains(required)) {
+      return ToolkitTagRecoveryEligibility.incomplete;
+    }
+  }
+  return ToolkitTagRecoveryEligibility.complete;
+}
+
+bool jobIsBinaryReleaseLeg(String? jobName) {
+  final name = jobName ?? '';
+  if (name.startsWith('build (')) {
+    return true;
+  }
+  if (name == 'dry-run-bundle' || name == 'publish' || name == 'postflight') {
+    return true;
+  }
+  return false;
+}
+
+bool allFailedJobsAreBinaryReleaseLegs(List<Map<String, dynamic>> failedJobs) {
+  if (failedJobs.isEmpty) {
+    return false;
+  }
+  return failedJobs.every(
+    (job) => jobIsBinaryReleaseLeg(job['name']?.toString()),
+  );
+}
+
 enum RunnerAcquisitionRetryDecision {
   noFailedJobs,
   attemptCapReached,
   supersededRun,
+  releaseTagAlreadyComplete,
   nonAcquisitionFailure,
   rerunFailedJobs,
 }
@@ -145,18 +227,8 @@ RunnerAcquisitionRetryDecision classifyRunnerAcquisitionRetry({
   int? triggerRunId,
   DateTime? triggerRunCreatedAt,
   List<Map<String, dynamic>>? siblingRunsOnRef,
+  ToolkitTagRecoveryEligibility? tagRecoveryEligibility,
 }) {
-  if (triggerRunId != null &&
-      triggerRunCreatedAt != null &&
-      siblingRunsOnRef != null &&
-      isRunSupersededOnRef(
-        triggerRunId: triggerRunId,
-        triggerRunCreatedAt: triggerRunCreatedAt,
-        siblingRunsOnRef: siblingRunsOnRef,
-      )) {
-    return RunnerAcquisitionRetryDecision.supersededRun;
-  }
-
   if (runAttempt >= maxRunAttempt) {
     return RunnerAcquisitionRetryDecision.attemptCapReached;
   }
@@ -177,6 +249,27 @@ RunnerAcquisitionRetryDecision classifyRunnerAcquisitionRetry({
     }
   }
 
+  final superseded = triggerRunId != null &&
+      triggerRunCreatedAt != null &&
+      siblingRunsOnRef != null &&
+      isRunSupersededOnRef(
+        triggerRunId: triggerRunId,
+        triggerRunCreatedAt: triggerRunCreatedAt,
+        siblingRunsOnRef: siblingRunsOnRef,
+      );
+
+  if (superseded) {
+    final tagScoped = allFailedJobsAreBinaryReleaseLegs(failed) &&
+        tagRecoveryEligibility != null;
+    if (tagScoped) {
+      if (tagRecoveryEligibility == ToolkitTagRecoveryEligibility.incomplete) {
+        return RunnerAcquisitionRetryDecision.rerunFailedJobs;
+      }
+      return RunnerAcquisitionRetryDecision.releaseTagAlreadyComplete;
+    }
+    return RunnerAcquisitionRetryDecision.supersededRun;
+  }
+
   return RunnerAcquisitionRetryDecision.rerunFailedJobs;
 }
 
@@ -188,6 +281,9 @@ String retryDecisionSummary(RunnerAcquisitionRetryDecision decision) {
       return 'Run attempt is at or above the retry cap (3); skip auto-retry.';
     case RunnerAcquisitionRetryDecision.supersededRun:
       return 'A newer workflow run exists (or is active) for the same ref; '
+          'skip auto-retry.';
+    case RunnerAcquisitionRetryDecision.releaseTagAlreadyComplete:
+      return 'Toolkit release tag already has a complete published asset set; '
           'skip auto-retry.';
     case RunnerAcquisitionRetryDecision.nonAcquisitionFailure:
       return 'Failed/cancelled jobs include a real failure or an ambiguous '

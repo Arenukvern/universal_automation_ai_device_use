@@ -1,0 +1,47 @@
+{
+  "run_id": 44100031,
+  "run_created_at": "2026-01-01T00:00:00Z",
+  "release_tag": "universal_automation_toolkit-v0.6.2",
+  "tag_recovery_eligibility": "incomplete",
+  "sibling_runs_on_ref": [
+    {
+      "id": 44100031,
+      "created_at": "2026-01-01T00:00:00Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 44100032,
+      "created_at": "2026-01-01T00:05:00Z",
+      "status": "in_progress",
+      "conclusion": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": 4004,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": null,
+      "runner_name": null
+    },
+    {
+      "id": 4005,
+      "name": "build (linux-x64, ubuntu-latest)",
+      "conclusion": "failure",
+      "steps": [
+        {"name": "Compile", "conclusion": "failure"}
+      ],
+      "runner_id": 12,
+      "runner_name": "GitHub Actions 7"
+    }
+  ],
+  "annotations_by_job_id": {
+    "4004": [
+      {
+        "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
+      }
+    ]
+  }
+}

@@ -53,6 +53,17 @@ Future<void> main(List<String> args) async {
     }
   }
 
+  final runMeta = await _fetchWorkflowRun(repo, runIdRaw, token);
+  final releaseTag = parseReleaseTagFromWorkflowRun(runMeta);
+  ToolkitTagRecoveryEligibility? tagRecovery;
+  if (releaseTag != null) {
+    final releaseView = await _fetchReleaseView(repo, releaseTag, token);
+    tagRecovery = toolkitTagRecoveryEligibility(
+      releaseTag: releaseTag,
+      releaseView: releaseView,
+    );
+  }
+
   final jobs = await _listJobs(repo, runIdRaw, token);
   final annotationsByJobId = await _loadAnnotations(repo, jobs, token);
 
@@ -74,6 +85,7 @@ Future<void> main(List<String> args) async {
     triggerRunId: runCreatedAt != null ? runId : null,
     triggerRunCreatedAt: runCreatedAt,
     siblingRunsOnRef: siblingRuns,
+    tagRecoveryEligibility: tagRecovery,
   );
 
   final summary = StringBuffer()
@@ -86,6 +98,12 @@ Future<void> main(List<String> args) async {
       'Failed/cancelled jobs: '
       '${jobs.where(jobIsFailedOrCancelled).map((j) => j['name']).join(', ')}',
     );
+  if (releaseTag != null) {
+    summary.writeln('Toolkit release tag: `$releaseTag`.');
+    if (tagRecovery != null) {
+      summary.writeln('Tag recovery eligibility: `${tagRecovery.name}`.');
+    }
+  }
   if (siblingRuns != null) {
     summary.writeln(
       'Sibling runs on ref `$headBranch`: ${siblingRuns.length} listed.',
@@ -123,6 +141,30 @@ Future<void> main(List<String> args) async {
   ok('dispatched gh run rerun --failed for $runIdRaw');
 }
 
+/// Visible for tests.
+String? parseReleaseTagFromWorkflowRun(Map<String, dynamic>? run) {
+  if (run == null) {
+    return null;
+  }
+  final inputs = run['inputs'];
+  if (inputs is Map) {
+    final fromInput = inputs['release_tag'] ?? inputs['release-tag'];
+    if (fromInput is String && fromInput.isNotEmpty) {
+      return fromInput;
+    }
+  }
+  for (final field in ['head_branch', 'display_title', 'name']) {
+    final value = run[field];
+    if (value is String) {
+      final match = toolkitReleaseTagPattern.firstMatch(value);
+      if (match != null) {
+        return match.group(0);
+      }
+    }
+  }
+  return null;
+}
+
 void ok(String message) => stdout.writeln('release_runner_acquisition_retry: $message');
 
 void fail(String message) {
@@ -136,6 +178,60 @@ Future<void> _writeStepSummary(String markdown) async {
     return;
   }
   await File(path).writeAsString(markdown, mode: FileMode.append);
+}
+
+Future<Map<String, dynamic>?> _fetchWorkflowRun(
+  String repo,
+  String runId,
+  String token,
+) async {
+  final result = await Process.run(
+    'gh',
+    [
+      'api',
+      'repos/$repo/actions/runs/$runId',
+    ],
+    environment: {'GH_TOKEN': token},
+    runInShell: false,
+  );
+  if (result.exitCode != 0) {
+    stderr.writeln(result.stderr);
+    return null;
+  }
+  final decoded = jsonDecode(result.stdout.toString());
+  if (decoded is Map<String, dynamic>) {
+    return decoded;
+  }
+  return null;
+}
+
+Future<Map<String, dynamic>?> _fetchReleaseView(
+  String repo,
+  String tag,
+  String token,
+) async {
+  final result = await Process.run(
+    'gh',
+    [
+      'release',
+      'view',
+      tag,
+      '--repo',
+      repo,
+      '--json',
+      'isDraft,assets',
+    ],
+    environment: {'GH_TOKEN': token},
+    runInShell: false,
+  );
+  if (result.exitCode != 0) {
+    return null;
+  }
+  final decoded = jsonDecode(result.stdout.toString());
+  if (decoded is Map<String, dynamic>) {
+    return decoded;
+  }
+  return null;
 }
 
 Future<List<Map<String, dynamic>>> _listSiblingRuns({
