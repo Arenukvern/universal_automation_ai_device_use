@@ -150,19 +150,37 @@ Future<String?> _resolveReleaseTag(
     return null;
   }
   final event = run['event']?.toString() ?? '';
-  List<Map<String, dynamic>>? matchingRefs;
-  Map<String, String> peeled = {};
-  if (event != 'workflow_dispatch') {
-    final headSha = run['head_sha']?.toString();
-    if (headSha != null && headSha.isNotEmpty) {
-      matchingRefs = await _matchingToolkitTagRefs(repo, token);
-      peeled = await _peelAnnotatedToolkitTags(repo, matchingRefs, token);
+  final headSha = run['head_sha']?.toString();
+  if (event == 'workflow_dispatch') {
+    return resolveReleaseTagFromWorkflowRun(run: run);
+  }
+
+  if (headSha != null && headSha.isNotEmpty) {
+    final lookup = await _matchingToolkitTagRefs(repo, token);
+    if (tagLookupFallsBackToPerRefSkip(
+      event: event,
+      headSha: headSha,
+      lookupFailed: lookup.failed,
+      matchingRefCount: lookup.refs.length,
+    )) {
+      stdout.writeln(toolkitTagLookupFallbackLogLine);
+    }
+    if (lookup.failed || lookup.refs.isEmpty) {
+      return null;
+    }
+    final pushTag = await resolvePushToolkitTagWithPeel(
+      headSha: headSha,
+      matchingTagRefs: lookup.refs,
+      peelAnnotatedTag: (tagSha) => _peelAnnotatedTag(repo, tagSha, token),
+    );
+    if (pushTag != null) {
+      return pushTag;
     }
   }
+
   return resolveReleaseTagFromWorkflowRun(
     run: run,
-    matchingToolkitTagRefs: matchingRefs,
-    peeledTagCommits: peeled,
+    matchingToolkitTagRefs: const [],
   );
 }
 
@@ -239,79 +257,68 @@ Future<Map<String, dynamic>?> _fetchReleaseView(
   return null;
 }
 
-Future<List<Map<String, dynamic>>> _matchingToolkitTagRefs(
+class _ToolkitTagRefsLookup {
+  const _ToolkitTagRefsLookup({required this.refs, required this.failed});
+
+  final List<Map<String, dynamic>> refs;
+  final bool failed;
+}
+
+Future<_ToolkitTagRefsLookup> _matchingToolkitTagRefs(
   String repo,
   String token,
 ) async {
+  // `--slurp` merges paginated ref pages into one JSON array; without it each
+  // page is a separate document and matching-refs would be truncated.
   final result = await Process.run(
     'gh',
     [
       'api',
       'repos/$repo/git/matching-refs/tags/universal_automation_toolkit-v',
       '--paginate',
+      '--slurp',
     ],
     environment: {'GH_TOKEN': token},
     runInShell: false,
   );
   if (result.exitCode != 0) {
     stderr.writeln(result.stderr);
-    return const [];
+    return const _ToolkitTagRefsLookup(refs: [], failed: true);
   }
-  final refs = <Map<String, dynamic>>[];
   final body = result.stdout.toString().trim();
   if (body.isEmpty) {
-    return refs;
+    return const _ToolkitTagRefsLookup(refs: [], failed: false);
   }
   final decoded = jsonDecode(body);
-  if (decoded is List) {
-    for (final ref in decoded) {
-      if (ref is Map<String, dynamic>) {
-        refs.add(ref);
-      }
-    }
-  }
-  return refs;
+  final refs = parseMatchingToolkitTagRefsJson(decoded);
+  return _ToolkitTagRefsLookup(refs: refs, failed: false);
 }
 
-Future<Map<String, String>> _peelAnnotatedToolkitTags(
+Future<String?> _peelAnnotatedTag(
   String repo,
-  List<Map<String, dynamic>> refs,
+  String tagObjectSha,
   String token,
 ) async {
-  final peeled = <String, String>{};
-  for (final ref in refs) {
-    final object = ref['object'];
-    if (object is! Map<String, dynamic>) {
-      continue;
-    }
-    if (object['type']?.toString() != 'tag') {
-      continue;
-    }
-    final tagSha = object['sha']?.toString();
-    if (tagSha == null || tagSha.isEmpty || peeled.containsKey(tagSha)) {
-      continue;
-    }
-    final result = await Process.run(
-      'gh',
-      [
-        'api',
-        'repos/$repo/git/tags/$tagSha',
-      ],
-      environment: {'GH_TOKEN': token},
-      runInShell: false,
-    );
-    if (result.exitCode != 0) {
-      continue;
-    }
-    final decoded = jsonDecode(result.stdout.toString());
-    if (decoded is Map<String, dynamic>) {
-      final target = decoded['object'];
-      if (target is Map && target['sha'] is String) {
-        peeled[tagSha] = target['sha'] as String;
-      }
+  final result = await Process.run(
+    'gh',
+    [
+      'api',
+      'repos/$repo/git/tags/$tagObjectSha',
+    ],
+    environment: {'GH_TOKEN': token},
+    runInShell: false,
+  );
+  if (result.exitCode != 0) {
+    return null;
+  }
+  final decoded = jsonDecode(result.stdout.toString());
+  if (decoded is Map<String, dynamic>) {
+    final target = decoded['object'];
+    if (target is Map && target['sha'] is String) {
+      return target['sha'] as String;
     }
   }
-  return peeled;
+  return null;
 }
 
 Future<List<Map<String, dynamic>>> _listSiblingRuns({

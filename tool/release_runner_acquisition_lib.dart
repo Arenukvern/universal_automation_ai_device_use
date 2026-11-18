@@ -200,6 +200,81 @@ String? resolveToolkitTagForHeadSha({
   return null;
 }
 
+/// Parses `git/matching-refs` JSON from `gh api` (flat list or `--slurp` pages).
+List<Map<String, dynamic>> parseMatchingToolkitTagRefsJson(Object? decoded) {
+  final refs = <Map<String, dynamic>>[];
+  if (decoded is! List) {
+    return refs;
+  }
+  for (final element in decoded) {
+    if (element is Map) {
+      refs.add(Map<String, dynamic>.from(element));
+    } else if (element is List) {
+      for (final inner in element) {
+        if (inner is Map) {
+          refs.add(Map<String, dynamic>.from(inner));
+        }
+      }
+    }
+  }
+  return refs;
+}
+
+/// Log line when [git/matching-refs] fails or is empty on a push run.
+const toolkitTagLookupFallbackLogLine =
+    'release_runner_acquisition_retry: toolkit tag lookup failed or empty; '
+    'falling back to per-ref supersession skip';
+
+/// True when tag-scoped supersession cannot run and per-ref skip applies.
+bool tagLookupFallsBackToPerRefSkip({
+  required String event,
+  required String? headSha,
+  required bool lookupFailed,
+  required int matchingRefCount,
+}) {
+  if (event == 'workflow_dispatch') {
+    return false;
+  }
+  if (headSha == null || headSha.isEmpty) {
+    return false;
+  }
+  return lookupFailed || matchingRefCount == 0;
+}
+
+/// Resolves a push-run toolkit tag, peeling only annotated refs and stopping
+/// at the first match.
+Future<String?> resolvePushToolkitTagWithPeel({
+  required String headSha,
+  required List<Map<String, dynamic>> matchingTagRefs,
+  required Future<String?> Function(String tagObjectSha) peelAnnotatedTag,
+}) async {
+  for (final ref in matchingTagRefs) {
+    final object = ref['object'];
+    if (object is! Map<String, dynamic>) {
+      continue;
+    }
+    var commitSha = object['sha']?.toString();
+    if (commitSha == null || commitSha.isEmpty) {
+      continue;
+    }
+    if (object['type']?.toString() == 'tag') {
+      final peeled = await peelAnnotatedTag(commitSha);
+      if (peeled == null || peeled.isEmpty) {
+        continue;
+      }
+      commitSha = peeled;
+    }
+    if (commitSha != headSha) {
+      continue;
+    }
+    final tag = tagNameFromGitRef(ref);
+    if (tag != null) {
+      return tag;
+    }
+  }
+  return null;
+}
+
 /// Resolves the toolkit release tag for a workflow run API object.
 ///
 /// Push runs (Release Please on `main`) use [head_sha] and
