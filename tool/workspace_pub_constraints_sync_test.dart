@@ -19,32 +19,91 @@ description: nested name: fake
     });
   });
 
-  group('syncDependencyLine', () {
-    const versions = {'universal_automation_interface': '0.4.0'};
+  group('caretConstraintAdmits', () {
+    test('pre-1.0 caret range', () {
+      expect(caretConstraintAdmits('0.6.1', '0.6.2'), isTrue);
+      expect(caretConstraintAdmits('0.6.1', '0.6.9'), isTrue);
+      expect(caretConstraintAdmits('0.6.1', '0.7.0'), isFalse);
+      expect(caretConstraintAdmits('0.6.2', '0.6.1'), isFalse);
+    });
 
-    test('updates constraint', () {
+    test('post-1.0 caret range', () {
+      expect(caretConstraintAdmits('1.0.0', '1.1.0'), isTrue);
+      expect(caretConstraintAdmits('1.0.0', '1.9.9'), isTrue);
+      expect(caretConstraintAdmits('1.0.0', '2.0.0'), isFalse);
+    });
+  });
+
+  group('syncDependencyLine', () {
+    test('patch bump: no change when range still admits sibling', () {
+      const versions = {'universal_automation_toolkit': '0.6.2'};
       expect(
         syncDependencyLine(
-          '  universal_automation_interface: ^0.3.0',
+          '  universal_automation_toolkit: ^0.6.1',
           versions,
         ),
-        '  universal_automation_interface: ^0.4.0',
+        '  universal_automation_toolkit: ^0.6.1',
       );
     });
 
-    test('preserves trailing comment', () {
+    test('pre-1.0 minor bump: raise when sibling leaves range', () {
+      const versions = {'universal_automation_toolkit': '0.7.0'};
       expect(
         syncDependencyLine(
-          '  universal_automation_interface: ^0.3.0  # train pin',
+          '  universal_automation_toolkit: ^0.6.2',
           versions,
         ),
-        '  universal_automation_interface: ^0.4.0  # train pin',
+        '  universal_automation_toolkit: ^0.7.0',
+      );
+    });
+
+    test('post-1.0 minor bump: no change', () {
+      const versions = {'universal_example': '1.1.0'};
+      expect(
+        syncDependencyLine(
+          '  universal_example: ^1.0.0',
+          versions,
+        ),
+        '  universal_example: ^1.0.0',
+      );
+    });
+
+    test('major bump: raise', () {
+      const versions = {'universal_automation_interface': '1.0.0'};
+      expect(
+        syncDependencyLine(
+          '  universal_automation_interface: ^0.5.0',
+          versions,
+        ),
+        '  universal_automation_interface: ^1.0.0',
+      );
+    });
+
+    test('hand-raised floor preserved', () {
+      const versions = {'universal_automation_toolkit': '0.6.2'};
+      expect(
+        syncDependencyLine(
+          '  universal_automation_toolkit: ^0.6.9  # ahead of train',
+          versions,
+        ),
+        '  universal_automation_toolkit: ^0.6.9  # ahead of train',
+      );
+    });
+
+    test('preserves trailing comment when raising', () {
+      const versions = {'universal_automation_toolkit': '0.7.0'};
+      expect(
+        syncDependencyLine(
+          '  universal_automation_toolkit: ^0.6.2  # train pin',
+          versions,
+        ),
+        '  universal_automation_toolkit: ^0.7.0  # train pin',
       );
     });
 
     test('leaves unknown packages unchanged', () {
       expect(
-        syncDependencyLine('  meta: ^1.19.0', versions),
+        syncDependencyLine('  meta: ^1.19.0', const {}),
         '  meta: ^1.19.0',
       );
     });

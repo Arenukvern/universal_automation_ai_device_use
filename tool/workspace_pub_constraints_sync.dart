@@ -28,7 +28,69 @@ class PubspecHeader {
   final String version;
 }
 
+class _SemVerTriple implements Comparable<_SemVerTriple> {
+  _SemVerTriple(this.major, this.minor, this.patch);
+
+  final int major;
+  final int minor;
+  final int patch;
+
+  @override
+  int compareTo(_SemVerTriple other) {
+    if (major != other.major) {
+      return major.compareTo(other.major);
+    }
+    if (minor != other.minor) {
+      return minor.compareTo(other.minor);
+    }
+    return patch.compareTo(other.patch);
+  }
+}
+
+_SemVerTriple? parseSemVerTriple(String version) {
+  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)').firstMatch(version.trim());
+  if (match == null) {
+    return null;
+  }
+  return _SemVerTriple(
+    int.parse(match.group(1)!),
+    int.parse(match.group(2)!),
+    int.parse(match.group(3)!),
+  );
+}
+
+/// Upper exclusive bound for a caret floor (pub semantics).
+_SemVerTriple caretUpperExclusive(_SemVerTriple floor) {
+  if (floor.major == 0) {
+    return _SemVerTriple(0, floor.minor + 1, 0);
+  }
+  return _SemVerTriple(floor.major + 1, 0, 0);
+}
+
+/// Whether [caretFloor] `^x.y.z` admits [targetVersion] on pub.dev.
+bool caretConstraintAdmits(String caretFloor, String targetVersion) {
+  final floor = parseSemVerTriple(caretFloor);
+  final target = parseSemVerTriple(targetVersion);
+  if (floor == null || target == null) {
+    return false;
+  }
+  if (target.compareTo(floor) < 0) {
+    return false;
+  }
+  final upper = caretUpperExclusive(floor);
+  return target.compareTo(upper) < 0;
+}
+
+String? parseCaretFloorFromConstraint(String constraintPart) {
+  final trimmed = constraintPart.trim();
+  final match = RegExp(r'^\^(\d+\.\d+\.\d+)').firstMatch(trimmed);
+  return match?.group(1);
+}
+
 /// Rewrites a dependency line for a workspace package; preserves trailing comments.
+///
+/// Raises the caret floor only when the existing constraint does not admit the
+/// sibling package version (pub caret rules). Never lowers a hand-raised floor.
 String syncDependencyLine(
   String line,
   Map<String, String> workspaceVersions,
@@ -38,17 +100,32 @@ String syncDependencyLine(
     return line;
   }
   final name = match.group(2)!;
-  final version = workspaceVersions[name];
-  if (version == null) {
+  final siblingVersion = workspaceVersions[name];
+  if (siblingVersion == null) {
     return line;
   }
   final indent = match.group(1)!;
   final rest = match.group(3)!;
   final comment = RegExp(r'^(.*?)(\s+#.*)$').firstMatch(rest);
-  if (comment != null) {
-    return '$indent$name: ^$version${comment.group(2)!}';
+  final constraintPart = comment != null ? comment.group(1)! : rest;
+  final suffix = comment?.group(2) ?? '';
+
+  final floor = parseCaretFloorFromConstraint(constraintPart);
+  if (floor != null) {
+    if (caretConstraintAdmits(floor, siblingVersion)) {
+      return line;
+    }
+    final floorV = parseSemVerTriple(floor);
+    final siblingV = parseSemVerTriple(siblingVersion);
+    if (floorV != null &&
+        siblingV != null &&
+        floorV.compareTo(siblingV) > 0) {
+      return line;
+    }
   }
-  return '$indent$name: ^$version';
+
+  final updated = '$indent$name: ^$siblingVersion$suffix';
+  return updated;
 }
 
 String syncPubspecContent(
