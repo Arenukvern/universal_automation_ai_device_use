@@ -76,6 +76,47 @@ void main() {
     });
   });
 
+  group('parseMatchingToolkitTagRefsJson', () {
+    final sampleRef = {
+      'ref': 'refs/tags/universal_automation_toolkit-v0.6.2',
+      'object': {'type': 'commit', 'sha': 'abc'},
+    };
+
+    test('flat list', () {
+      expect(
+        parseMatchingToolkitTagRefsJson([sampleRef]),
+        hasLength(1),
+      );
+    });
+
+    test('slurped single page', () {
+      expect(
+        parseMatchingToolkitTagRefsJson([
+          [sampleRef],
+        ]),
+        hasLength(1),
+      );
+    });
+
+    test('slurped two pages', () {
+      final refs = parseMatchingToolkitTagRefsJson([
+        [sampleRef],
+        [
+          {
+            'ref': 'refs/tags/universal_automation_toolkit-v0.6.1',
+            'object': {'type': 'commit', 'sha': 'def'},
+          },
+        ],
+      ]);
+      expect(refs, hasLength(2));
+    });
+
+    test('empty', () {
+      expect(parseMatchingToolkitTagRefsJson([]), isEmpty);
+      expect(parseMatchingToolkitTagRefsJson(null), isEmpty);
+    });
+  });
+
   group('tagLookupFallsBackToPerRefSkip', () {
     test('push with failed lookup falls back', () {
       expect(

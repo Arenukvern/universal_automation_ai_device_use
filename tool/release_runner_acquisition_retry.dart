@@ -285,19 +285,12 @@ Future<_ToolkitTagRefsLookup> _matchingToolkitTagRefs(
     stderr.writeln(result.stderr);
     return const _ToolkitTagRefsLookup(refs: [], failed: true);
   }
-  final refs = <Map<String, dynamic>>[];
   final body = result.stdout.toString().trim();
   if (body.isEmpty) {
-    return _ToolkitTagRefsLookup(refs: refs, failed: false);
+    return const _ToolkitTagRefsLookup(refs: [], failed: false);
   }
   final decoded = jsonDecode(body);
-  if (decoded is List) {
-    for (final ref in decoded) {
-      if (ref is Map<String, dynamic>) {
-        refs.add(ref);
-      }
-    }
-  }
+  final refs = parseMatchingToolkitTagRefsJson(decoded);
   return _ToolkitTagRefsLookup(refs: refs, failed: false);
 }
 

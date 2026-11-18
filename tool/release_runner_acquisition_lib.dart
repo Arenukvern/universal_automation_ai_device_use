@@ -200,6 +200,26 @@ String? resolveToolkitTagForHeadSha({
   return null;
 }
 
+/// Parses `git/matching-refs` JSON from `gh api` (flat list or `--slurp` pages).
+List<Map<String, dynamic>> parseMatchingToolkitTagRefsJson(Object? decoded) {
+  final refs = <Map<String, dynamic>>[];
+  if (decoded is! List) {
+    return refs;
+  }
+  for (final element in decoded) {
+    if (element is Map) {
+      refs.add(Map<String, dynamic>.from(element));
+    } else if (element is List) {
+      for (final inner in element) {
+        if (inner is Map) {
+          refs.add(Map<String, dynamic>.from(inner));
+        }
+      }
+    }
+  }
+  return refs;
+}
+
 /// Log line when [git/matching-refs] fails or is empty on a push run.
 const toolkitTagLookupFallbackLogLine =
     'release_runner_acquisition_retry: toolkit tag lookup failed or empty; '
