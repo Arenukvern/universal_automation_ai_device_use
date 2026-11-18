@@ -13,6 +13,10 @@ on:
       tooling_ref:
         required: true
         type: string
+      recovery_mode:
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -29,6 +33,7 @@ jobs:
     env:
       RELEASE_TAG: ${{ inputs.release_tag }}
       VERSION: ${{ inputs.version }}
+      RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
     steps:
       - name: Checkout workflow tooling at caller commit
         uses: actions/checkout@v7
@@ -57,6 +62,8 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           VERSION: ${{ inputs.version }}
+          RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
+          CHECKSUMS_FILE: dist/release/checksums.txt
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/check_release_assets_conflict.sh" \
             "$RELEASE_TAG" \
@@ -76,6 +83,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
+          VERSION: ${{ inputs.version }}
+          RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
+          CHECKSUMS_FILE: dist/release/checksums.txt
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_github_release_is_draft.sh" \
             "$RELEASE_TAG"
@@ -95,6 +105,7 @@ jobs:
           RELEASE_TAG: ${{ inputs.release_tag }}
           VERSION: ${{ inputs.version }}
           GITHUB_REPOSITORY_SLUG: ${{ github.repository }}
+          RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/append_binary_install_notes_to_draft_release.sh" \
             "$RELEASE_TAG"
@@ -105,6 +116,7 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           VERSION: ${{ inputs.version }}
+          RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/upload_draft_github_release_assets.sh" \
             "$RELEASE_TAG" \
@@ -116,6 +128,8 @@ jobs:
           GITHUB_REPOSITORY: ${{ github.repository }}
           RELEASE_TAG: ${{ inputs.release_tag }}
           VERSION: ${{ inputs.version }}
+          RELEASE_RECOVERY_MODE: ${{ inputs.recovery_mode }}
+          CHECKSUMS_FILE: dist/release/checksums.txt
         run: |
           bash "${{ env.TOOLING_CHECKOUT_PATH }}/tool/release/assert_release_assets_complete_on_draft.sh" \
             "$RELEASE_TAG" \

@@ -11,6 +11,19 @@ VERSION="${VERSION:-}"
   exit 1
 }
 
+command -v gh >/dev/null 2>&1 || {
+  echo "append_binary_install_notes_to_draft_release: gh CLI required" >&2
+  exit 1
+}
+
+is_draft="$(gh release view "$TAG" --repo "$REPO" --json isDraft -q .isDraft 2>/dev/null || true)"
+if [[ "$is_draft" != "true" ]]; then
+  if [[ "${RELEASE_RECOVERY_MODE:-false}" == "true" ]]; then
+    echo "append_binary_install_notes_to_draft_release: release already published; skipping"
+    exit 0
+  fi
+fi
+
 NOTES="$(mktemp)"
 trap 'rm -f "$NOTES"' EXIT
 cat >"$NOTES" <<EOF

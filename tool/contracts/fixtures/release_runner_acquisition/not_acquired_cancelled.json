@@ -1,0 +1,19 @@
+{
+  "jobs": [
+    {
+      "id": 1001,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": null,
+      "runner_name": null
+    }
+  ],
+  "annotations_by_job_id": {
+    "1001": [
+      {
+        "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
+      }
+    ]
+  }
+}

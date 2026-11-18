@@ -23,6 +23,7 @@ const undraftAllowedScript = 'publish_github_release_from_draft.sh';
 const publishScriptClosureExtras = <String>[
   'append_draft_release_binary_notes.sh',
   'assert_release_assets_complete.sh',
+  'compare_remote_checksums_with_local.sh',
 ];
 
 const publishWorkflowRootEnvPins = <String, String>{
@@ -96,6 +97,7 @@ const publishStepForbiddenKeys = <String>{
 const publishJobEnvPins = <String, Object>{
   'RELEASE_TAG': r'${{ inputs.release_tag }}',
   'VERSION': r'${{ inputs.version }}',
+  'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
 };
 
 const checkoutActionWithPins = <String, Object>{
@@ -119,6 +121,8 @@ const publishRunStepEnvPins = <String, Map<String, String>>{
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
+    'CHECKSUMS_FILE': 'dist/release/checksums.txt',
   },
   'assert_github_release_exists.sh': {
     'GH_TOKEN': r'${{ github.token }}',
@@ -129,6 +133,9 @@ const publishRunStepEnvPins = <String, Map<String, String>>{
     'GH_TOKEN': r'${{ github.token }}',
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
+    'VERSION': r'${{ inputs.version }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
+    'CHECKSUMS_FILE': 'dist/release/checksums.txt',
   },
   'validate_release_checksums_file.sh': {
     'VERSION': r'${{ inputs.version }}',
@@ -139,18 +146,22 @@ const publishRunStepEnvPins = <String, Map<String, String>>{
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
     'GITHUB_REPOSITORY_SLUG': r'${{ github.repository }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
   },
   'upload_draft_github_release_assets.sh': {
     'GH_TOKEN': r'${{ github.token }}',
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
   },
   'assert_release_assets_complete_on_draft.sh': {
     'GH_TOKEN': r'${{ github.token }}',
     'GITHUB_REPOSITORY': r'${{ github.repository }}',
     'RELEASE_TAG': r'${{ inputs.release_tag }}',
     'VERSION': r'${{ inputs.version }}',
+    'RELEASE_RECOVERY_MODE': r'${{ inputs.recovery_mode }}',
+    'CHECKSUMS_FILE': 'dist/release/checksums.txt',
   },
   'publish_github_release_from_draft.sh': {
     'GH_TOKEN': r'${{ github.token }}',

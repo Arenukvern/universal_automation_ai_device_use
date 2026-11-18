@@ -1,0 +1,29 @@
+{
+  "jobs": [
+    {
+      "id": 4004,
+      "name": "build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": null,
+      "runner_name": null
+    },
+    {
+      "id": 4005,
+      "name": "build (linux-x64, ubuntu-latest)",
+      "conclusion": "failure",
+      "steps": [
+        {"name": "Compile", "conclusion": "failure"}
+      ],
+      "runner_id": 12,
+      "runner_name": "GitHub Actions 7"
+    }
+  ],
+  "annotations_by_job_id": {
+    "4004": [
+      {
+        "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
+      }
+    ]
+  }
+}

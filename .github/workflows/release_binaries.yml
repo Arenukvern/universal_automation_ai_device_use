@@ -49,3 +49,4 @@ jobs:
       release_tag: ${{ needs.build.outputs.release_tag }}
       version: ${{ needs.build.outputs.version }}
       tooling_ref: ${{ github.sha }}
+      recovery_mode: true
