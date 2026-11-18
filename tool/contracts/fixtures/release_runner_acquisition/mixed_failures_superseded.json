@@ -1,8 +1,11 @@
 {
   "run_id": 44100031,
   "run_created_at": "2026-01-01T00:00:00Z",
-  "release_tag": "universal_automation_toolkit-v0.6.2",
-  "tag_recovery_eligibility": "incomplete",
+  "workflow_run": {
+    "event": "workflow_dispatch",
+    "name": "release-binaries universal_automation_toolkit-v0.6.2"
+  },
+  "release_view": null,
   "sibling_runs_on_ref": [
     {
       "id": 44100031,
@@ -20,7 +23,7 @@
   "jobs": [
     {
       "id": 4004,
-      "name": "build (darwin-arm64, macos-15)",
+      "name": "release-binaries-build / build (darwin-arm64, macos-15)",
       "conclusion": "cancelled",
       "steps": [],
       "runner_id": null,
@@ -28,7 +31,7 @@
     },
     {
       "id": 4005,
-      "name": "build (linux-x64, ubuntu-latest)",
+      "name": "release-binaries-build / build (linux-x64, ubuntu-latest)",
       "conclusion": "failure",
       "steps": [
         {"name": "Compile", "conclusion": "failure"}

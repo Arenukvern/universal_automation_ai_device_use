@@ -141,6 +141,118 @@ enum ToolkitTagRecoveryEligibility {
 final toolkitReleaseTagPattern =
     RegExp(r'^universal_automation_toolkit-v(\d+\.\d+\.\d+)$');
 
+/// Matches a toolkit release tag anywhere in workflow titles / run names.
+final toolkitReleaseTagUnanchoredPattern =
+    RegExp(r'universal_automation_toolkit-v\d+\.\d+\.\d+');
+
+String? toolkitTagFromUnanchoredText(String? text) {
+  if (text == null || text.isEmpty) {
+    return null;
+  }
+  final match = toolkitReleaseTagUnanchoredPattern.firstMatch(text);
+  return match?.group(0);
+}
+
+String? tagNameFromGitRef(Map<String, dynamic> ref) {
+  final refName = ref['ref'];
+  if (refName is! String) {
+    return null;
+  }
+  const prefix = 'refs/tags/';
+  if (!refName.startsWith(prefix)) {
+    return null;
+  }
+  final tag = refName.substring(prefix.length);
+  if (toolkitReleaseTagPattern.hasMatch(tag)) {
+    return tag;
+  }
+  return null;
+}
+
+/// Resolves `universal_automation_toolkit-v*` tag pointing at [headSha].
+///
+/// [peeledTagCommits] maps annotated tag object SHAs to their target commits.
+String? resolveToolkitTagForHeadSha({
+  required String headSha,
+  required List<Map<String, dynamic>> matchingTagRefs,
+  Map<String, String> peeledTagCommits = const {},
+}) {
+  for (final ref in matchingTagRefs) {
+    final object = ref['object'];
+    if (object is! Map<String, dynamic>) {
+      continue;
+    }
+    var commitSha = object['sha']?.toString();
+    if (commitSha == null || commitSha.isEmpty) {
+      continue;
+    }
+    if (object['type']?.toString() == 'tag') {
+      commitSha = peeledTagCommits[commitSha] ?? commitSha;
+    }
+    if (commitSha != headSha) {
+      continue;
+    }
+    final tag = tagNameFromGitRef(ref);
+    if (tag != null) {
+      return tag;
+    }
+  }
+  return null;
+}
+
+/// Resolves the toolkit release tag for a workflow run API object.
+///
+/// Push runs (Release Please on `main`) use [head_sha] and
+/// [matchingToolkitTagRefs] — the REST run object has no `inputs`, and
+/// `head_branch` / `display_title` are not reliable tag carriers.
+///
+/// `workflow_dispatch` runs match [display_title] and `name` unanchored.
+String? resolveReleaseTagFromWorkflowRun({
+  required Map<String, dynamic>? run,
+  List<Map<String, dynamic>>? matchingToolkitTagRefs,
+  Map<String, String> peeledTagCommits = const {},
+}) {
+  if (run == null) {
+    return null;
+  }
+  final event = run['event']?.toString() ?? '';
+  if (event == 'workflow_dispatch') {
+    return toolkitTagFromUnanchoredText(run['display_title']?.toString()) ??
+        toolkitTagFromUnanchoredText(run['name']?.toString());
+  }
+
+  final headSha = run['head_sha']?.toString();
+  if (event == 'push') {
+    if (headSha == null ||
+        headSha.isEmpty ||
+        matchingToolkitTagRefs == null) {
+      return null;
+    }
+    return resolveToolkitTagForHeadSha(
+      headSha: headSha,
+      matchingTagRefs: matchingToolkitTagRefs,
+      peeledTagCommits: peeledTagCommits,
+    );
+  }
+
+  if (headSha != null &&
+      headSha.isNotEmpty &&
+      matchingToolkitTagRefs != null &&
+      matchingToolkitTagRefs.isNotEmpty) {
+    final fromSha = resolveToolkitTagForHeadSha(
+      headSha: headSha,
+      matchingTagRefs: matchingToolkitTagRefs,
+      peeledTagCommits: peeledTagCommits,
+    );
+    if (fromSha != null) {
+      return fromSha;
+    }
+  }
+
+  return toolkitTagFromUnanchoredText(run['display_title']?.toString()) ??
+      toolkitTagFromUnanchoredText(run['name']?.toString());
+}
+
 List<String> expectedToolkitReleaseAssetNames(String version) => [
       'universal_automation_${version}_darwin-arm64.tar.gz',
       'universal_automation_${version}_darwin-x64.tar.gz',
@@ -190,12 +302,26 @@ ToolkitTagRecoveryEligibility toolkitTagRecoveryEligibility({
   return ToolkitTagRecoveryEligibility.complete;
 }
 
-bool jobIsBinaryReleaseLeg(String? jobName) {
+/// Job name segment after the last ` / ` (reusable workflow jobs).
+String binaryReleaseJobLegName(String? jobName) {
   final name = jobName ?? '';
-  if (name.startsWith('build (')) {
+  final separator = ' / ';
+  final idx = name.lastIndexOf(separator);
+  if (idx >= 0) {
+    return name.substring(idx + separator.length);
+  }
+  return name;
+}
+
+bool jobIsBinaryReleaseLeg(String? jobName) {
+  final leg = binaryReleaseJobLegName(jobName);
+  if (leg.startsWith('build (')) {
     return true;
   }
-  if (name == 'dry-run-bundle' || name == 'publish' || name == 'postflight') {
+  if (leg == 'dry-run-bundle' ||
+      leg == 'publish' ||
+      leg == 'postflight' ||
+      leg == 'prepare') {
     return true;
   }
   return false;

@@ -54,7 +54,7 @@ Future<void> main(List<String> args) async {
   }
 
   final runMeta = await _fetchWorkflowRun(repo, runIdRaw, token);
-  final releaseTag = parseReleaseTagFromWorkflowRun(runMeta);
+  final releaseTag = await _resolveReleaseTag(repo, runMeta, token);
   ToolkitTagRecoveryEligibility? tagRecovery;
   if (releaseTag != null) {
     final releaseView = await _fetchReleaseView(repo, releaseTag, token);
@@ -141,28 +141,29 @@ Future<void> main(List<String> args) async {
   ok('dispatched gh run rerun --failed for $runIdRaw');
 }
 
-/// Visible for tests.
-String? parseReleaseTagFromWorkflowRun(Map<String, dynamic>? run) {
+Future<String?> _resolveReleaseTag(
+  String repo,
+  Map<String, dynamic>? run,
+  String token,
+) async {
   if (run == null) {
     return null;
   }
-  final inputs = run['inputs'];
-  if (inputs is Map) {
-    final fromInput = inputs['release_tag'] ?? inputs['release-tag'];
-    if (fromInput is String && fromInput.isNotEmpty) {
-      return fromInput;
+  final event = run['event']?.toString() ?? '';
+  List<Map<String, dynamic>>? matchingRefs;
+  Map<String, String> peeled = {};
+  if (event != 'workflow_dispatch') {
+    final headSha = run['head_sha']?.toString();
+    if (headSha != null && headSha.isNotEmpty) {
+      matchingRefs = await _matchingToolkitTagRefs(repo, token);
+      peeled = await _peelAnnotatedToolkitTags(repo, matchingRefs, token);
     }
   }
-  for (final field in ['head_branch', 'display_title', 'name']) {
-    final value = run[field];
-    if (value is String) {
-      final match = toolkitReleaseTagPattern.firstMatch(value);
-      if (match != null) {
-        return match.group(0);
-      }
-    }
-  }
-  return null;
+  return resolveReleaseTagFromWorkflowRun(
+    run: run,
+    matchingToolkitTagRefs: matchingRefs,
+    peeledTagCommits: peeled,
+  );
 }
 
 void ok(String message) => stdout.writeln('release_runner_acquisition_retry: $message');
@@ -205,6 +206,10 @@ Future<Map<String, dynamic>?> _fetchWorkflowRun(
   return null;
 }
 
+/// With `contents: read` only, `gh release view` cannot see draft releases — the
+/// call fails and we treat the tag as [ToolkitTagRecoveryEligibility.incomplete]
+/// so the run is retried. That fail-open behavior is intentional because publish
+/// is idempotent.
 Future<Map<String, dynamic>?> _fetchReleaseView(
   String repo,
   String tag,
@@ -232,6 +237,81 @@ Future<Map<String, dynamic>?> _fetchReleaseView(
     return decoded;
   }
   return null;
+}
+
+Future<List<Map<String, dynamic>>> _matchingToolkitTagRefs(
+  String repo,
+  String token,
+) async {
+  final result = await Process.run(
+    'gh',
+    [
+      'api',
+      'repos/$repo/git/matching-refs/tags/universal_automation_toolkit-v',
+      '--paginate',
+    ],
+    environment: {'GH_TOKEN': token},
+    runInShell: false,
+  );
+  if (result.exitCode != 0) {
+    stderr.writeln(result.stderr);
+    return const [];
+  }
+  final refs = <Map<String, dynamic>>[];
+  final body = result.stdout.toString().trim();
+  if (body.isEmpty) {
+    return refs;
+  }
+  final decoded = jsonDecode(body);
+  if (decoded is List) {
+    for (final ref in decoded) {
+      if (ref is Map<String, dynamic>) {
+        refs.add(ref);
+      }
+    }
+  }
+  return refs;
+}
+
+Future<Map<String, String>> _peelAnnotatedToolkitTags(
+  String repo,
+  List<Map<String, dynamic>> refs,
+  String token,
+) async {
+  final peeled = <String, String>{};
+  for (final ref in refs) {
+    final object = ref['object'];
+    if (object is! Map<String, dynamic>) {
+      continue;
+    }
+    if (object['type']?.toString() != 'tag') {
+      continue;
+    }
+    final tagSha = object['sha']?.toString();
+    if (tagSha == null || tagSha.isEmpty || peeled.containsKey(tagSha)) {
+      continue;
+    }
+    final result = await Process.run(
+      'gh',
+      [
+        'api',
+        'repos/$repo/git/tags/$tagSha',
+      ],
+      environment: {'GH_TOKEN': token},
+      runInShell: false,
+    );
+    if (result.exitCode != 0) {
+      continue;
+    }
+    final decoded = jsonDecode(result.stdout.toString());
+    if (decoded is Map<String, dynamic>) {
+      final target = decoded['object'];
+      if (target is Map && target['sha'] is String) {
+        peeled[tagSha] = target['sha'] as String;
+      }
+    }
+  }
+  return peeled;
 }
 
 Future<List<Map<String, dynamic>>> _listSiblingRuns({
