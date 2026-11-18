@@ -76,6 +76,93 @@ void main() {
     });
   });
 
+  group('tagLookupFallsBackToPerRefSkip', () {
+    test('push with failed lookup falls back', () {
+      expect(
+        tagLookupFallsBackToPerRefSkip(
+          event: 'push',
+          headSha: 'abc',
+          lookupFailed: true,
+          matchingRefCount: 0,
+        ),
+        isTrue,
+      );
+    });
+
+    test('push with empty refs falls back', () {
+      expect(
+        tagLookupFallsBackToPerRefSkip(
+          event: 'push',
+          headSha: 'abc',
+          lookupFailed: false,
+          matchingRefCount: 0,
+        ),
+        isTrue,
+      );
+    });
+
+    test('dispatch never falls back on lookup', () {
+      expect(
+        tagLookupFallsBackToPerRefSkip(
+          event: 'workflow_dispatch',
+          headSha: 'abc',
+          lookupFailed: true,
+          matchingRefCount: 0,
+        ),
+        isFalse,
+      );
+    });
+
+    test('tag lookup fallback yields per-ref supersession skip', () {
+      final fixture =
+          _loadFixture('tag_scoped_binaries_incomplete_superseded.json');
+      expect(
+        classifyRunnerAcquisitionRetry(
+          jobs: fixture.jobs,
+          annotationsByJobId: fixture.annotationsByJobId,
+          runAttempt: 1,
+          triggerRunId: fixture.runId,
+          triggerRunCreatedAt: fixture.runCreatedAt,
+          siblingRunsOnRef: fixture.siblingRunsOnRef,
+          tagRecoveryEligibility: null,
+        ),
+        RunnerAcquisitionRetryDecision.supersededRun,
+      );
+    });
+  });
+
+  group('resolvePushToolkitTagWithPeel', () {
+    test('peels only annotated refs and stops at first match', () async {
+      var peelCalls = 0;
+      final tag = await resolvePushToolkitTagWithPeel(
+        headSha: 'commit-a',
+        matchingTagRefs: [
+          {
+            'ref': 'refs/tags/universal_automation_toolkit-v0.6.1',
+            'object': {'type': 'commit', 'sha': 'commit-b'},
+          },
+          {
+            'ref': 'refs/tags/universal_automation_toolkit-v0.6.2',
+            'object': {'type': 'tag', 'sha': 'annotated-1'},
+          },
+          {
+            'ref': 'refs/tags/universal_automation_toolkit-v0.6.3',
+            'object': {'type': 'tag', 'sha': 'annotated-2'},
+          },
+        ],
+        peelAnnotatedTag: (tagSha) async {
+          peelCalls++;
+          if (tagSha == 'annotated-1') {
+            return 'commit-a';
+          }
+          return 'commit-z';
+        },
+      );
+      expect(tag, 'universal_automation_toolkit-v0.6.2');
+      expect(peelCalls, 1);
+    });
+  });
+
   group('resolveReleaseTagFromWorkflowRun', () {
     test('dispatch run name yields toolkit tag', () {
       expect(
