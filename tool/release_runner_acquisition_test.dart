@@ -76,6 +76,119 @@ void main() {
     });
   });
 
+  group('resolveReleaseTagFromWorkflowRun', () {
+    test('dispatch run name yields toolkit tag', () {
+      expect(
+        resolveReleaseTagFromWorkflowRun(
+          run: {
+            'event': 'workflow_dispatch',
+            'head_branch': 'main',
+            'display_title': 'Release binaries',
+            'name': 'release-binaries universal_automation_toolkit-v0.6.2',
+          },
+        ),
+        'universal_automation_toolkit-v0.6.2',
+      );
+    });
+
+    test('push resolves tag via head_sha and matching refs (annotated peel)', () {
+      expect(
+        resolveReleaseTagFromWorkflowRun(
+          run: {
+            'event': 'push',
+            'head_branch': 'main',
+            'head_sha': 'c476b70d8686d649922af477c8dcc56b2ef2477c',
+            'display_title':
+                'fix(universal_automation_toolkit): document 0.6.2+ GitHub binaries',
+          },
+          matchingToolkitTagRefs: [
+            {
+              'ref': 'refs/tags/universal_automation_toolkit-v0.6.2',
+              'object': {
+                'type': 'tag',
+                'sha': 'annotated_tag_object_sha_062',
+              },
+            },
+          ],
+          peeledTagCommits: const {
+            'annotated_tag_object_sha_062':
+                'c476b70d8686d649922af477c8dcc56b2ef2477c',
+          },
+        ),
+        'universal_automation_toolkit-v0.6.2',
+      );
+    });
+
+    test('push ignores display_title when head_sha has no matching tag', () {
+      expect(
+        resolveReleaseTagFromWorkflowRun(
+          run: {
+            'event': 'push',
+            'head_branch': 'main',
+            'head_sha': 'deadbeef',
+            'display_title': 'mentions universal_automation_toolkit-v9.9.9',
+          },
+          matchingToolkitTagRefs: const [],
+        ),
+        isNull,
+      );
+    });
+  });
+
+  group('binaryReleaseJobLegName', () {
+    test('classifies reusable-workflow job legs', () {
+      expect(
+        jobIsBinaryReleaseLeg(
+          'release-binaries-build / build (darwin-arm64, macos-15)',
+        ),
+        isTrue,
+      );
+      expect(
+        jobIsBinaryReleaseLeg('release-binaries-build / prepare'),
+        isTrue,
+      );
+      expect(
+        jobIsBinaryReleaseLeg('release-binaries-publish / publish'),
+        isTrue,
+      );
+      expect(
+        jobIsBinaryReleaseLeg('release-runner-retry / maybe-retry'),
+        isFalse,
+      );
+    });
+  });
+
+  group('toolkitTagRecoveryEligibility', () {
+    test('draft release is incomplete', () {
+      expect(
+        toolkitTagRecoveryEligibility(
+          releaseTag: 'universal_automation_toolkit-v0.6.2',
+          releaseView: const {'isDraft': true, 'assets': []},
+        ),
+        ToolkitTagRecoveryEligibility.incomplete,
+      );
+    });
+
+    test('published with all assets is complete', () {
+      expect(
+        toolkitTagRecoveryEligibility(
+          releaseTag: 'universal_automation_toolkit-v0.6.2',
+          releaseView: {
+            'isDraft': false,
+            'assets': [
+              {'name': 'universal_automation_0.6.2_darwin-arm64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_darwin-x64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_linux-x64.tar.gz'},
+              {'name': 'universal_automation_0.6.2_windows-x64.zip'},
+              {'name': 'checksums.txt'},
+            ],
+          },
+        ),
+        ToolkitTagRecoveryEligibility.complete,
+      );
+    });
+  });
+
   group('classifyRunnerAcquisitionRetry', () {
     RunnerAcquisitionRetryDecision classify(_Fixture fixture, {int attempt = 1}) {
       return classifyRunnerAcquisitionRetry(
@@ -85,6 +198,31 @@ void main() {
         triggerRunId: fixture.runId,
         triggerRunCreatedAt: fixture.runCreatedAt,
         siblingRunsOnRef: fixture.siblingRunsOnRef,
+        tagRecoveryEligibility: _tagRecoveryFromFixture(fixture),
+      );
+    }
+
+    RunnerAcquisitionRetryDecision classifyWithResolvedTag(
+      _Fixture fixture, {
+      int attempt = 1,
+    }) {
+      final releaseTag = resolveReleaseTagFromWorkflowRun(
+        run: fixture.workflowRun,
+        matchingToolkitTagRefs: fixture.matchingToolkitTagRefs,
+        peeledTagCommits: fixture.peeledTagCommits,
+      );
+      final recovery = toolkitTagRecoveryEligibility(
+        releaseTag: releaseTag,
+        releaseView: fixture.releaseView,
+      );
+      return classifyRunnerAcquisitionRetry(
+        jobs: fixture.jobs,
+        annotationsByJobId: fixture.annotationsByJobId,
+        runAttempt: attempt,
+        triggerRunId: fixture.runId,
+        triggerRunCreatedAt: fixture.runCreatedAt,
+        siblingRunsOnRef: fixture.siblingRunsOnRef,
+        tagRecoveryEligibility: recovery,
       );
     }
 
@@ -118,9 +256,51 @@ void main() {
           RunnerAcquisitionRetryDecision.nonAcquisitionFailure);
     });
 
-    test('fixture: superseded run with acquisition-shaped job', () {
+    test('fixture: superseded run with non-binary failed job', () {
       expect(classify(_loadFixture('superseded_run.json')),
           RunnerAcquisitionRetryDecision.supersededRun);
+    });
+
+    test('Release Please push: tag resolve + incomplete assets reruns', () {
+      final fixture =
+          _loadFixture('release_please_push_incomplete_superseded.json');
+      final tag = resolveReleaseTagFromWorkflowRun(
+        run: fixture.workflowRun,
+        matchingToolkitTagRefs: fixture.matchingToolkitTagRefs,
+        peeledTagCommits: fixture.peeledTagCommits,
+      );
+      expect(tag, 'universal_automation_toolkit-v0.6.2');
+      expect(
+        classifyWithResolvedTag(fixture),
+        RunnerAcquisitionRetryDecision.rerunFailedJobs,
+      );
+    });
+
+    test('tag-scoped: binaries-only + newer run + incomplete tag reruns', () {
+      expect(
+        classifyWithResolvedTag(
+          _loadFixture('tag_scoped_binaries_incomplete_superseded.json'),
+        ),
+        RunnerAcquisitionRetryDecision.rerunFailedJobs,
+      );
+    });
+
+    test('tag-scoped: binaries-only + complete published tag skips', () {
+      expect(
+        classifyWithResolvedTag(
+          _loadFixture('tag_scoped_binaries_complete_superseded.json'),
+        ),
+        RunnerAcquisitionRetryDecision.releaseTagAlreadyComplete,
+      );
+    });
+
+    test('mixed failure with newer run skips (non-acquisition)', () {
+      expect(
+        classifyWithResolvedTag(
+          _loadFixture('mixed_failures_superseded.json'),
+        ),
+        RunnerAcquisitionRetryDecision.nonAcquisitionFailure,
+      );
     });
 
     test('attempt cap blocks retry', () {
@@ -150,6 +330,24 @@ void main() {
   });
 }
 
+ToolkitTagRecoveryEligibility? _tagRecoveryFromFixture(_Fixture fixture) {
+  if (fixture.tagRecoveryEligibility != null) {
+    return fixture.tagRecoveryEligibility;
+  }
+  if (fixture.workflowRun != null) {
+    final tag = resolveReleaseTagFromWorkflowRun(
+      run: fixture.workflowRun,
+      matchingToolkitTagRefs: fixture.matchingToolkitTagRefs,
+      peeledTagCommits: fixture.peeledTagCommits,
+    );
+    return toolkitTagRecoveryEligibility(
+      releaseTag: tag,
+      releaseView: fixture.releaseView,
+    );
+  }
+  return null;
+}
+
 class _Fixture {
   _Fixture(
     this.jobs,
@@ -158,6 +356,11 @@ class _Fixture {
     this.runId,
     this.runCreatedAt,
     this.siblingRunsOnRef,
+    this.tagRecoveryEligibility,
+    this.workflowRun,
+    this.matchingToolkitTagRefs,
+    this.peeledTagCommits = const {},
+    this.releaseView,
   });
   final List<Map<String, dynamic>> jobs;
   final Map<int, List<Map<String, dynamic>>> annotationsByJobId;
@@ -165,6 +368,11 @@ class _Fixture {
   final int? runId;
   final DateTime? runCreatedAt;
   final List<Map<String, dynamic>>? siblingRunsOnRef;
+  final ToolkitTagRecoveryEligibility? tagRecoveryEligibility;
+  final Map<String, dynamic>? workflowRun;
+  final List<Map<String, dynamic>>? matchingToolkitTagRefs;
+  final Map<String, String> peeledTagCommits;
+  final Map<String, dynamic>? releaseView;
 }
 
 _Fixture _loadFixture(String name) {
@@ -196,6 +404,36 @@ _Fixture _loadFixture(String name) {
         .map((e) => Map<String, dynamic>.from(e as Map))
         .toList();
   }
+  ToolkitTagRecoveryEligibility? tagRecovery;
+  final tagRaw = root['tag_recovery_eligibility'] as String?;
+  if (tagRaw == 'incomplete') {
+    tagRecovery = ToolkitTagRecoveryEligibility.incomplete;
+  } else if (tagRaw == 'complete') {
+    tagRecovery = ToolkitTagRecoveryEligibility.complete;
+  }
+  Map<String, dynamic>? workflowRun;
+  final rawRun = root['workflow_run'];
+  if (rawRun is Map) {
+    workflowRun = Map<String, dynamic>.from(rawRun);
+  }
+  List<Map<String, dynamic>>? matchingRefs;
+  final rawRefs = root['matching_toolkit_tag_refs'];
+  if (rawRefs is List) {
+    matchingRefs =
+        rawRefs.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+  }
+  final peeled = <String, String>{};
+  final rawPeeled = root['peeled_tag_commits'] as Map<String, dynamic>? ?? {};
+  for (final entry in rawPeeled.entries) {
+    peeled[entry.key] = entry.value.toString();
+  }
+  Map<String, dynamic>? releaseView;
+  if (root.containsKey('release_view')) {
+    final rawView = root['release_view'];
+    if (rawView is Map) {
+      releaseView = Map<String, dynamic>.from(rawView);
+    }
+  }
   return _Fixture(
     jobs,
     ann,
@@ -203,5 +441,10 @@ _Fixture _loadFixture(String name) {
     runId: root['run_id'] as int?,
     runCreatedAt: runCreatedAt,
     siblingRunsOnRef: siblings,
+    tagRecoveryEligibility: tagRecovery,
+    workflowRun: workflowRun,
+    matchingToolkitTagRefs: matchingRefs,
+    peeledTagCommits: peeled,
+    releaseView: releaseView,
   );
 }

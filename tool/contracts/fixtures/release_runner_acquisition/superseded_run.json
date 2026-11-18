@@ -18,7 +18,7 @@
   "jobs": [
     {
       "id": 6001,
-      "name": "build (darwin-arm64, macos-15)",
+      "name": "release-please",
       "conclusion": "cancelled",
       "steps": [],
       "runner_id": 0,

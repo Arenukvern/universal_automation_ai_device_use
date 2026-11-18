@@ -1,0 +1,53 @@
+{
+  "run_id": 44100021,
+  "run_created_at": "2026-01-01T00:00:00Z",
+  "workflow_run": {
+    "event": "workflow_dispatch",
+    "head_branch": "main",
+    "display_title": "Release binaries",
+    "name": "release-binaries universal_automation_toolkit-v0.6.2"
+  },
+  "release_view": {
+    "isDraft": false,
+    "assets": [
+      {"name": "universal_automation_0.6.2_darwin-arm64.tar.gz"},
+      {"name": "universal_automation_0.6.2_darwin-x64.tar.gz"},
+      {"name": "universal_automation_0.6.2_linux-x64.tar.gz"},
+      {"name": "universal_automation_0.6.2_windows-x64.zip"},
+      {"name": "checksums.txt"}
+    ]
+  },
+  "sibling_runs_on_ref": [
+    {
+      "id": 44100021,
+      "created_at": "2026-01-01T00:00:00Z",
+      "status": "completed",
+      "conclusion": "failure"
+    },
+    {
+      "id": 44100022,
+      "created_at": "2026-01-01T00:05:00Z",
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "jobs": [
+    {
+      "id": 7002,
+      "name": "release-binaries-build / build (darwin-arm64, macos-15)",
+      "conclusion": "cancelled",
+      "steps": [],
+      "runner_id": 0,
+      "runner_name": "",
+      "created_at": "2026-01-01T00:00:00Z",
+      "completed_at": "2026-01-01T00:16:00Z"
+    }
+  ],
+  "annotations_by_job_id": {
+    "7002": [
+      {
+        "message": "The job was not acquired by Runner of type hosted even after multiple attempts"
+      }
+    ]
+  }
+}
