@@ -33,6 +33,19 @@ public static class UaMock {
   if (-not (Test-Path $OutPath)) { throw "failed to compile mock CLI" }
 }
 
+function Wait-MockHttpServer([string]$BaseUrl, [int]$TimeoutSec = 30) {
+  $deadline = (Get-Date).AddSeconds($TimeoutSec)
+  while ((Get-Date) -lt $deadline) {
+    try {
+      Invoke-WebRequest -Uri "$BaseUrl/" -UseBasicParsing -TimeoutSec 2 | Out-Null
+      return
+    } catch {
+      Start-Sleep -Milliseconds 500
+    }
+  }
+  throw "mock HTTP server not ready at $BaseUrl"
+}
+
 function Publish-MockRelease([string]$Dir, [string]$Version, [string]$Label, [switch]$Broken) {
   $pkg = Join-Path $Dir "universal_automation_${Version}_windows-x64"
   if (Test-Path $pkg) { Remove-Item -Recurse -Force $pkg }
@@ -89,8 +102,8 @@ Publish-MockRelease -Dir $rel -Version "1.0.0" -Label "mock-1.0.0"
 $py = Get-Command python -ErrorAction SilentlyContinue
 if (-not $py) { throw "python required for local release fixture server" }
 $server = Start-Process -FilePath $py.Source -ArgumentList "-m", "http.server", "8765", "--directory", $rel -PassThru -WindowStyle Hidden
-Start-Sleep -Seconds 2
 $base = "http://127.0.0.1:8765"
+Wait-MockHttpServer -BaseUrl $base
 
 try {
   $env:UNIVERSAL_AUTOMATION_SHARE = $share
