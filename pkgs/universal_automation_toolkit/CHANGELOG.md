@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.6.3
+
+### Patch Changes
+
+- Release tooling: version PRs and tags now come from dart_changesets (no API changes).
+
 ## [0.6.2](https://github.com/Arenukvern/universal_automation_ai_device_use/compare/universal_automation_toolkit-v0.6.1...universal_automation_toolkit-v0.6.2) (2026-11-18)
 
 
@@ -93,3 +99,4 @@
 ## 0.1.1
 
 - Require `universal_driver_macos` ^0.2.1 (hooks/code_assets ^2) and `universal_screencast` ^0.1.2 (CDP ^0.3).
+

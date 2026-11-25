@@ -1,2 +1,2 @@
 /// Toolkit package version (must match [pubspec.yaml] `version:`).
-const toolkitPackageVersion = '0.6.2';
+const toolkitPackageVersion = '0.6.3';
