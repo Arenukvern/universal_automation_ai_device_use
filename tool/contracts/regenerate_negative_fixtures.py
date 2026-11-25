@@ -13,7 +13,7 @@ GOLDEN = {
     "publish": ROOT / ".github/workflows/release_binaries_publish.yml",
     "dispatch": ROOT / ".github/workflows/release_binaries.yml",
     "pr": ROOT / ".github/workflows/release_binaries_pr.yml",
-    "please": ROOT / ".github/workflows/release-please.yml",
+    "publish_caller": ROOT / ".github/workflows/publish.yml",
 }
 
 OUT = {
@@ -21,7 +21,7 @@ OUT = {
     "publish": ROOT / "tool/contracts/fixtures/release_workflow_publish",
     "dispatch": ROOT / "tool/contracts/fixtures/release_workflow_dispatch",
     "pr": ROOT / "tool/contracts/fixtures/release_workflow_pr",
-    "please": ROOT / "tool/contracts/fixtures/release_workflow_please",
+    "publish_caller": ROOT / "tool/contracts/fixtures/release_workflow_publish_caller",
     "caller": ROOT / "tool/contracts/fixtures/release_workflow_caller",
 }
 
@@ -30,7 +30,7 @@ VALIDATOR = {
     "publish": "publish",
     "dispatch": "dispatch",
     "pr": "pr",
-    "please": "please",
+    "publish_caller": "publish_caller",
     "caller": "caller",
 }
 
@@ -49,12 +49,12 @@ def write_fixture(kind: str, name: str, text: str) -> None:
 def dart_errors(kind: str, yml: Path) -> str:
     if kind == "pr":
         cmd = ["dart", "run", str(ROOT / "tool/check_release_workflow.dart"), "--pr-smoke-workflow", str(yml)]
-    elif kind == "please":
+    elif kind == "publish_caller":
         cmd = [
             "dart",
             "run",
             str(ROOT / "tool/check_release_workflow.dart"),
-            "--please-caller-workflow",
+            "--publish-caller-workflow",
             str(yml),
         ]
     elif kind == "caller":

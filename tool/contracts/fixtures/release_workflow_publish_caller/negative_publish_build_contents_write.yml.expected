@@ -1,0 +1,1 @@
+negative_publish_build_contents_write.yml: release-binaries-build needs contents: read

@@ -2,9 +2,16 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:pub_semver/pub_semver.dart';
+import 'package:yaml/yaml.dart';
 
-/// Toolkit package key in `release-please-config.json`.
+/// Toolkit package path segment under `pkgs/`.
 const toolkitReleasePleasePackage = 'pkgs/universal_automation_toolkit';
+
+/// Toolkit pubspec `name:` in `changesets.yaml` `version_files`.
+const toolkitChangesetsPackageName = 'universal_automation_toolkit';
+
+/// One `changesets.yaml` version_files entry for the toolkit package.
+typedef ToolkitVersionFile = ({String path, String pattern});
 
 /// Documented excludes for [discoverToolkitVersionSurfaces] (paths are
 /// matched against repo-relative posix segments).
@@ -23,7 +30,7 @@ const toolkitVersionDiscoveryExcludeRules = <String>[
   'plans',
 ];
 
-/// A versioned file Release Please must bump via toolkit `extra-files`.
+/// A versioned file the release train must bump (`changesets.yaml` version_files).
 typedef ToolkitVersionSurface = ({
   String configPath,
   String kind,
@@ -49,6 +56,15 @@ String absolutePathForToolkitExtraFile(String configPath, String repoRoot) {
 }
 
 /// Config-path form of a discovered absolute file (for matching extra-files).
+/// Repo-root-relative POSIX path for a discovered version surface.
+String repoRelativePathForToolkitVersionSurface(
+  String configPath,
+  String repoRoot,
+) {
+  final abs = absolutePathForToolkitExtraFile(configPath, repoRoot);
+  return abs.substring(repoRoot.length + 1).replaceAll(r'\', '/');
+}
+
 String absoluteToExtraFileConfigPath(String absolutePath, String repoRoot) {
   final normalized = absolutePath.replaceAll(r'\', '/');
   final toolkitRoot = '${toolkitPackageDir(repoRoot)}/';
@@ -193,105 +209,103 @@ List<ToolkitVersionSurface> discoverToolkitVersionSurfaces(String repoRoot) {
   return surfaces;
 }
 
-/// Release Please `extra-files` entries for the toolkit package.
-List<Map<String, dynamic>> loadToolkitReleasePleaseExtraFiles(String repoRoot) {
-  final file = File('$repoRoot/release-please-config.json');
+/// `changesets.yaml` version_files for [toolkitChangesetsPackageName].
+List<ToolkitVersionFile> loadToolkitChangesetsVersionFiles(String repoRoot) {
+  final file = File('$repoRoot/changesets.yaml');
   if (!file.existsSync()) {
-    throw StateError('missing release-please-config.json');
+    throw StateError('missing changesets.yaml');
   }
-  final doc = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
-  final packages = doc['packages'] as Map<String, dynamic>?;
-  if (packages == null) {
-    throw StateError('release-please-config.json: packages missing');
+  final doc = loadYaml(file.readAsStringSync());
+  if (doc is! Map) {
+    throw StateError('changesets.yaml: root must be a mapping');
   }
-  final toolkit = packages[toolkitReleasePleasePackage] as Map<String, dynamic>?;
-  if (toolkit == null) {
-    throw StateError('release-please-config.json: toolkit package missing');
+  final versionFiles = doc['version_files'];
+  if (versionFiles is! Map) {
+    throw StateError('changesets.yaml: version_files missing');
   }
-  final extra = toolkit['extra-files'];
-  if (extra is! List) {
-    throw StateError('release-please-config.json: toolkit extra-files missing');
+  final raw = versionFiles[toolkitChangesetsPackageName];
+  if (raw is! List) {
+    throw StateError(
+      'changesets.yaml: version_files.$toolkitChangesetsPackageName missing',
+    );
   }
-  return extra
-      .map((e) {
-        if (e is String) {
-          return {'path': e, 'type': 'string'};
-        }
-        if (e is Map) {
-          return Map<String, dynamic>.from(e);
-        }
-        throw StateError('invalid extra-files entry: $e');
-      })
-      .toList(growable: false);
+  final out = <ToolkitVersionFile>[];
+  for (final item in raw) {
+    if (item is! Map) {
+      throw StateError('invalid version_files entry: $item');
+    }
+    final path = item['path']?.toString().trim() ?? '';
+    final pattern = item['pattern']?.toString() ?? '';
+    if (path.isEmpty || !pattern.contains('{version}')) {
+      throw StateError('invalid version_files entry: $item');
+    }
+    out.add((path: path, pattern: pattern));
+  }
+  return out;
 }
 
-bool extraFilesCoverSurface(
-  List<Map<String, dynamic>> extraFiles,
+bool versionFilesCoverSurface(
+  List<ToolkitVersionFile> versionFiles,
   ToolkitVersionSurface surface,
+  String repoRoot,
 ) {
-  for (final entry in extraFiles) {
-    final path = canonicalExtraFileConfigPath('${entry['path']}');
-    if (path != surface.configPath) {
+  final want = repoRelativePathForToolkitVersionSurface(
+    surface.configPath,
+    repoRoot,
+  );
+  for (final entry in versionFiles) {
+    final normalized = entry.path.replaceAll(r'\', '/').trim();
+    if (normalized != want) {
       continue;
     }
-    final type = '${entry['type'] ?? 'string'}';
-    if (surface.kind == 'generic') {
-      if (type == 'generic' || (type == 'string' && path.endsWith('.dart'))) {
-        return true;
-      }
+    if (!entry.pattern.contains('{version}')) {
+      continue;
     }
-    if (surface.kind == 'json' && type == 'json') {
-      if (entry['jsonpath'] == surface.jsonpath) {
-        return true;
-      }
+    if (surface.kind == 'json' && normalized.endsWith('.json')) {
+      return true;
+    }
+    if (surface.kind == 'generic' && normalized.endsWith('.dart')) {
+      return true;
     }
   }
   return false;
 }
 
-List<String> validateToolkitVersionSurfacesReleasePlease(String repoRoot) {
+List<String> validateToolkitVersionSurfacesChangesets(String repoRoot) {
   final errors = <String>[];
-  List<Map<String, dynamic>> extraFiles;
+  List<ToolkitVersionFile> versionFiles;
   try {
-    extraFiles = loadToolkitReleasePleaseExtraFiles(repoRoot);
+    versionFiles = loadToolkitChangesetsVersionFiles(repoRoot);
   } catch (e) {
-    return ['release-please toolkit versions: $e'];
+    return ['changesets toolkit versions: $e'];
   }
 
   List<ToolkitVersionSurface> surfaces;
   try {
     surfaces = discoverToolkitVersionSurfaces(repoRoot);
   } catch (e) {
-    return ['release-please toolkit versions: $e'];
+    return ['changesets toolkit versions: $e'];
   }
 
-  for (final entry in extraFiles) {
-    final configPath = canonicalExtraFileConfigPath('${entry['path']}');
-    final abs = absolutePathForToolkitExtraFile(configPath, repoRoot);
-    if (!File(abs).existsSync()) {
+  for (final entry in versionFiles) {
+    final abs = File('$repoRoot/${entry.path}');
+    if (!abs.existsSync()) {
       errors.add(
-        'release-please-config.json: toolkit extra-files path missing on disk: '
-        '$configPath → $abs',
+        'changesets.yaml: version_files path missing on disk: '
+        '${entry.path} → ${abs.path}',
       );
     }
   }
 
   for (final surface in surfaces) {
-    if (!extraFilesCoverSurface(extraFiles, surface)) {
+    if (!versionFilesCoverSurface(versionFiles, surface, repoRoot)) {
       errors.add(
-        'release-please-config.json: toolkit extra-files must cover '
-        '${surface.configPath} (type: ${surface.kind}'
-        '${surface.jsonpath != null ? ', jsonpath: ${surface.jsonpath}' : ''})',
+        'changesets.yaml: version_files.$toolkitChangesetsPackageName must cover '
+        '${surface.configPath} (kind: ${surface.kind}'
+        '${surface.jsonpath != null ? ', jsonpath: ${surface.jsonpath}' : ''}); '
+        'dart_changesets bumps version_files on release',
       );
     }
-  }
-
-  final dartPath = '${toolkitPackageDir(repoRoot)}/lib/src/package_version.dart';
-  final dartText = File(dartPath).readAsStringSync();
-  if (!dartText.contains('x-release-please-version')) {
-    errors.add(
-      '$dartPath: must include x-release-please-version marker for release-please',
-    );
   }
 
   return errors;

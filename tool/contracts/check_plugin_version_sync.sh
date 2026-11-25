@@ -1,46 +1,52 @@
 #!/usr/bin/env bash
-# Plugin bundle versions must match pkgs/universal_automation_toolkit pubspec (Release Please extra-files).
+# Plugin bundle versions must match pkgs/universal_automation_toolkit pubspec (changesets version_files).
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PUBSPEC="$ROOT_DIR/pkgs/universal_automation_toolkit/pubspec.yaml"
-CONFIG="$ROOT_DIR/release-please-config.json"
-TOOLKIT_PKG="pkgs/universal_automation_toolkit"
+CONFIG="$ROOT_DIR/changesets.yaml"
+TOOLKIT_NAME="universal_automation_toolkit"
 
 fail() { echo "check_plugin_version_sync: $*" >&2; exit 1; }
 ok() { echo "check_plugin_version_sync: $*"; }
 
 command -v jq >/dev/null 2>&1 || fail "jq required"
+command -v python3 >/dev/null 2>&1 || fail "python3 required"
 [[ -f "$CONFIG" ]] || fail "missing $CONFIG"
 
 VERSION="$(sed -nE "s/^version:[[:space:]]*([^[:space:]]+).*$/\1/p" "$PUBSPEC" | head -n1)"
 [[ -n "$VERSION" ]] || fail "could not read toolkit version"
 
-resolve_extra_file_path() {
-  local rel="$1"
-  if [[ "$rel" == /* ]]; then
-    printf '%s' "$ROOT_DIR$rel"
-    return
-  fi
-  printf '%s' "$ROOT_DIR/$TOOLKIT_PKG/$rel"
-}
-
 count=0
 while IFS= read -r rel; do
   [[ -n "$rel" ]] || continue
   count=$((count + 1))
-  manifest="$(resolve_extra_file_path "$rel")"
-  [[ -f "$manifest" ]] || fail "extra-files path missing on disk: $rel → $manifest"
+  manifest="$ROOT_DIR/$rel"
+  [[ -f "$manifest" ]] || fail "version_files path missing on disk: $rel → $manifest"
   got="$(jq -r '.version' "$manifest")"
   if [[ "$got" != "$VERSION" ]]; then
     fail "$manifest version $got != toolkit pubspec $VERSION"
   fi
-done < <(jq -r --arg pkg "$TOOLKIT_PKG" '
-    .packages[$pkg]."extra-files"[]?
-    | select(.type == "json" or ((.path // "") | endswith(".json")))
-    | .path // empty
-  ' "$CONFIG")
+done < <(python3 - "$CONFIG" "$TOOLKIT_NAME" <<'PY'
+import re
+import sys
+from pathlib import Path
 
-[[ "$count" -ge 1 ]] || fail "release-please-config.json must list toolkit extra-files"
+text = Path(sys.argv[1]).read_text(encoding="utf-8")
+pkg = re.escape(sys.argv[2])
+m = re.search(rf"^[ \t]*{pkg}:[ \t]*\n((?:[ \t]+-[^\n]*\n)+)", text, re.MULTILINE)
+if not m:
+    sys.exit(0)
+block = m.group(1)
+for line in block.splitlines():
+    pm = re.match(r"^[ \t]+- path:[ \t]+(.+)$", line)
+    if pm:
+        p = pm.group(1).strip()
+        if p.endswith(".json"):
+            print(p)
+PY
+)
 
-ok "plugin manifests at $VERSION ($count extra-files)"
+[[ "$count" -ge 1 ]] || fail "changesets.yaml must list toolkit JSON version_files"
+
+ok "plugin manifests at $VERSION ($count version_files)"

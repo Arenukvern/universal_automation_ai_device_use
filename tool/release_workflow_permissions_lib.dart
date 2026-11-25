@@ -460,7 +460,7 @@ List<String> validateDiscoveredProductionReusableCallers(String repoRoot) {
   final errors = <String>[];
   final topLevel = discoverBinaryReusableCallerWorkflowFiles(repoRoot);
   const expectedCallers = {
-    'release-please.yml',
+    'publish.yml',
     'release_binaries.yml',
     'release_binaries_pr.yml',
   };
@@ -483,81 +483,8 @@ List<String> validateDiscoveredProductionReusableCallers(String repoRoot) {
   return errors;
 }
 
-/// Explicit ceilings for selected local release-please jobs (not reusable callers).
-final releasePleaseLocalJobCeilings = <String, PermissionMap>{
-  'audit-release-train': PermissionMap.parse({'contents': 'read'}),
-  'dispatch-package-publish': PermissionMap.parse({'actions': 'write'}),
-  'wait-package-publish': PermissionMap.parse({
-    'actions': 'write',
-    'contents': 'read',
-  }),
-};
-
-final releasePleaseLocalJobRequiredJobPermissions = <String, PermissionMap>{
-  'audit-release-train': PermissionMap.parse({'contents': 'read'}),
-};
-
-List<String> validateReleasePleaseLocalJobPermissions(
-  String repoRoot, {
-  String? yamlText,
-  String label = 'release-please.yml',
-}) {
-  final errors = <String>[];
-  final text = yamlText ??
-      File('$repoRoot/.github/workflows/release-please.yml').readAsStringSync();
-  final doc = loadYaml(text);
-  if (doc is! Map) {
-    return ['$label: root must be a mapping'];
-  }
-  final jobs = doc['jobs'];
-  if (jobs is! Map) {
-    return ['$label: jobs missing'];
-  }
-  final workflowPerms = doc['permissions'];
-
-  for (final entry in releasePleaseLocalJobCeilings.entries) {
-    final jobId = entry.key;
-    final ceiling = entry.value;
-    final job = jobs[jobId];
-    if (job is! Map) {
-      errors.add('$label: missing local job $jobId');
-      continue;
-    }
-    if (job.containsKey('uses')) {
-      continue;
-    }
-    final required = releasePleaseLocalJobRequiredJobPermissions[jobId];
-    if (required != null && job['permissions'] == null) {
-      errors.add(
-        '$label: $jobId must set explicit job permissions (required for audit)',
-      );
-      continue;
-    }
-    try {
-      final effective = PermissionMap.parse(
-        job['permissions'],
-        inheritWhenMissing: workflowPerms != null
-            ? PermissionMap.parse(workflowPerms)
-            : null,
-      );
-      errors.addAll(
-        effective.validateAgainstCeiling(
-          ceiling,
-          label: '$label → $jobId',
-        ),
-      );
-    } on PermissionParseException catch (e) {
-      errors.add('$label → $jobId: $e');
-    }
-  }
-  return errors;
-}
-
 List<String> validateProductionReusablePermissionChains(String repoRoot) {
-  return [
-    ...validateDiscoveredProductionReusableCallers(repoRoot),
-    ...validateReleasePleaseLocalJobPermissions(repoRoot),
-  ];
+  return validateDiscoveredProductionReusableCallers(repoRoot);
 }
 
 /// Negative fixture: callee job requests write under a read-only caller ceiling.

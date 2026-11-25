@@ -95,7 +95,18 @@ List<WorkspacePackage> loadWorkspacePackages(Directory repoRoot) {
   return packages;
 }
 
-/// release-please manifest: `pkgs/foo` → semver string.
+/// Workspace pubspec versions: package name → semver string.
+Map<String, String> loadPubspecVersionsFromWorkspace(Directory repoRoot) {
+  final byName = <String, String>{};
+  for (final pkg in loadWorkspacePackages(repoRoot)) {
+    if (pkg.version.isNotEmpty) {
+      byName[pkg.name] = pkg.version;
+    }
+  }
+  return byName;
+}
+
+/// Release manifest: `pkgs/foo` → semver string (release-please JSON or override).
 Map<String, String> loadReleaseManifestVersions(
   Directory repoRoot,
   String manifestPath,

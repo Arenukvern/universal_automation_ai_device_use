@@ -1,1 +1,0 @@
-release-please-config.json: only pkgs/universal_automation_toolkit may set non-false draft (got pkgs/universal_automation_harness with draft=true)

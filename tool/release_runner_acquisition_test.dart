@@ -389,7 +389,7 @@ void main() {
           RunnerAcquisitionRetryDecision.supersededRun);
     });
 
-    test('Release Please push: tag resolve + incomplete assets reruns', () {
+    test('release push: tag resolve + incomplete assets reruns', () {
       final fixture =
           _loadFixture('release_please_push_incomplete_superseded.json');
       final tag = resolveReleaseTagFromWorkflowRun(

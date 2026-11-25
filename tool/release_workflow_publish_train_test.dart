@@ -5,11 +5,11 @@ import 'package:test/test.dart';
 import 'release_workflow_contract_lib.dart';
 
 void main() {
-  test('release-please.yml pub train is independent of binary jobs', () {
+  test('publish.yml chains dart_changesets publish with toolkit binaries', () {
     final path =
-        '${Directory.current.path}/.github/workflows/release-please.yml';
+        '${Directory.current.path}/.github/workflows/publish.yml';
     final text = File(path).readAsStringSync();
-    final errors = validateReleasePleaseBinariesCaller(text);
+    final errors = validateChangesetsPublishBinariesCaller(text);
     expect(errors, isEmpty, reason: errors.join('; '));
   });
 }

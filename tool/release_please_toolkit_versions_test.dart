@@ -59,8 +59,8 @@ void main() {
     );
   });
 
-  test('discovered surfaces are listed in release-please extra-files', () {
-    final errors = validateToolkitVersionSurfacesReleasePlease(repoRoot.path);
+  test('discovered surfaces are listed in changesets version_files', () {
+    final errors = validateToolkitVersionSurfacesChangesets(repoRoot.path);
     expect(errors, isEmpty, reason: errors.join('\n'));
   });
 
@@ -71,10 +71,11 @@ void main() {
       kind: 'json',
       jsonpath: r'$.version',
     );
-  final wrongRoot = [
-      {'path': '/server.json', 'type': 'json', 'jsonpath': r'$.version'},
-    ];
-    expect(extraFilesCoverSurface(wrongRoot, surface), isFalse);
+    final wrongRoot = [(path: 'pkgs/universal_automation_toolkit/wrong.json', pattern: '{version}')];
+    expect(
+      versionFilesCoverSurface(wrongRoot, surface, repoRoot.path),
+      isFalse,
+    );
     final absWrong =
         absolutePathForToolkitExtraFile('/server.json', repoRoot.path);
     expect(File(absWrong).existsSync(), isFalse);
@@ -87,13 +88,12 @@ void main() {
       jsonpath: r'$.version',
     );
     final wrongRoot = [
-      {
-        'path': 'plugin/.cursor-plugin/plugin.json',
-        'type': 'json',
-        'jsonpath': r'$.version',
-      },
+      (path: 'pkgs/universal_automation_toolkit/plugin.json', pattern: '{version}'),
     ];
-    expect(extraFilesCoverSurface(wrongRoot, surface), isFalse);
+    expect(
+      versionFilesCoverSurface(wrongRoot, surface, repoRoot.path),
+      isFalse,
+    );
     final absWrong = absolutePathForToolkitExtraFile(
       'plugin/.cursor-plugin/plugin.json',
       repoRoot.path,
@@ -119,7 +119,7 @@ void main() {
     addTearDown(() {
       if (dartFile.existsSync()) dartFile.deleteSync();
     });
-    final errors = validateToolkitVersionSurfacesReleasePlease(repoRoot.path);
+    final errors = validateToolkitVersionSurfacesChangesets(repoRoot.path);
     expect(errors, isNotEmpty);
     expect(errors.join('\n'), contains('toolkit_wire_version.dart'));
   });
@@ -138,7 +138,7 @@ void main() {
     addTearDown(() {
       if (dartFile.existsSync()) dartFile.deleteSync();
     });
-    final errors = validateToolkitVersionSurfacesReleasePlease(repoRoot.path);
+    final errors = validateToolkitVersionSurfacesChangesets(repoRoot.path);
     expect(errors, isNotEmpty);
     expect(errors.join('\n'), contains('toolkit_build_version.dart'));
   });
@@ -151,7 +151,7 @@ void main() {
     addTearDown(() {
       if (stale.existsSync()) stale.deleteSync();
     });
-    final errors = validateToolkitVersionSurfacesReleasePlease(repoRoot.path);
+    final errors = validateToolkitVersionSurfacesChangesets(repoRoot.path);
     expect(errors, isNotEmpty);
     expect(errors.join('\n'), contains('stale_wire_manifest.json'));
   });
@@ -171,7 +171,7 @@ void main() {
         stray.deleteSync();
       }
     });
-    final errors = validateToolkitVersionSurfacesReleasePlease(repoRoot.path);
+    final errors = validateToolkitVersionSurfacesChangesets(repoRoot.path);
     expect(errors, isNotEmpty);
     expect(errors.join('\n'), contains('mcp_manifest.json'));
   });

@@ -43,7 +43,7 @@ ACTIONLINT_NOISE_RULES=(
   "negative_no_workflow_call.yml|syntax-check expression"
   "negative_secrets_in_with.yml|action expression"
   "negative_secrets_step_if.yml|expression"
-  "negative_please_wrong_build_workflow.yml|workflow-call expression"
+  "negative_publish_wrong_build_workflow.yml|workflow-call expression"
   "negative_pr_wrong_workflow.yml|workflow-call"
   "negative_publish_needs_postflight.yml|job-needs"
 )

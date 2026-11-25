@@ -1,0 +1,63 @@
+name: dart_changesets publish
+
+on:
+  push:
+    tags:
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. universal_automation_toolkit-v1.2.3'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dart-changesets-publish-${{ inputs.tag || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      tag: ${{ inputs.tag || github.ref_name }}
+      execute: ${{ github.event_name == 'push' || inputs.tag != '' }}
+
+  release-binaries-build:
+    needs: publish
+    if: startsWith(inputs.tag || github.ref_name, 'universal_automation_toolkit-v')
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release_binaries_build.yml
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    with:
+      release_tag: ${{ inputs.tag || github.ref_name }}
+      dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [publish, release-binaries-build]
+    if: startsWith(inputs.tag || github.ref_name, 'universal_automation_toolkit-v')
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
+      version: ${{ needs.release-binaries-build.outputs.version }}
+      tooling_ref: ${{ github.sha }}
+  dispatch-package-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - run: true
