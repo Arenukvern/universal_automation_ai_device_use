@@ -20,7 +20,7 @@ void main() {
       expect(
         discoveredCallers.map((e) => e.$1).toSet(),
         {
-          'release-please.yml',
+          'publish.yml',
           'release_binaries.yml',
           'release_binaries_pr.yml',
         },
@@ -29,11 +29,11 @@ void main() {
 
     test('enumerates every caller → callee job path', () {
       expect(paths.map((p) => p.path).toSet(), containsAll({
-        'release-please.yml → release-binaries-build → release_binaries_build.yml → prepare',
-        'release-please.yml → release-binaries-build → release_binaries_build.yml → build',
-        'release-please.yml → release-binaries-build → release_binaries_build.yml → dry-run-bundle',
-        'release-please.yml → release-binaries-publish → release_binaries_publish.yml → publish',
-        'release-please.yml → release-binaries-publish → release_binaries_publish.yml → postflight',
+        'publish.yml → release-binaries-build → release_binaries_build.yml → prepare',
+        'publish.yml → release-binaries-build → release_binaries_build.yml → build',
+        'publish.yml → release-binaries-build → release_binaries_build.yml → dry-run-bundle',
+        'publish.yml → release-binaries-publish → release_binaries_publish.yml → publish',
+        'publish.yml → release-binaries-publish → release_binaries_publish.yml → postflight',
         'release_binaries.yml → build → release_binaries_build.yml → prepare',
         'release_binaries.yml → build → release_binaries_build.yml → build',
         'release_binaries.yml → build → release_binaries_build.yml → dry-run-bundle',
@@ -82,13 +82,6 @@ void main() {
           reason: row.path,
         );
       }
-    });
-  });
-
-  group('release-please local jobs', () {
-    test('audit-release-train and pub train respect explicit ceilings', () {
-      final errors = validateReleasePleaseLocalJobPermissions(repoRoot);
-      expect(errors, isEmpty, reason: errors.join('; '));
     });
   });
 

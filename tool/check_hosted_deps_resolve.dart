@@ -16,12 +16,12 @@ import 'workspace_pub_constraints_sync.dart';
 
 void printUsage() {
   stdout.writeln('''
-Hosted dependency resolve + release-please version policy.
+Hosted dependency resolve + release train version policy.
 
 Flags:
   --co-release              Co-release sibling resolution along publish_order.yaml
   --check-manifest-drift    Blocking manifest/pubspec policy (release paths)
-  --release-pr              With --check-manifest-drift: on the release-please
+  --release-pr              With --check-manifest-drift: on the version-packages
                             branch, accept manifest == pubspec > pub.dev latest
                             not yet on pub.dev as a pending release (not an error).
                             Without this flag, manifest not on pub.dev is always
@@ -33,7 +33,7 @@ Flags:
                             With --release-pr: treat in-train workspace versions as
                             pending (do not resolve siblings from pub.dev only).
   --github-report           Emit workflow commands for GitHub Actions
-  --release-manifest <path> Alternate release-please manifest JSON
+  --release-manifest <path> Alternate release manifest JSON (default: pubspecs)
   --publish-order <path>    Alternate publish_order.yaml
   --help                    Show this text
 ''');
@@ -97,10 +97,7 @@ Future<void> main(List<String> args) async {
 
   final releaseByName = manifestPath != null
       ? loadReleaseManifestVersions(repoRoot, manifestPath)
-      : loadReleaseManifestVersions(
-          repoRoot,
-          '${repoRoot.path}/.release-please-manifest.json',
-        );
+      : loadPubspecVersionsFromWorkspace(repoRoot);
 
   final catalog = PubDevCatalog();
   try {

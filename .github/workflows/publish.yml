@@ -1,0 +1,110 @@
+# dart_changesets per-tag publish leg. pub.dev is ref-gated per package tag.
+# Toolkit binary assets chain after pub.dev publish for that tag only.
+name: dart_changesets publish
+
+on:
+  push:
+    tags:
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag, e.g. universal_automation_toolkit-v1.2.3'
+        required: true
+        type: string
+      execute:
+        description: 'Publish for real (unchecked = preflight)'
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: dart-changesets-publish-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+      execute: ${{ github.event_name == 'push' || inputs.execute }}
+    permissions:
+      contents: read
+      id-token: write
+
+  toolkit-github-release:
+    needs: publish
+    if: >-
+      startsWith(github.event.inputs.tag || github.ref_name, 'universal_automation_toolkit-v') &&
+      (github.event_name == 'push' || inputs.execute)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          fetch-depth: 0
+
+      - name: Setup Dart SDK
+        uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+
+      - name: Create or update draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          bash tool/release/create_toolkit_draft_github_release.sh "$RELEASE_TAG"
+
+  release-binaries-build:
+    needs: [publish, toolkit-github-release]
+    if: >-
+      startsWith(github.event.inputs.tag || github.ref_name, 'universal_automation_toolkit-v') &&
+      (github.event_name == 'push' || inputs.execute)
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release_binaries_build.yml
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    with:
+      release_tag: ${{ github.event.inputs.tag || github.ref_name }}
+      dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [publish, release-binaries-build]
+    if: >-
+      startsWith(github.event.inputs.tag || github.ref_name, 'universal_automation_toolkit-v') &&
+      (github.event_name == 'push' || inputs.execute)
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
+      version: ${{ needs.release-binaries-build.outputs.version }}
+      tooling_ref: ${{ github.sha }}
+
+  post-publish-audit:
+    needs:
+      - publish
+      - release-binaries-publish
+    if: >-
+      always() &&
+      needs.publish.result == 'success' &&
+      (needs.release-binaries-publish.result == 'success' ||
+       needs.release-binaries-publish.result == 'skipped') &&
+      (github.event_name == 'push' || inputs.execute)
+    uses: ./.github/workflows/post_publish_audit.yml

@@ -5,19 +5,18 @@ on:
     paths:
       - 'pkgs/universal_tooling_runtime/**'
       - '.github/workflows/tooling_runtime_ci.yml'
-      - '.github/workflows/publish_package.yml'
+      - '.github/workflows/publish.yml'
   push:
     branches:
       - main
     paths:
       - 'pkgs/universal_tooling_runtime/**'
       - '.github/workflows/tooling_runtime_ci.yml'
-      - '.github/workflows/publish_package.yml'
-  # Dispatched from release-please.yml after constraint sync (see Validate).
+      - '.github/workflows/publish.yml'
   workflow_dispatch:
     inputs:
       expected_sha:
-        description: Exact commit on release-please--branches--main to verify.
+        description: Exact commit on changesets/version-packages to verify.
         required: false
         type: string
 
@@ -65,6 +64,5 @@ jobs:
         run: dart test --concurrency=1
         working-directory: pkgs/universal_tooling_runtime
 
-      - name: Publish dry run
-        run: dart pub publish --dry-run
-        working-directory: pkgs/universal_tooling_runtime
+      - name: Publish dry run (all publishable packages, strict warnings exit 65)
+        run: dart run tool/validate_publishable_packages.dart --dry-run-gate

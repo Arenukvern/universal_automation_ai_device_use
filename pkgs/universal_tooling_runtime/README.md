@@ -70,23 +70,19 @@ dart_flutter_packages).
 
 ## Publishing
 
-Releases use [release-please](https://github.com/googleapis/release-please) with
-tag `universal_tooling_runtime-v{{version}}`. Pub.dev publish uses the shared
-[`.github/workflows/publish_package.yml`](../../.github/workflows/publish_package.yml)
-(`workflow_dispatch` on the tag ref, OIDC via the `pub.dev` environment).
-`release-please.yml` dispatches that workflow after each release. There is no
-`on.push.tags` trigger, so tag pushes cannot double-fire publish.
-
-`workflow_dispatch` loads the workflow from the **ref you pass** (`--ref`). Use a
-tag whose `pubspec.yaml` version matches the tag name.
+Releases use [dart_changesets](https://github.com/Arenukvern/dart_changesets) with
+tag `universal_tooling_runtime-v{{version}}`. Pub.dev publish uses
+[`.github/workflows/publish.yml`](../../.github/workflows/publish.yml) (tag push or
+`workflow_dispatch` with `execute=true`, OIDC).
 
 ### Manual recovery
 
 ```bash
-gh workflow run publish_package.yml \
+gh workflow run publish.yml \
   --repo Arenukvern/universal_automation_ai_device_use \
-  --ref universal_tooling_runtime-vX.Y.Z
+  --ref universal_tooling_runtime-vX.Y.Z \
+  -f tag=universal_tooling_runtime-vX.Y.Z \
+  -f execute=true
 ```
 
-Normal path: merge the release-please release PR; CI dispatches `publish_package.yml`
-on each new tag (Anton approves via the `pub.dev` environment).
+See [RELEASING.md](../../RELEASING.md).

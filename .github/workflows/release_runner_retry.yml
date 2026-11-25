@@ -7,7 +7,8 @@ run-name: release-runner-retry ${{ github.event.workflow_run.name }} (${{ github
 on:
   workflow_run:
     workflows:
-      - Release Please
+      - Release
+      - dart_changesets publish
       - Release binaries build
       - Release binaries (toolkit)
     types:

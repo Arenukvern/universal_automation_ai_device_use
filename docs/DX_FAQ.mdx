@@ -24,14 +24,14 @@ A: `dart analyze` on the packages in [steward.yaml](https://github.com/Arenukver
 
 ## Release train (contributors)
 
-**Q: How do package versions get bumped today?**  
-A: **Today:** Release Please on `main` — use `fix(scope):` / `feat(scope):` / `chore:` per package; do not hand-edit `version:` or `CHANGELOG.md` on releasable packages ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md)). **Direction:** the repo is migrating to **Dart Changesets** in a separate PR; after that lands, follow Changesets + updated RELEASING instead of Release Please conventions.
+**Q: How do package versions get bumped?**  
+A: Add a changeset in your feature PR: `dart run dart_changesets@^1.0.2 add` (or author `.changesets/*.md` with front matter `'package_name': patch|minor|major`). After merge to `main`, [`release.yml`](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/.github/workflows/release.yml) opens/updates **`changesets/version-packages`**. Merge that version PR when CI is green — tags and [`publish.yml`](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/.github/workflows/publish.yml) legs follow automatically. Do not hand-edit `version:` or `CHANGELOG.md` on releasable packages ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md)).
 
-**Q: After Changesets lands, what changes for me?**  
-A: Expect per-package `.changeset/` entries in PRs and an updated [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md). Until the migration PR merges, Release Please remains the accurate how-to — see [Design FAQ — release model](/DESIGN_FAQ#release-train-and-workspace-policy).
+**Q: What runs on the version-packages PR?**  
+A: Same `Validate` jobs as other PRs plus blocking co-release/drift/audit with `--release-pr`, and strict `dart pub publish --dry-run` for every publishable package (warnings exit **65**). Also `dart run tool/sync_workspace_pub_constraints.dart --check`.
 
-**Q: How do I refresh sibling `^` constraints in the workspace?**  
-A: `dart run tool/sync_workspace_pub_constraints.dart --write` (or `--check` in CI). The sync **raises** floors only when pub caret rules require it; see [Design FAQ — caret floor](/DESIGN_FAQ#release-train-and-workspace-policy).
+**Q: How do I refresh sibling `^` constraints locally?**  
+A: `dart run tool/sync_workspace_pub_constraints.dart --write` (or `--check` in CI). Caret raises only when pub rules require it — [Design FAQ — caret floor](/DESIGN_FAQ#release-train-and-workspace-policy).
 
 **Q: How do I install toolkit CLI without `dart pub global`?**  
 A: Download platform archives from the toolkit GitHub release (`universal_automation_toolkit-v*`) per [RELEASING.md § binaries](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#toolkit-github-release-binaries-no-dart-install) or use `./install.sh` at repo root.

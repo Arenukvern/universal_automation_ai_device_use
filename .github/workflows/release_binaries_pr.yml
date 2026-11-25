@@ -9,8 +9,8 @@ on:
       - install.sh
       - install.ps1
       - .github/workflows/release_binaries*.yml
-      - release-please-config.json
-      - .release-please-manifest.json
+      - changesets.yaml
+      - .changesets/**
   push:
     branches:
       - main
@@ -20,8 +20,8 @@ on:
       - install.sh
       - install.ps1
       - .github/workflows/release_binaries*.yml
-      - release-please-config.json
-      - .release-please-manifest.json
+      - changesets.yaml
+      - .changesets/**
 
 permissions:
   contents: read

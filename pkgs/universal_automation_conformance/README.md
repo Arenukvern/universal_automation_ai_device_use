@@ -9,7 +9,7 @@ like `universal_storage_conformance`.
 `universal_screencast` `^0.3.0`.
 
 Intra-workspace `universal_screencast` constraints are synced on each
-release-please train (see
+dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 conformance releases that adopt a new screencast line ship in the same
 release PR after `universal_screencast`.
@@ -19,7 +19,7 @@ release PR after `universal_screencast`.
 Frame source/sink conformance suites that exercise screencast types assume
 **`universal_screencast` 0.3.3 or newer** (aligned with the CDP 0.6.3
 release train). Hosted `pubspec.yaml` pins are updated by the
-release-please constraint sync when conformance enters a train; they are
+dart_changesets version step when conformance enters a train; they are
 not edited by hand on `main`.
 
 ```dart

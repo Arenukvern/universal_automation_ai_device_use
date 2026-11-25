@@ -6,7 +6,7 @@ wired through Dart native-assets build hooks — the ADR 0001 pattern
 code asset, and Dart binds via `@Native`). **No Flutter plugin surface.**
 
 Intra-workspace `universal_screencast` constraints are synced on each
-release-please train (see
+dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 macOS capture releases that adopt a new screencast line ship in the same
 release PR after `universal_screencast`.
@@ -33,7 +33,7 @@ apps that never opted into any protocol.
 ## Requirements
 
 - **`universal_screencast` 0.3.3 or newer** when composing captures into the
-  frame pipeline (hosted pins via release-please constraint sync, not
+  frame pipeline (hosted pins via dart_changesets version step, not
   hand-edited on `main`).
 - macOS 13+ (built for arm64 and x64).
 - `swiftc` + Xcode command line tools at build time (the hook runs on

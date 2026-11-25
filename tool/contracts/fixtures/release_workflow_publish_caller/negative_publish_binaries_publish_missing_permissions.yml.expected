@@ -1,0 +1,1 @@
+negative_publish_binaries_publish_missing_permissions.yml: release-binaries-publish: reusable-workflow caller must set explicit permissions on the job or workflow

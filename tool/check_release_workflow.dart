@@ -6,7 +6,6 @@
 
 import 'dart:io';
 
-import 'release_please_immutable_release_lib.dart';
 import 'release_please_toolkit_versions_lib.dart';
 import 'release_workflow_contract_lib.dart';
 import 'release_publish_script_pins_lib.dart';
@@ -29,28 +28,25 @@ Future<void> main(List<String> args) async {
   }
   if (!args.contains('--workflow') &&
       !args.contains('--pr-smoke-workflow') &&
-      !args.contains('--please-caller-workflow') &&
-      !args.contains('--binary-reusable-caller-workflow') &&
-      !args.contains('--release-please-config')) {
+      !args.contains('--publish-caller-workflow') &&
+      !args.contains('--release-workflow') &&
+      !args.contains('--binary-reusable-caller-workflow')) {
     await _validateAllReleaseWorkflowContracts(root.path);
     return;
   }
-  if (args.contains('--release-please-config')) {
-    final i = args.indexOf('--release-please-config');
+  if (args.contains('--release-workflow')) {
+    final i = args.indexOf('--release-workflow');
     if (i + 1 >= args.length) {
-      stderr.writeln('--release-please-config requires a path');
+      stderr.writeln('--release-workflow requires a path');
       exit(2);
     }
-    final configPath = args[i + 1];
-    final file = File(configPath);
+    final workflowPath = args[i + 1];
+    final file = File(workflowPath);
     if (!file.existsSync()) {
-      stderr.writeln('Missing config: $configPath');
+      stderr.writeln('Missing workflow: $workflowPath');
       exit(1);
     }
-    final errors = validateToolkitImmutableReleaseReleasePleaseConfig(
-      root.path,
-      configText: file.readAsStringSync(),
-    );
+    final errors = validateChangesetsReleaseWorkflow(await file.readAsString());
     if (errors.isNotEmpty) {
       stderr.writeln('check_release_workflow failures:');
       for (final e in errors) {
@@ -89,10 +85,10 @@ Future<void> main(List<String> args) async {
     stdout.writeln('check_release_workflow: ${file.path} OK');
     return;
   }
-  if (args.contains('--please-caller-workflow')) {
-    final i = args.indexOf('--please-caller-workflow');
+  if (args.contains('--publish-caller-workflow')) {
+    final i = args.indexOf('--publish-caller-workflow');
     if (i + 1 >= args.length) {
-      stderr.writeln('--please-caller-workflow requires a path');
+      stderr.writeln('--publish-caller-workflow requires a path');
       exit(2);
     }
     final workflowPath = args[i + 1];
@@ -104,12 +100,8 @@ Future<void> main(List<String> args) async {
     final yaml = await file.readAsString();
     final label = file.uri.pathSegments.last;
     final errors = [
-      ...validateReleasePleaseBinariesCaller(yaml),
-      ...validateReleasePleaseLocalJobPermissions(
-        root.path,
-        yamlText: yaml,
-        label: label,
-      ),
+      ...validateChangesetsPublishBinariesCaller(yaml, label: label),
+      ...validateBinaryReusableCallerYaml(yaml, label, repoRoot: root.path),
     ];
     if (errors.isNotEmpty) {
       stderr.writeln('check_release_workflow failures:');
@@ -208,7 +200,8 @@ Future<void> _validateAllReleaseWorkflowContracts(
     '$rootPath/.github/workflows/release_binaries_publish.yml',
     '$rootPath/.github/workflows/release_binaries.yml',
     '$rootPath/.github/workflows/release_binaries_pr.yml',
-    '$rootPath/.github/workflows/release-please.yml',
+    '$rootPath/.github/workflows/release.yml',
+    '$rootPath/.github/workflows/publish.yml',
   ];
   for (final p in paths) {
     if (!File(p).existsSync()) {
@@ -230,12 +223,15 @@ Future<void> _validateAllReleaseWorkflowContracts(
     ...validateReleaseBinariesPrWorkflowYaml(
       await File(paths[3]).readAsString(),
     ),
-    ...validateReleasePleaseBinariesCaller(
+    ...validateChangesetsReleaseWorkflow(
       await File(paths[4]).readAsString(),
     ),
+    ...validateChangesetsPublishBinariesCaller(
+      await File(paths[5]).readAsString(),
+    ),
     ...validateProductionReusablePermissionChains(rootPath),
-    ...validateToolkitVersionSurfacesReleasePlease(rootPath),
-    ...validateToolkitImmutableReleaseReleasePleaseConfig(rootPath),
+    ...validateToolkitVersionSurfacesChangesets(rootPath),
+    ...validateChangesetsToolkitTagFormat(rootPath),
     ...validateReleasePublishScriptClosure(
       rootPath,
       scriptOverlayDir: scriptOverlayDir,

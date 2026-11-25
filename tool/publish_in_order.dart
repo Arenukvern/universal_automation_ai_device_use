@@ -38,12 +38,11 @@ Future<int> runPublishInOrder({
 }) async {
   final root = repoRoot ?? findWorkspaceRepoRoot();
   final publishOrderPath = '${root.path}/tool/publish_order.yaml';
-  final manifestPath =
-      manifestPathOverride ?? '${root.path}/.release-please-manifest.json';
-
   final packages = loadWorkspacePackages(root);
   final workspaceNames = packages.map((p) => p.name).toSet();
-  final manifestByName = loadReleaseManifestVersions(root, manifestPath);
+  final manifestByName = manifestPathOverride != null
+      ? loadReleaseManifestVersions(root, manifestPathOverride)
+      : loadPubspecVersionsFromWorkspace(root);
   final configuredOrder = loadPublishOrderYaml(publishOrderPath);
   final byName = {for (final p in packages) p.name: p};
 

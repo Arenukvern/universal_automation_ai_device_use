@@ -277,7 +277,7 @@ Future<String?> resolvePushToolkitTagWithPeel({
 
 /// Resolves the toolkit release tag for a workflow run API object.
 ///
-/// Push runs (Release Please on `main`) use [head_sha] and
+/// Push runs (release workflow on `main`) use [head_sha] and
 /// [matchingToolkitTagRefs] — the REST run object has no `inputs`, and
 /// `head_branch` / `display_title` are not reliable tag carriers.
 ///

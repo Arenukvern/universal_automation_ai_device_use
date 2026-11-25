@@ -212,9 +212,9 @@ the repo root (see [RELEASING.md](../../RELEASING.md)); from source use
 
 From **0.6.2** onward, each toolkit release train attaches four platform
 archives plus `checksums.txt` to the GitHub release (draft-then-publish
-in [RELEASING.md](../../RELEASING.md)). After the release-please PR merges,
-Release Please tags toolkit on `main` and `release-please.yml` runs
-`release-binaries-build` then `release-binaries-publish` on that push.
+in [RELEASING.md](../../RELEASING.md)). After the version-packages PR merges,
+`publish.yml` tags `universal_automation_toolkit-v*` and runs
+`release-binaries-build`, `toolkit-github-release`, and `release-binaries-publish`.
 
 **0.6.1** is on pub.dev but its GitHub release is a **draft with no binary
 assets** — prepare failed because a read-only token cannot see draft

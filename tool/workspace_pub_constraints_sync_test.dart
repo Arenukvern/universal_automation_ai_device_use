@@ -140,7 +140,7 @@ dependencies:
   });
 
   group('sync entrypoint SDK-only invariant', () {
-    // The release-please sync job invokes the tool with plain `dart` (no
+    // Validate / version-packages CI invokes the tool with plain `dart` (no
     // `dart run`) so its success never depends on package resolution: it
     // repairs a tree whose sibling constraints do not resolve yet, and
     // `dart run`'s tolerance of failed implicit pub gets is an SDK-version
@@ -159,7 +159,7 @@ dependencies:
           RegExp(r"^\s*import\s+'package:").hasMatch(source),
           isFalse,
           reason:
-              'tool/$name must stay SDK-only: the release-please sync job '
+              'tool/$name must stay SDK-only: the constraint-sync CI job '
               'runs it with plain `dart` before pub resolution exists',
         );
       }
