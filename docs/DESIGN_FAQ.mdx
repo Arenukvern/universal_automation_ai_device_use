@@ -1,0 +1,61 @@
+# Design Decisions FAQ — Universal Automation Device Use
+
+Quick **why** reference for maintainers and agents. For **charter** see [North Star](/NORTH_STAR). Operational **how** lives in [DX_FAQ](/DX_FAQ). Durable strategic decisions: [ADRs](/decisions).
+
+Cross-links follow [Skill Steward FAQ-driven documentation](https://github.com/Arenukvern/skill_steward/blob/main/docs/decisions/0002-adopt-faq-driven-documentation.mdx) (paired DESIGN + DX, no duplicated paragraphs).
+
+## Documentation
+
+**Q: Why separate DESIGN_FAQ from DX_FAQ?**  
+A: **Why** (trade-offs, boundaries, honest platform status) vs **how** (commands, pub.dev, validate gates) confuse agents when mixed. ADRs hold strategic decisions; FAQs hold standing operational compression. Charter and `north_star_impact` live only in [North Star](/NORTH_STAR). [ADR 0002 (skill_steward)](https://github.com/Arenukvern/skill_steward/blob/main/docs/decisions/0002-adopt-faq-driven-documentation.mdx).
+
+## Platform tiers (honest today)
+
+**Q: What is the macOS “computer use” tier really?**  
+A: **Unsigned preview** — not production-hardened desktop control. `universal_driver_macos` implements AX/CGEvent paths; toolkit MCP exposes `serve --os` and related tools. The release pipeline **skips** Developer ID signing and notarization when signing secrets are unset ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet)). arm64 linker output may carry an automatic ad-hoc signature only; that is **not** pipeline codesign and does **not** preserve TCC grants (Accessibility, Screen Recording) — users must re-grant after **each** toolkit update ([toolkit README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/README.md)). Do not claim stable unattended macOS agent control.
+
+**Q: Why does browser automation attach instead of launching Chrome?**  
+A: Target lifecycle belongs to the **host** (oka / your supervisor), not UA. `universal_browser_cdp` discovers and attaches to an **existing** CDP endpoint (`CdpBrowserSession.attach`); it does not spawn browsers. Keeps one observe/act contract while respecting who owns the process ([CDP README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_cdp/README.md)).
+
+**Q: Where are Android and iOS?**  
+A: **Roadmap only** in this repo. [ADR 0009](/decisions/0009_one_mcp_server_with_adapters) declares factory slots and `oka_devices` handoff — no shipped mobile adapters yet. Do not document or market mobile device-use as available here.
+
+**Q: What does Linux desktop support mean today?**  
+A: **Preview — not yet tested on a live GNOME/AT-SPI desktop.** Scope today is AT-SPI **read + semantic click** (`Action.DoAction`) via D-Bus — no keyboard synthesis, typing ladder, or browser navigation ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). Conformance passes against a stub; treat live desktop behavior as unproven.
+
+**Q: Where does W3C WebDriver fit?**  
+A: **`universal_browser_webdriver`**: classic W3C WebDriver over HTTP (`WebDriverClient`) for sessions, navigation, elements, clicks, typing, and screenshots. `WebDriverDriver` implements the family contract but **refuses `snapshot()`** (no a11y tree on classic WebDriver). After `newSession`, when capabilities include `webSocketUrl`, `WebDriverClient.bidi()` opens a **WebDriver BiDi** WebSocket (`WebDriverBidiConnection` — commands, subscribe, live events); remotes with no `webSocketUrl` refuse BiDi (`DriverUnsupportedException` — e.g. safaridriver today per client docs). Classic HTTP stays the primary command path; BiDi adds observation where the remote supports it. Safari: `SafariDriverEndpoint.spawn` or attach to a host-owned base URL. Chromium-heavy work usually prefers CDP attach. Toolkit: `serve --webdriver` ([package README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_webdriver/README.md)).
+
+**Q: What about Windows?**  
+A: The **UIA Rust sidecar is not shipped** as a release artifact consumers can rely on. Dart protocol + stub/conformance exist; live Windows UIA verification is pending ([Windows driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_windows/README.md)). Toolkit refuses loudly without the sidecar binary.
+
+## Architecture
+
+**Q: Why one MCP server with adapters instead of per-platform servers?**  
+A: One **`automation_*` tool surface** and registry; new tiers register **adapter packages** (`universal_driver_*`, `universal_browser_*`, …), never a second MCP product. Honest `tools/list` visibility only when an adapter is installed **and** its target is reachable ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)).
+
+**Q: Why split `universal_automation_toolkit` and `universal_automation_harness`?**  
+A: **Toolkit** = plan runner, MCP/CLI, adapters, low-level composition. **Harness** = composition-root SDK (flows, commands, budgets) that compiles to the **same** `AutomationPlan` artifact every face runs ([ADR 0004](/decisions/0004_harness_layer_and_packaging_boundaries)). Avoids parallel Dart vocabularies and keeps MCP thin.
+
+**Q: Why keep contracts in `universal_automation_interface` separate from drivers?**  
+A: Published contracts and conformance travel ahead of platform proof. Drivers opt into the family `AutomationDriver` shape; semantics and refusal behavior stay shared ([ADR 0001](/decisions/0001_drivers_into_ua_private_oss_ready)).
+
+## Release train and workspace policy
+
+**Q: What is the intended release model?**  
+A: **Dart Changesets** on a future PR will replace today’s Release Please flow — structured changeset files in PRs, legible per-package changelogs, and auditable publish steps. Until that lands, follow **today’s** mechanics in [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md) (Release Please + conventional commits on `main`). Do not treat Release Please as the lasting center; do not hand-cut `version:` / `CHANGELOG.md` on releasable packages under either train.
+
+**Q: Why caret-floor constraint sync instead of always rewriting `^sibling`?**  
+A: `tool/sync_workspace_pub_constraints.dart` raises a sibling `^` floor **only** when pub caret semantics no longer admit the new workspace version; patch bumps within range stay untouched; hand-raised floors are never lowered (`--check` fails on drift above sibling). Avoids forced fake co-releases (e.g. harness **0.3.3** only to satisfy a blind pin when **0.3.2** already fits the train). Policy survives the Changesets migration: [RELEASING.md § constraint sync](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#release-please-constraint-sync) (PR #62); update that doc when the train switches.
+
+**Q: Why no git worktrees for agent/CI work on this repo?**  
+A: **Policy:** use normal feature branches on a single checkout (`git checkout -b cursor/...`). Worktrees duplicate state, confuse sparse release tooling paths, and make steward/evidence paths harder to reason about. Cloud agents and humans branch from `main` only — not a git technical limitation.
+
+## Stewardship
+
+**Q: How do FAQs relate to Skill Steward in this repo?**  
+A: [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/steward.yaml) records `stewardship.governance.faq` paths; `steward doctor` / map skills expect DESIGN + DX at `docs/*_FAQ.mdx` with optional root symlinks per [guild FAQ format](https://github.com/Arenukvern/mcp_flutter/blob/main/.agents/skills/repository-governance-lifecycle/references/faq-format.md).
+
+**Q: When do I update this file vs an ADR?**  
+A: **ADR** for durable cross-cutting decisions and trade-offs. **DESIGN_FAQ** for standing “why we still do X” answers agents hit every week. One Q&A per change when possible; link the ADR instead of copying it.
+
