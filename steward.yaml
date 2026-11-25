@@ -21,7 +21,7 @@ adoption:
 
 stewardship:
   governance:
-    charter: AGENTS.md
+    north_star: docs/NORTH_STAR.mdx
     adr_dir: docs/decisions
     faq:
       design: docs/DESIGN_FAQ.mdx

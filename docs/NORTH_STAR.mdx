@@ -36,9 +36,22 @@ driver tier is production-ready without platform-specific proof.
 
 | Status | Evidence | Do not overclaim |
 | --- | --- | --- |
-| Proven | Published-style package layout, MIT licenses, `dart analyze` gate in CI (`steward.yaml`), conformance package, toolkit CLI/MCP | Unattended production agent control of end-user devices |
-| Emerging | Native driver validation artifacts under `pkgs/universal_driver_macos/validation/`, plugin bundle, MCP `server.json` draft | Every platform tier live-proven in CI |
+| Proven | Published-style package layout, MIT licenses, `dart analyze` gate in CI (`steward.yaml`), conformance package, toolkit CLI/MCP, CDP attach to user-started Chrome | Unattended production agent control of end-user devices |
+| Emerging | macOS AX/CGEvent **preview** (ad-hoc signed release binaries; TCC re-grant after updates), Linux AT-SPI read/semantic click, plugin bundle | Every OS tier production-hardened; mobile adapters shipped |
+| Roadmap / blocked | Android/iOS factory slots ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)), Windows UIA sidecar binary | Marketing mobile or Windows desktop use as available today |
 | Not owned | `universal_storage_*` (sibling repo), Flutter JIT debug harness (consumer + `mcp_flutter`) | Replacing OS security prompts or consent models |
+
+## Platform tiers (honest today)
+
+| Tier | Status | What to expect |
+| --- | --- | --- |
+| **macOS** | Preview | `universal_driver_macos` + toolkit `serve --os`; release binaries are **ad-hoc signed**; TCC (Accessibility, Screen Recording) **re-grant after each toolkit update** ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet)). |
+| **Browser (CDP)** | Supported attach | Attach to **existing** Chrome over CDP — UA does not launch the browser ([CDP README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_cdp/README.md)). |
+| **Linux** | Narrow | AT-SPI **read + semantic click** only — no keyboard synthesis ladder ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). |
+| **Windows** | Not shipped | UIA Rust sidecar is **not** a release artifact; toolkit refuses without it ([Windows driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_windows/README.md)). |
+| **Android / iOS** | Roadmap | Adapter slots and `oka_devices` handoff only — no shipped mobile drivers in this repo ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)). |
+
+Standing **why** for each tier: [Design FAQ](/DESIGN_FAQ#platform-tiers-honest-today). Operational setup: [DX FAQ](/DX_FAQ).
 
 ## What we own
 
@@ -48,7 +61,7 @@ driver tier is production-ready without platform-specific proof.
 | OS/browser/capture/WebRTC driver packages | Universal storage product family |
 | Toolkit: plans, runner, one MCP server + adapters, plugin/skills | Official MCP registry approval (submission is separate); never per-platform MCP servers |
 | ADRs, SECURITY, consent-gated composition patterns | Silent bypass of accessibility / screen-recording consent |
-| Release/changelog intent per package | Hidden automation without receipts or fail-closed refusal |
+| Release/changelog intent per package (migrating to **Dart Changesets**; Release Please until that PR lands) | Hidden automation without receipts or fail-closed refusal |
 
 ## Care, consent, and evidence
 
@@ -70,9 +83,13 @@ ADR work before the repo center moves. See [AGENTS.md](https://github.com/Arenuk
 ## Boundaries (non-negotiable)
 
 - Behavior SSOT is **code and schemas**; docs link inward.
+- **Charter** → this document (`docs/NORTH_STAR.mdx`, published via [docs.json](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs.json)); [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) is the agent map only.
 - New strategic **why** → ADR in [docs/decisions/](https://github.com/Arenukvern/universal_automation_ai_device_use/tree/main/docs/decisions).
+- Standing operational **why** → [Design FAQ](/DESIGN_FAQ).
+- Operational **how** → [DX FAQ](/DX_FAQ).
 - Domain tutorials and app-specific harnesses stay in their product repos.
 - No public issue for unpatched security vulnerabilities ([SECURITY.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/SECURITY.md)).
+- Agent/CI checkouts: **no git worktrees** — feature branches on a single clone (see [Design FAQ](/DESIGN_FAQ#release-train-and-workspace-policy)).
 
 ## Success looks like
 
@@ -85,6 +102,7 @@ ADR work before the repo center moves. See [AGENTS.md](https://github.com/Arenuk
 
 ## References
 
+- [Design FAQ](/DESIGN_FAQ) · [DX FAQ](/DX_FAQ)
 - [ADR index](/decisions)
 - [ADR 0009 — one MCP server with adapters](/decisions/0009_one_mcp_server_with_adapters)
 - [ADR 0002 — public GitHub home and rename](/decisions/0002_public_github_rename)

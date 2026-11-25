@@ -1,19 +1,13 @@
 # Design Decisions FAQ — Universal Automation Device Use
 
-Quick **why** reference for maintainers and agents. Operational **how** lives in [DX_FAQ](/DX_FAQ). Charter detail: [North Star](/NORTH_STAR). Durable decisions: [ADRs](/decisions).
+Quick **why** reference for maintainers and agents. For **charter** see [North Star](/NORTH_STAR). Operational **how** lives in [DX_FAQ](/DX_FAQ). Durable strategic decisions: [ADRs](/decisions).
 
 Cross-links follow [Skill Steward FAQ-driven documentation](https://github.com/Arenukvern/skill_steward/blob/main/docs/decisions/0002-adopt-faq-driven-documentation.mdx) (paired DESIGN + DX, no duplicated paragraphs).
 
-## North Star
-
-**Q: Where is the repo charter maintained?**  
-A: [docs/NORTH_STAR.mdx](/NORTH_STAR) is canonical (published via [docs.json](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/docs.json)). [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md) is the agent entry map only — not a second charter.
+## Documentation
 
 **Q: Why separate DESIGN_FAQ from DX_FAQ?**  
-A: **Why** (trade-offs, boundaries, honest platform status) vs **how** (commands, pub.dev, validate gates) confuse agents when mixed. ADRs hold strategic decisions; FAQs hold standing operational compression. [ADR 0002 (skill_steward)](https://github.com/Arenukvern/skill_steward/blob/main/docs/decisions/0002-adopt-faq-driven-documentation.mdx).
-
-**Q: How should structural changes touch the North Star?**  
-A: Classify `north_star_impact` in [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md): `clarifies` → smallest FAQ/doc/skill edit; `amends` / `conflicts` → ADR before moving the center.
+A: **Why** (trade-offs, boundaries, honest platform status) vs **how** (commands, pub.dev, validate gates) confuse agents when mixed. ADRs hold strategic decisions; FAQs hold standing operational compression. Charter and `north_star_impact` live only in [North Star](/NORTH_STAR). [ADR 0002 (skill_steward)](https://github.com/Arenukvern/skill_steward/blob/main/docs/decisions/0002-adopt-faq-driven-documentation.mdx).
 
 ## Platform tiers (honest today)
 
@@ -45,11 +39,11 @@ A: Published contracts and conformance travel ahead of platform proof. Drivers o
 
 ## Release train and workspace policy
 
-**Q: Why Release Please instead of hand-cut versions?**  
-A: **Zero-touch release** on `main`: conventional commits bump per-package versions, open a release PR, sync constraints, build toolkit binaries, publish pub.dev — documented in [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md). Manual `version:` / `CHANGELOG` edits on releasable packages fight the train.
+**Q: What is the intended release model?**  
+A: **Dart Changesets** on a future PR will replace today’s Release Please flow — structured changeset files in PRs, legible per-package changelogs, and auditable publish steps. Until that lands, follow **today’s** mechanics in [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md) (Release Please + conventional commits on `main`). Do not treat Release Please as the lasting center; do not hand-cut `version:` / `CHANGELOG.md` on releasable packages under either train.
 
 **Q: Why caret-floor constraint sync instead of always rewriting `^sibling`?**  
-A: `tool/sync_workspace_pub_constraints.dart` raises a sibling `^` floor **only** when pub caret semantics no longer admit the new workspace version; patch bumps within range stay untouched; hand-raised floors are never lowered (`--check` fails on drift above sibling). Avoids forced fake co-releases (e.g. harness **0.3.3** only to satisfy a blind pin when **0.3.2** already fits the train). Policy: [RELEASING.md § constraint sync](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#release-please-constraint-sync) (landed via PR #62).
+A: `tool/sync_workspace_pub_constraints.dart` raises a sibling `^` floor **only** when pub caret semantics no longer admit the new workspace version; patch bumps within range stay untouched; hand-raised floors are never lowered (`--check` fails on drift above sibling). Avoids forced fake co-releases (e.g. harness **0.3.3** only to satisfy a blind pin when **0.3.2** already fits the train). Policy survives the Changesets migration: [RELEASING.md § constraint sync](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#release-please-constraint-sync) (PR #62); update that doc when the train switches.
 
 **Q: Why no git worktrees for agent/CI work on this repo?**  
 A: **Policy:** use normal feature branches on a single checkout (`git checkout -b cursor/...`). Worktrees duplicate state, confuse sparse release tooling paths, and make steward/evidence paths harder to reason about. Cloud agents and humans branch from `main` only — not a git technical limitation.

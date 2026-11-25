@@ -24,8 +24,11 @@ A: `dart analyze` on the packages in [steward.yaml](https://github.com/Arenukver
 
 ## Release train (contributors)
 
-**Q: How do package versions get bumped?**  
-A: **Release Please** on `main` — use `fix(scope):` / `feat(scope):` / `chore:` per package; do not hand-edit `version:` or `CHANGELOG.md` on releasable packages. See [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md).
+**Q: How do package versions get bumped today?**  
+A: **Today:** Release Please on `main` — use `fix(scope):` / `feat(scope):` / `chore:` per package; do not hand-edit `version:` or `CHANGELOG.md` on releasable packages ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md)). **Direction:** the repo is migrating to **Dart Changesets** in a separate PR; after that lands, follow Changesets + updated RELEASING instead of Release Please conventions.
+
+**Q: After Changesets lands, what changes for me?**  
+A: Expect per-package `.changeset/` entries in PRs and an updated [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md). Until the migration PR merges, Release Please remains the accurate how-to — see [Design FAQ — release model](/DESIGN_FAQ#release-train-and-workspace-policy).
 
 **Q: How do I refresh sibling `^` constraints in the workspace?**  
 A: `dart run tool/sync_workspace_pub_constraints.dart --write` (or `--check` in CI). The sync **raises** floors only when pub caret rules require it; see [Design FAQ — caret floor](/DESIGN_FAQ#release-train-and-workspace-policy).
@@ -90,7 +93,7 @@ A: `automation_request_consent {kind: "screenRecording"}` asks the OS (the syste
 ## North Star impact (structural changes)
 
 **Q: When do I stop and write an ADR?**  
-A: When `north_star_impact` is `amends` or `conflicts` with the charter — see [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md). For `clarifies`, update this FAQ, docs map, or a skill instead of expanding scope silently.
+A: Charter and the full `north_star_impact` habit: [North Star](/NORTH_STAR#north-star-impact-habit) · [AGENTS.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/AGENTS.md). When impact is `amends` or `conflicts`, write an ADR first. For `clarifies`, update this FAQ, docs map, or a skill — do not expand scope silently.
 
 
 ## Background browsers (no CDP)
