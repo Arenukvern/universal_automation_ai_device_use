@@ -1,7 +1,7 @@
 // Runs `dart analyze` and `dart test` for every package in publish_order.yaml
 // (same surface publish_package.yml exercises before publish).
 //
-// Release-please CI also runs `dart pub publish --dry-run` per package (workspace
+// Validate CI also runs `dart pub publish --dry-run` per package (workspace
 // resolution after root pub get) and fails on exit 65 warnings.
 
 import 'dart:io';

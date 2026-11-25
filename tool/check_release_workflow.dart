@@ -231,6 +231,7 @@ Future<void> _validateAllReleaseWorkflowContracts(
     ),
     ...validateProductionReusablePermissionChains(rootPath),
     ...validateToolkitVersionSurfacesChangesets(rootPath),
+    ...validateChangesetsToolkitTagFormat(rootPath),
     ...validateReleasePublishScriptClosure(
       rootPath,
       scriptOverlayDir: scriptOverlayDir,

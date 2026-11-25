@@ -1,5 +1,5 @@
 // Validates that workspace packages can resolve sibling dependencies from
-// pub.dev and optional same-release versions (release-please manifest).
+// pub.dev and optional same-release versions (changesets/version-packages manifest).
 
 import 'dart:convert';
 import 'dart:io';
@@ -106,7 +106,7 @@ Map<String, String> loadPubspecVersionsFromWorkspace(Directory repoRoot) {
   return byName;
 }
 
-/// Release manifest: `pkgs/foo` → semver string (release-please JSON or override).
+/// Release manifest: `pkgs/foo` → semver string (workspace pubspecs or override).
 Map<String, String> loadReleaseManifestVersions(
   Directory repoRoot,
   String manifestPath,
@@ -692,7 +692,7 @@ class AuditPublishedLatestFindings {
 
 /// Checks pub.dev **latest** tarball pubspecs for unresolved sibling deps.
 ///
-/// On a release-please PR ([releasePrMode]), pub.dev-latest drift becomes a
+/// On a version-packages PR ([releasePrMode]), pub.dev-latest drift becomes a
 /// warning only when the workspace in-train [entry.key] version satisfies the
 /// failing constraint (fix-forward). If in-train does not satisfy, stay error.
 AuditPublishedLatestFindings auditPublishedLatestErrors({
@@ -794,7 +794,7 @@ List<String> publishedExactVersionWorkspaceConstraintDriftErrors({
         '${pkg.name}@${pkg.version}: workspace $depName constraint '
         '${local ?? '(missing)'} differs from pub.dev ${pkg.version} '
         '(${remote ?? '(missing)'}). '
-        'Land a fix(${pkg.name}) commit so release-please bumps it and you can publish a new version.',
+        'Land a fix(${pkg.name}) commit with a changeset so the version PR bumps it and you can publish a new version.',
       );
     }
   }

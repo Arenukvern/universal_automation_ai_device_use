@@ -5,7 +5,7 @@ composition validation and audience policies. Frames are read-only
 observations — `frames != semantics`.
 
 Intra-workspace `universal_browser_cdp` constraints are synced on each
-release-please train (see
+dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md)).
 Screencast releases that adopt a new CDP minor (for example 0.6.2 after the
 behavior reaction-floor fix) ship in the same release PR as `universal_browser_cdp`.
@@ -14,7 +14,7 @@ behavior reaction-floor fix) ship in the same release PR as `universal_browser_c
 
 `CdpScreencastFrameSource` and CDP-backed pacing assume **`universal_browser_cdp`
 0.6.3 or newer** for the monotonic pause / drift fix in behavior timing. Hosted
-`pubspec.yaml` pins are updated by the release-please constraint sync when
+`pubspec.yaml` pins are updated by the dart_changesets version step when
 screencast enters a train; they are not edited by hand on `main`.
 
 Part of the `universal_automation_*` family

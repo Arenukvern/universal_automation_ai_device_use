@@ -16,6 +16,8 @@ bash "$ROOT_DIR/tool/contracts/test_validate_release_checksums.sh"
 
 bash "$ROOT_DIR/tool/contracts/test_assert_release_git_tag_at_sha.sh"
 
+bash "$ROOT_DIR/tool/contracts/test_create_toolkit_draft_github_release.sh"
+
 bash "$ROOT_DIR/tool/contracts/check_negative_actionlint.sh"
 
 run_negative_dir() {

@@ -52,6 +52,7 @@ jobs:
           bash tool/contracts/check_plugin_version_sync.sh
           bash tool/contracts/test_audit_release_binaries_train.sh
           bash tool/contracts/test_resolve_release_tag.sh
+          bash tool/contracts/test_create_toolkit_draft_github_release.sh
           bash tool/contracts/test_verify_release_tarball_architecture.sh
           bash tool/contracts/test_release_recovery_flow.sh
           bash tool/contracts/test_install.sh
@@ -137,7 +138,7 @@ jobs:
         if: ${{ env.IS_VERSION_PACKAGES_PR == 'true' }}
         run: dart run tool/check_hosted_deps_resolve.dart --co-release --check-manifest-drift --release-pr
 
-      - name: Publishable packages dry-run (blocking, warnings exit 67)
+      - name: Publishable packages dry-run (blocking, warnings exit 65)
         run: dart run tool/validate_publishable_packages.dart --dry-run-gate
 
       - name: Version-packages PR — pub.dev audit (blocking)

@@ -6,7 +6,7 @@ polled through the Dart VM service and delivered through the
 `universal_screencast` pipeline contracts.
 
 Intra-workspace `universal_screencast` constraints are synced on each
-release-please train (see
+dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 capture releases that adopt a new screencast line ship in the same release
 PR after `universal_screencast`.
@@ -15,7 +15,7 @@ PR after `universal_screencast`.
 
 `ToolkitFrameSource` and pipeline composition assume **`universal_screencast`
 0.3.3 or newer**. Hosted `pubspec.yaml` pins are updated by the
-release-please constraint sync when capture_flutter enters a train; they
+dart_changesets version step when capture_flutter enters a train; they
 are not edited by hand on `main`.
 
 Part of the `universal_automation_*` family

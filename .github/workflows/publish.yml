@@ -23,7 +23,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: dart-changesets-publish-${{ github.event.inputs.tag || github.ref }}
+  group: dart-changesets-publish-${{ github.event.inputs.tag || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
@@ -96,3 +96,15 @@ jobs:
       release_tag: ${{ needs.release-binaries-build.outputs.release_tag }}
       version: ${{ needs.release-binaries-build.outputs.version }}
       tooling_ref: ${{ github.sha }}
+
+  post-publish-audit:
+    needs:
+      - publish
+      - release-binaries-publish
+    if: >-
+      always() &&
+      needs.publish.result == 'success' &&
+      (needs.release-binaries-publish.result == 'success' ||
+       needs.release-binaries-publish.result == 'skipped') &&
+      (github.event_name == 'push' || inputs.execute)
+    uses: ./.github/workflows/post_publish_audit.yml

@@ -9,7 +9,7 @@ agent interchange.
 
 One vocabulary, no parallel Darts: this package depends on the toolkit
 and the interface, never redefines them. Intra-workspace `universal_automation_toolkit`
-constraints are synced on each release-please train (see
+constraints are synced on each dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 harness releases that adopt a new toolkit version ship in the same release PR after toolkit.
 
@@ -19,7 +19,7 @@ after the toolkit **0.6.2** co-release train.
 
 **Co-release train:** toolkit **0.6.2** documents the GitHub binary distribution path for CLI/serve
 artifacts (after the **0.6.1** immutable-draft upload train). Harness **0.3.3** bumps the
-`universal_automation_toolkit` constraint from `^0.6.1` to `^0.6.2` via release-please constraint
+`universal_automation_toolkit` constraint from `^0.6.1` to `^0.6.2` via dart_changesets version
 sync in the same release PR as toolkit.
 The relation to oka's `resource_composition` is recorded in ADR 0004 — components here are
 structurally compatible with its `Component` values; the hosted

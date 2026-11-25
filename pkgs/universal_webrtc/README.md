@@ -3,7 +3,7 @@
 High-level WebRTC for pure Dart: signaling contracts, a peer factory over
 the webrtc-rs sidecar, and a `FrameSink` that pumps screencast frames
 through the WebRTC data channel. Intra-workspace `universal_screencast`
-constraints are synced on each release-please train (see
+constraints are synced on each dart_changesets version PR (see
 [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md));
 WebRTC releases that adopt a new screencast line ship in the same release
 PR after `universal_screencast`.
@@ -12,7 +12,7 @@ PR after `universal_screencast`.
 
 `WebrtcDataChannelSink` and peer bring-up over screencast frames assume
 **`universal_screencast` 0.3.3 or newer**. Hosted `pubspec.yaml` pins are
-updated by the release-please constraint sync when WebRTC enters a train;
+updated by the dart_changesets version step when WebRTC enters a train;
 they are not edited by hand on `main`.
 
 Cross-platform wherever cargo runs;

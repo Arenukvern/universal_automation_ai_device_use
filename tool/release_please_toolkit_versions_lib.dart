@@ -310,3 +310,32 @@ List<String> validateToolkitVersionSurfacesChangesets(String repoRoot) {
 
   return errors;
 }
+
+/// Installers resolve `universal_automation_toolkit-v{version}` GitHub releases.
+List<String> validateChangesetsToolkitTagFormat(String repoRoot) {
+  final errors = <String>[];
+  var tagFormat = '{package}-v{version}';
+  final config = File('$repoRoot/changesets.yaml');
+  if (config.existsSync()) {
+    final doc = loadYaml(config.readAsStringSync());
+    if (doc is YamlMap) {
+      final raw = doc['tag_format'];
+      if (raw != null) {
+        tagFormat = raw.toString();
+      }
+    }
+  }
+  const pkg = toolkitChangesetsPackageName;
+  const version = '1.2.3';
+  final tag = tagFormat
+      .replaceAll('{package}', pkg)
+      .replaceAll('{version}', version);
+  final expected = '$pkg-v$version';
+  if (tag != expected) {
+    errors.add(
+      'changesets.yaml: tag_format must yield $expected for toolkit installers '
+      '(got $tag from "$tagFormat")',
+    );
+  }
+  return errors;
+}

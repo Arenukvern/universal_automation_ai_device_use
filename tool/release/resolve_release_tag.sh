@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Resolve release_tag for workflow_dispatch runs (Release Please toolkit tags).
+# Resolve release_tag for workflow_dispatch runs (universal_automation_toolkit-v* tags).
 # Writes: release_tag, version, release_ref, dry_run to GITHUB_OUTPUT when set.
 set -euo pipefail
 

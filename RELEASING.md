@@ -5,7 +5,7 @@
 1. **Intent files** — contributors add `.changesets/*.md` in feature PRs:
    `dart run dart_changesets@^1.0.2 add` (or hand-write front matter: `'<package>': patch|minor|major`).
 2. **Merge to `main`** — [`.github/workflows/release.yml`](.github/workflows/release.yml) opens/updates `changesets/version-packages`.
-3. **Green CI on the version PR** is the gate: intra-workspace constraint check, co-release resolve, manifest drift (`--release-pr`), every publishable package `dart pub publish --dry-run` via [`validate_publishable_packages.dart`](tool/validate_publishable_packages.dart) (warnings → exit **67**), and blocking `--audit-published --release-pr`.
+3. **Green CI on the version PR** is the gate: intra-workspace constraint check, co-release resolve, manifest drift (`--release-pr`), every publishable package `dart pub publish --dry-run` via [`validate_publishable_packages.dart`](tool/validate_publishable_packages.dart) (warnings → exit **65**), and blocking `--audit-published --release-pr`.
 4. **Merge the version PR** — dart_changesets pushes one `<package>-v<version>` tag per release and starts [`publish.yml`](.github/workflows/publish.yml) per tag (tag push + PAT, or `workflow_dispatch` when preflight).
 5. **`publish.yml`** — reusable `Arenukvern/dart_changesets/.github/workflows/publish.yml@v1` publishes to pub.dev (OIDC). For `universal_automation_toolkit-v*` only: draft GitHub release + [`release_binaries_build.yml`](.github/workflows/release_binaries_build.yml) → [`release_binaries_publish.yml`](.github/workflows/release_binaries_publish.yml) (four platform archives + `checksums.txt`; same install.sh / asset names as before).
 
