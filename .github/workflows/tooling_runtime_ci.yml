@@ -64,6 +64,5 @@ jobs:
         run: dart test --concurrency=1
         working-directory: pkgs/universal_tooling_runtime
 
-      - name: Publish dry run
-        run: dart pub publish --dry-run
-        working-directory: pkgs/universal_tooling_runtime
+      - name: Publish dry run (all publishable packages, strict warnings exit 65)
+        run: dart run tool/validate_publishable_packages.dart --dry-run-gate

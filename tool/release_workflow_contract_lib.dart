@@ -671,16 +671,25 @@ List<String> validateChangesetsPublishBinariesCaller(
       errors.add('$label: $toolkitGithubReleaseJob must define steps');
     } else {
       var sawCreate = false;
+      var createStepHasGhToken = false;
       for (final step in steps) {
         if (step is! Map) continue;
         final run = step['run']?.toString() ?? '';
         if (run.contains('create_toolkit_draft_github_release.sh')) {
           sawCreate = true;
+          final env = step['env'];
+          if (env is Map && env.containsKey('GH_TOKEN')) {
+            createStepHasGhToken = true;
+          }
         }
       }
       if (!sawCreate) {
         errors.add(
           '$label: $toolkitGithubReleaseJob must run create_toolkit_draft_github_release.sh',
+        );
+      } else if (!createStepHasGhToken) {
+        errors.add(
+          '$label: $toolkitGithubReleaseJob create step must set env GH_TOKEN for gh',
         );
       }
     }

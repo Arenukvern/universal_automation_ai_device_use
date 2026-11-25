@@ -23,16 +23,18 @@ VERSION="${RELEASE_TAG#universal_automation_toolkit-v}"
 REPO="${GITHUB_REPOSITORY:-Arenukvern/universal_automation_ai_device_use}"
 
 NOTES_FILE="$(mktemp)"
-trap 'rm -f "$NOTES_FILE"' EXIT
 
 (
   cd "$ROOT_DIR"
-  dart run dart_changesets@ release-notes \
+  dart run dart_changesets@^1.0.2 release-notes \
     --package universal_automation_toolkit \
     --version "$VERSION" >"$NOTES_FILE"
 ) || fail "dart_changesets release-notes failed"
 
-if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
+VIEW_ERR="$(mktemp)"
+trap 'rm -f "$VIEW_ERR" "$NOTES_FILE"' EXIT
+
+if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>"$VIEW_ERR"; then
   is_draft="$(gh release view "$RELEASE_TAG" --repo "$REPO" --json isDraft -q .isDraft)"
   if [[ "$is_draft" != "true" ]]; then
     fail "release $RELEASE_TAG already published; refusing to edit notes"
@@ -40,6 +42,9 @@ if gh release view "$RELEASE_TAG" --repo "$REPO" >/dev/null 2>&1; then
   gh release edit "$RELEASE_TAG" --repo "$REPO" --notes-file "$NOTES_FILE" --draft=true
   echo "Updated draft GitHub release $RELEASE_TAG"
 else
-  gh release create "$RELEASE_TAG" --repo "$REPO" --draft --notes-file "$NOTES_FILE"
+  if ! grep -qiE 'release not found|not found|HTTP 404|Could not find' "$VIEW_ERR"; then
+    fail "gh release view failed (not a missing release): $(cat "$VIEW_ERR")"
+  fi
+  gh release create "$RELEASE_TAG" --repo "$REPO" --draft --verify-tag --notes-file "$NOTES_FILE"
   echo "Created draft GitHub release $RELEASE_TAG"
 fi

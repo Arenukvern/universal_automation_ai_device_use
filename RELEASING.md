@@ -3,7 +3,7 @@
 ## dart_changesets train (default)
 
 1. **Intent files** — contributors add `.changesets/*.md` in feature PRs:
-   `dart run dart_changesets@ add` (or hand-write front matter: `'<package>': patch|minor|major`).
+   `dart run dart_changesets@^1.0.2 add` (or hand-write front matter: `'<package>': patch|minor|major`).
 2. **Merge to `main`** — [`.github/workflows/release.yml`](.github/workflows/release.yml) opens/updates `changesets/version-packages`.
 3. **Green CI on the version PR** is the gate: intra-workspace constraint check, co-release resolve, manifest drift (`--release-pr`), every publishable package `dart pub publish --dry-run` via [`validate_publishable_packages.dart`](tool/validate_publishable_packages.dart) (warnings → exit **67**), and blocking `--audit-published --release-pr`.
 4. **Merge the version PR** — dart_changesets pushes one `<package>-v<version>` tag per release and starts [`publish.yml`](.github/workflows/publish.yml) per tag (tag push + PAT, or `workflow_dispatch` when preflight).
@@ -49,15 +49,15 @@ dart run tool/publish_in_order.dart --publish --yes
 
 ## Toolkit GitHub Release binaries
 
-When the toolkit tag’s `publish` job succeeds, `toolkit-github-release` creates/updates a **draft** GitHub release (notes from `dart run dart_changesets@ release-notes`). Binaries jobs upload assets and undraft — same immutable-release contract as before (see [`tool/release/`](tool/release/)).
+When the toolkit tag’s `publish` job succeeds, `toolkit-github-release` creates/updates a **draft** GitHub release (notes from `dart run dart_changesets@^1.0.2 release-notes`). Binaries jobs upload assets and undraft — same immutable-release contract as before (see [`tool/release/`](tool/release/)).
 
 PR smoke: [`.github/workflows/release_binaries_pr.yml`](.github/workflows/release_binaries_pr.yml) (`dry_run: true`). Manual recovery: [`.github/workflows/release_binaries.yml`](.github/workflows/release_binaries.yml).
 
 ## Local checks before proposing a release
 
 ```bash
-dart run dart_changesets@ doctor
-dart run dart_changesets@ version --check
+dart run dart_changesets@^1.0.2 doctor
+dart run dart_changesets@^1.0.2 version --check
 dart run tool/sync_workspace_pub_constraints.dart --check
 dart run tool/validate_publishable_packages.dart --dry-run-gate
 ```

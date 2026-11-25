@@ -2,6 +2,9 @@
 packages_dir: pkgs
 dependent_bump: patch
 tag_format: '{package}-v{version}'
+# Retired name (lexicon lives in DFP); stale git tag universal_lexicon-v* remains.
+ignore:
+  - universal_lexicon
 version_files:
   universal_automation_toolkit:
     - path: plugin/.cursor-plugin/plugin.json

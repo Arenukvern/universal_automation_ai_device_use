@@ -49,7 +49,7 @@ cd pkgs/<package> && dart pub get && dart test
 ### dart_changesets and workspace constraints
 
 Release intent lives in [`.changesets/`](.changesets/) (add with
-`dart run dart_changesets@ add`). Merges to `main` open
+`dart run dart_changesets@^1.0.2 add`). Merges to `main` open
 `changesets/version-packages`; merging that PR tags and publishes.
 
 [`dart_changesets`](https://github.com/Arenukvern/dart_changesets) bumps

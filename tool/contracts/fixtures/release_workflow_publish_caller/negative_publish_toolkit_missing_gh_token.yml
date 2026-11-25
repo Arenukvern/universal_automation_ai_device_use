@@ -1,0 +1,68 @@
+name: dart_changesets publish
+
+on:
+  push:
+    tags:
+      - '*-v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        required: true
+        type: string
+      execute:
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  publish:
+    uses: Arenukvern/dart_changesets/.github/workflows/publish.yml@v1
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+      execute: ${{ github.event_name == 'push' || inputs.execute }}
+
+  toolkit-github-release:
+    needs: publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create or update draft GitHub release
+        env:
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: bash tool/release/create_toolkit_draft_github_release.sh "${{ github.ref_name }}"
+
+  release-binaries-build:
+    needs: [publish, toolkit-github-release]
+    permissions:
+      contents: read
+    uses: ./.github/workflows/release_binaries_build.yml
+    secrets:
+      MACOS_CERT_P12: ${{ secrets.MACOS_CERT_P12 }}
+      MACOS_CERT_PASSWORD: ${{ secrets.MACOS_CERT_PASSWORD }}
+      MACOS_CODESIGN_IDENTITY: ${{ secrets.MACOS_CODESIGN_IDENTITY }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+    with:
+      release_tag: ${{ github.ref_name }}
+      dry_run: false
+      tooling_ref: ${{ github.sha }}
+
+  release-binaries-publish:
+    needs: [publish, release-binaries-build]
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release_binaries_publish.yml
+    with:
+      release_tag: universal_automation_toolkit-v0.0.0
+      version: "0.0.0"
+      tooling_ref: ${{ github.sha }}
