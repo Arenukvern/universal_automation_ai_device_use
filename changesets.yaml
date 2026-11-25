@@ -1,17 +1,14 @@
-# dart_changesets configuration for the pub.dev release train.
+# dart_changesets — pub workspace release train (per-package tags on merge).
 packages_dir: pkgs
 dependent_bump: patch
 tag_format: '{package}-v{version}'
-product_tag:
-  package: universal_automation_toolkit
-  format: 'v{version}'
 version_files:
   universal_automation_toolkit:
+    - path: plugin/.cursor-plugin/plugin.json
+      pattern: '"version": "{version}"'
     - path: plugin/.claude-plugin/plugin.json
       pattern: '"version": "{version}"'
     - path: plugin/.codex-plugin/plugin.json
-      pattern: '"version": "{version}"'
-    - path: plugin/.cursor-plugin/plugin.json
       pattern: '"version": "{version}"'
     - path: plugin/.zcode-plugin/plugin.json
       pattern: '"version": "{version}"'

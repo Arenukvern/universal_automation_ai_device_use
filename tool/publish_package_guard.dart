@@ -1,4 +1,4 @@
-// Validates GITHUB_REF and pubspec for publish_package.yml guard job.
+// Validates GITHUB_REF and pubspec for per-tag publish workflows (legacy guard helpers).
 //
 // Writes pkg_dir, package_name, version to GITHUB_OUTPUT when set.
 
@@ -26,7 +26,7 @@ void main(List<String> args) {
   } on FormatException catch (e) {
     stderr.writeln('::error::${e.message}');
     stderr.writeln(
-      'Manual publish: gh workflow run publish_package.yml '
+      'Manual publish: gh workflow run publish.yml '
       '--ref universal_<pkg>-vX.Y.Z',
     );
     exit(1);

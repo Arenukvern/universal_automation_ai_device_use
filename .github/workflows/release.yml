@@ -4,10 +4,12 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
   pull-requests: write
+  # workflow_dispatch creation (dart_changesets starts publish runs via gh workflow run).
   actions: write
 
 concurrency:
@@ -23,5 +25,8 @@ jobs:
           fetch-depth: 0
 
       - uses: Arenukvern/dart_changesets@v1
+        with:
+          # Secret name is legacy (Release Please); could rename later (e.g. DART_CHANGESETS_TOKEN).
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

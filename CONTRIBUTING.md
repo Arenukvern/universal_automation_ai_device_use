@@ -46,20 +46,22 @@ Per-package tests (when you touch a package):
 cd pkgs/<package> && dart pub get && dart test
 ```
 
-### Release Please and workspace constraints
+### dart_changesets and workspace constraints
 
-[release-please](https://github.com/googleapis/release-please) bumps each
-package’s `version:` but not dependent `^` constraints. Pub workspaces require
-every intra-repo dependency constraint to accept the workspace copy of that
-package. After version bumps (or before opening a release PR locally), run:
+Release intent lives in [`.changesets/`](.changesets/) (add with
+`dart run dart_changesets@ add`). Merges to `main` open
+`changesets/version-packages`; merging that PR tags and publishes.
+
+[`dart_changesets`](https://github.com/Arenukvern/dart_changesets) bumps
+versions and rewrites dependent constraints when carets no longer admit new
+sibling versions. For hand-raised floors or local preview before a version PR:
 
 ```sh
 dart run tool/sync_workspace_pub_constraints.dart --write
 ```
 
-CI runs `--check` before `dart pub get`. The Release Please workflow also syncs
-and commits constraints on the `release-please--branches--main` branch when a
-release PR is open.
+CI runs `dart run tool/sync_workspace_pub_constraints.dart --check` on every PR.
+See [RELEASING.md](RELEASING.md).
 
 ## Skill Steward
 

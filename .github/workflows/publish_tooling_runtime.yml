@@ -1,15 +1,18 @@
-# Legacy name — use publish_package.yml for all published packages.
-name: Publish universal_tooling_runtime (legacy)
+# Legacy name — use publish.yml for all published packages.
+name: Publish tooling runtime (legacy redirect)
 
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 jobs:
-  pointer:
+  redirect:
     runs-on: ubuntu-latest
     steps:
-      - name: Redirect to publish_package.yml
+      - name: Redirect to publish.yml
         run: |
-          echo "::error::This workflow was replaced by publish_package.yml."
-          echo "Run: gh workflow run publish_package.yml --ref universal_tooling_runtime-vX.Y.Z"
+          echo "::error::This workflow was replaced by publish.yml."
+          echo "Run: gh workflow run publish.yml --ref universal_tooling_runtime-vX.Y.Z -f tag=universal_tooling_runtime-vX.Y.Z -f execute=true"
           exit 1

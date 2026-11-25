@@ -536,6 +536,7 @@ const changesetsPublishReusableWorkflow =
 const changesetsCompositeAction = 'Arenukvern/dart_changesets@v1';
 
 const publishBinariesBuildJob = 'release-binaries-build';
+const toolkitGithubReleaseJob = 'toolkit-github-release';
 const publishBinariesPublishJob = 'release-binaries-publish';
 
 const forbiddenLegacyPublishTrainJobs = <String>{
@@ -648,6 +649,43 @@ List<String> validateChangesetsPublishBinariesCaller(
     }
   }
 
+  final toolkitRelease = jobsMap[toolkitGithubReleaseJob];
+  if (toolkitRelease is! Map) {
+    errors.add('$label: missing $toolkitGithubReleaseJob job');
+  } else {
+    final needs = _jobNeedsList(toolkitRelease);
+    if (!needs.contains('publish')) {
+      errors.add('$label: $toolkitGithubReleaseJob must need publish');
+    }
+    if (toolkitRelease.containsKey('uses')) {
+      errors.add(
+        '$label: $toolkitGithubReleaseJob must run locally, not use uses:',
+      );
+    }
+    final perms = toolkitRelease['permissions'];
+    if (perms is! Map || perms['contents']?.toString() != 'write') {
+      errors.add('$label: $toolkitGithubReleaseJob needs contents: write');
+    }
+    final steps = toolkitRelease['steps'];
+    if (steps is! List) {
+      errors.add('$label: $toolkitGithubReleaseJob must define steps');
+    } else {
+      var sawCreate = false;
+      for (final step in steps) {
+        if (step is! Map) continue;
+        final run = step['run']?.toString() ?? '';
+        if (run.contains('create_toolkit_draft_github_release.sh')) {
+          sawCreate = true;
+        }
+      }
+      if (!sawCreate) {
+        errors.add(
+          '$label: $toolkitGithubReleaseJob must run create_toolkit_draft_github_release.sh',
+        );
+      }
+    }
+  }
+
   final build = jobsMap[publishBinariesBuildJob];
   if (build is! Map) {
     errors.add('$label: missing $publishBinariesBuildJob job');
@@ -660,6 +698,11 @@ List<String> validateChangesetsPublishBinariesCaller(
     final needs = _jobNeedsList(build);
     if (!needs.contains('publish')) {
       errors.add('$label: $publishBinariesBuildJob must need publish');
+    }
+    if (!needs.contains(toolkitGithubReleaseJob)) {
+      errors.add(
+        '$label: $publishBinariesBuildJob must need $toolkitGithubReleaseJob',
+      );
     }
     final withMap = build['with'];
     if (withMap is! Map) {

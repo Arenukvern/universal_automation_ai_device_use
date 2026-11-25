@@ -1,7 +1,7 @@
 # Manual post-publish verification: every workspace package latest on pub.dev
 # must resolve sibling dependencies (fail closed).
 #
-# Also runs automatically at the end of the release-please publish train waiter.
+# Callable from other workflows; also scheduled for drift detection off-train.
 
 name: Post-publish audit
 

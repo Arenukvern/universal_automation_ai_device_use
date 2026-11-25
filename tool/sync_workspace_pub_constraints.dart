@@ -1,7 +1,7 @@
 // Syncs ^version constraints for dependencies on other workspace packages.
 //
 // Must stay SDK-only (no `package:` imports, directly or transitively): the
-// release-please sync job invokes it with plain `dart` — not `dart run` — so
+// Must stay SDK-only for CI environments that invoke it with plain `dart` —
 // success never depends on package resolution (it repairs a tree whose
 // constraints do not resolve yet). tool/workspace_pub_constraints_sync_test.dart
 // guards it.
