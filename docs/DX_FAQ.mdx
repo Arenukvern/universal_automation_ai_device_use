@@ -41,6 +41,23 @@ A: Download platform archives from the toolkit GitHub release (`universal_automa
 **Q: How do I point UA at Chrome for browser automation?**  
 A: Start Chrome **yourself** with remote debugging, then attach — UA does not launch the browser. Use a CDP base URI (e.g. `http://127.0.0.1:9222`) with `CdpBrowserSession.attach` or toolkit `cdp(...)` session wiring ([CDP README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_cdp/README.md)).
 
+## Browser (WebDriver)
+
+**Q: How do I point UA at chromedriver, geckodriver, or safaridriver?**  
+A: Start the **WebDriver HTTP server yourself** — UA attaches to the base URL; it does not replace your browser supervisor (same lifecycle rule as CDP). Examples: `chromedriver --port=9515`, `geckodriver`, or `safaridriver -p 7051` (Safari needs one-time `safaridriver --enable`). Toolkit:
+
+```bash
+universal-automation serve --webdriver http://127.0.0.1:9515
+# or
+export UNIVERSAL_AUTOMATION_WEBDRIVER=http://127.0.0.1:7051
+universal-automation serve --webdriver "$UNIVERSAL_AUTOMATION_WEBDRIVER"
+```
+
+The registry calls `WebDriverClient(endpoint).newSession()` on attach ([toolkit registry](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/lib/src/runner/registry.dart)). With only webdriver configured, MCP/CLI `act`, `screenshot`, and related `automation_*` verbs use that tier; when you configured multiple transports, pass per-call `transport: "webdriver"` on MCP tools (`cdp | webdriver | osAccessibility`).
+
+**Q: What works on the WebDriver tier in MCP/CLI?**  
+A: Classic W3C commands: navigate, find/click/type, screenshots, W3C pointer actions — same honest limits as [Design FAQ — WebDriver](/DESIGN_FAQ#platform-tiers-honest-today). **`automation_observe` / semantic tree paths refuse** because `WebDriverDriver.snapshot()` refuses (no a11y tree on classic WebDriver). For Chromium page automation with a tree, use CDP attach instead. Library users can call `WebDriverClient.bidi()` when `webSocketUrl` was advertised at session creation.
+
 ## Maintaining these FAQs
 
 **Q: After a code change, which FAQ do I edit?**  
