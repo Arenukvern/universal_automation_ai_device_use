@@ -37,7 +37,7 @@ driver tier is production-ready without platform-specific proof.
 | Status | Evidence | Do not overclaim |
 | --- | --- | --- |
 | Proven | Published-style package layout, MIT licenses, `dart analyze` gate in CI (`steward.yaml`), conformance package, toolkit CLI/MCP, CDP attach to user-started Chrome | Unattended production agent control of end-user devices |
-| Emerging | macOS AX/CGEvent **preview** (ad-hoc signed release binaries; TCC re-grant after updates), Linux AT-SPI read/semantic click, plugin bundle | Every OS tier production-hardened; mobile adapters shipped |
+| Emerging | macOS AX/CGEvent **unsigned preview** (no pipeline codesign/notarization; TCC re-grant after updates), Linux AT-SPI **preview / not yet live-tested**, WebDriver classic tier (no a11y tree), plugin bundle | Every OS tier production-hardened; mobile adapters shipped |
 | Roadmap / blocked | Android/iOS factory slots ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)), Windows UIA sidecar binary | Marketing mobile or Windows desktop use as available today |
 | Not owned | `universal_storage_*` (sibling repo), Flutter JIT debug harness (consumer + `mcp_flutter`) | Replacing OS security prompts or consent models |
 
@@ -45,9 +45,10 @@ driver tier is production-ready without platform-specific proof.
 
 | Tier | Status | What to expect |
 | --- | --- | --- |
-| **macOS** | Preview | `universal_driver_macos` + toolkit `serve --os`; release binaries are **ad-hoc signed**; TCC (Accessibility, Screen Recording) **re-grant after each toolkit update** ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet)). |
+| **macOS** | Unsigned preview | `universal_driver_macos` + toolkit `serve --os`; releases **skip** Developer ID signing when secrets are unset — linker-only ad-hoc on arm64 is not pipeline codesign; TCC (Accessibility, Screen Recording) **re-grant after each toolkit update** ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet)). |
 | **Browser (CDP)** | Supported attach | Attach to **existing** Chrome over CDP — UA does not launch the browser ([CDP README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_cdp/README.md)). |
-| **Linux** | Narrow | AT-SPI **read + semantic click** only — no keyboard synthesis ladder ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). |
+| **Browser (WebDriver)** | Supported (classic) | W3C WebDriver HTTP — actions + screenshots; **`snapshot()` refuses** (no a11y tree). Safari via `safaridriver`; attach to host-owned endpoints; no BiDi yet ([WebDriver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_webdriver/README.md)). |
+| **Linux** | Preview / untested live | AT-SPI **read + semantic click** — **not yet verified on GNOME**; no keyboard synthesis ladder ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). |
 | **Windows** | Not shipped | UIA Rust sidecar is **not** a release artifact; toolkit refuses without it ([Windows driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_windows/README.md)). |
 | **Android / iOS** | Roadmap | Adapter slots and `oka_devices` handoff only — no shipped mobile drivers in this repo ([ADR 0009](/decisions/0009_one_mcp_server_with_adapters)). |
 

@@ -1,0 +1,44 @@
+name: Question
+description: Usage, setup, or "how do I…" (not a bug or feature request)
+title: "[question]: "
+labels:
+  - question
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a **usage** or **integration** question. For bugs use the bug template; for new capabilities use the feature template.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Toolkit CLI / MCP
+        - Plans / harness
+        - Browser (CDP)
+        - Browser (WebDriver)
+        - macOS driver
+        - Linux driver
+        - Windows driver
+        - Release / install
+        - Docs / contributing
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: What are you trying to do?
+      description: Include OS, driver tier, and what you already tried.
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (optional)
+      placeholder: Versions, plan snippet, links to docs you read
+    validations:
+      required: false

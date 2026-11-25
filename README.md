@@ -92,7 +92,8 @@ Durable rule: [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx).
 | [`universal_automation_semantics`](pkgs/universal_automation_semantics/) ([pub](https://pub.dev/packages/universal_automation_semantics)) | Semantic views and family projections |
 | [`universal_automation_conformance`](pkgs/universal_automation_conformance/) ([pub](https://pub.dev/packages/universal_automation_conformance)) | Shared conformance harness |
 | [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/) ([pub](https://pub.dev/packages/universal_automation_toolkit)) | CLI, plans, MCP server |
-| `universal_driver_*` ([macOS](https://pub.dev/packages/universal_driver_macos) · [Linux](https://pub.dev/packages/universal_driver_linux) · [Windows](https://pub.dev/packages/universal_driver_windows)) | Native OS automation |
+| `universal_driver_*` ([macOS](https://pub.dev/packages/universal_driver_macos) · [Linux](https://pub.dev/packages/universal_driver_linux)) | Native OS automation (preview tiers — see [Design FAQ](docs/DESIGN_FAQ.mdx)) |
+| [`universal_driver_windows`](https://pub.dev/packages/universal_driver_windows) | Windows UIA — **not shipped in releases yet** (Rust sidecar missing; package is protocol/stub only) |
 | `universal_browser_*` ([CDP](https://pub.dev/packages/universal_browser_cdp) · [WebDriver](https://pub.dev/packages/universal_browser_webdriver)) | Browser automation |
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |
