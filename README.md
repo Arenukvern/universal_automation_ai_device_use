@@ -29,7 +29,7 @@ devices. Dart contracts, platform drivers, capture/WebRTC plumbing, plus an MCP
 [`universal_lexicon`](https://github.com/xsoulspace/dart_flutter_packages/tree/main/pkgs/universal_lexicon)
 in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages).
 
-- 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) (wiki + [DX FAQ](docs/DX_FAQ.mdx) + [llms.txt](llms.txt))
+- 📖 **Docs:** [docs.page/arenukvern/universal_automation_ai_device_use](https://docs.page/arenukvern/universal_automation_ai_device_use/) ([Design FAQ](docs/DESIGN_FAQ.mdx) · [DX FAQ](docs/DX_FAQ.mdx) · [llms.txt](llms.txt))
 - 🤝 **Contribute:** [guide](docs/contributing/contribution_guide.mdx) · [contributors](docs/contributing/contributors.mdx) · [code of conduct](CODE_OF_CONDUCT.md) · [security](SECURITY.md)
 
 **Charter:** [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) · **Decisions:** [docs/decisions/](docs/decisions/) · [AGENTS.md](AGENTS.md) · **Brand:** [docs/brand/](docs/brand/)
@@ -43,7 +43,7 @@ in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages
 
 This monorepo holds the **universal automation** family: shared `AutomationDriver`
 contracts, semantic projections, conformance tests, platform drivers (macOS, Linux,
-Windows, CDP, WebDriver), screencast/capture helpers, and WebRTC sidecars. The
+CDP, WebDriver; Windows UIA **not shipped in releases yet**), screencast/capture helpers, and WebRTC sidecars. The
 agent-facing CLI and MCP server live in
 [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/).
 
@@ -51,8 +51,8 @@ agent-facing CLI and MCP server live in
 
 Universal Automation exposes **one MCP server** (`universal-automation serve …`) and
 one `automation_*` tool surface (observe, act, capture/verify). Platform code plugs
-in as **adapter packages** registered on a single runtime registry — macOS, Windows,
-Linux, browser (CDP/WebDriver), and future Android, iOS, and Flutter tiers.
+in as **adapter packages** registered on a single runtime registry — macOS, Linux,
+browser (CDP/WebDriver), Windows UIA (**not shipped in releases yet** — sidecar missing), and future Android, iOS, and Flutter tiers.
 
 Do **not** ship or configure separate per-platform MCP servers (`android-use`,
 `ios-use`, `macos-use`, …). That would duplicate browser tooling, capture, and
@@ -92,7 +92,8 @@ Durable rule: [ADR 0009](docs/decisions/0009_one_mcp_server_with_adapters.mdx).
 | [`universal_automation_semantics`](pkgs/universal_automation_semantics/) ([pub](https://pub.dev/packages/universal_automation_semantics)) | Semantic views and family projections |
 | [`universal_automation_conformance`](pkgs/universal_automation_conformance/) ([pub](https://pub.dev/packages/universal_automation_conformance)) | Shared conformance harness |
 | [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/) ([pub](https://pub.dev/packages/universal_automation_toolkit)) | CLI, plans, MCP server |
-| `universal_driver_*` ([macOS](https://pub.dev/packages/universal_driver_macos) · [Linux](https://pub.dev/packages/universal_driver_linux) · [Windows](https://pub.dev/packages/universal_driver_windows)) | Native OS automation |
+| `universal_driver_*` ([macOS](https://pub.dev/packages/universal_driver_macos) · [Linux](https://pub.dev/packages/universal_driver_linux)) | Native OS automation (preview tiers — see [Design FAQ](docs/DESIGN_FAQ.mdx)) |
+| [`universal_driver_windows`](https://pub.dev/packages/universal_driver_windows) | Windows UIA — **not shipped in releases yet** (Rust sidecar missing; package is protocol/stub only) |
 | `universal_browser_*` ([CDP](https://pub.dev/packages/universal_browser_cdp) · [WebDriver](https://pub.dev/packages/universal_browser_webdriver)) | Browser automation |
 | `universal_screencast` ([pub](https://pub.dev/packages/universal_screencast)) / `universal_capture_*` ([macOS](https://pub.dev/packages/universal_capture_macos) · [Flutter](https://pub.dev/packages/universal_capture_flutter)) | Frames and capture |
 | `universal_webrtc` ([pub](https://pub.dev/packages/universal_webrtc)) / `universal_webrtc_raw` ([pub](https://pub.dev/packages/universal_webrtc_raw)) | WebRTC helpers |

@@ -33,9 +33,16 @@ final client = WebDriverClient(Uri.parse('http://127.0.0.1:7051'));
 await client.newSession(capabilities: {'browserName': 'safari'});
 ```
 
-## Non-claims
+## WebDriver BiDi
 
-- No WebDriver BiDi yet (declared follow-up; CDP covers Chromium).
+When `newSession` returns `capabilities.webSocketUrl`, `WebDriverClient.bidi()`
+opens a **WebDriver BiDi** WebSocket (`WebDriverBidiConnection` — commands,
+subscribe, live events). Remotes with no `webSocketUrl` throw
+`DriverUnsupportedException` (e.g. safaridriver today). Classic HTTP remains
+the primary toolkit command path; BiDi adds observation where the remote
+supports it (e.g. chromedriver 106+, geckodriver).
+
+## Non-claims
 - No accessibility-tree snapshots: that is the OS-native tier
   (`universal_capture_macos`), not classic WebDriver.
 - `snapshot()` intentionally throws — a silent empty tree would be worse.
