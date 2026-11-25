@@ -20,9 +20,13 @@ jobs:
   release:
     runs-on: ubuntu-latest
     steps:
+      # checkout@v7 default persist-credentials writes an includeIf git-credentials file;
+      # dart_changesets also sets http.extraHeader → duplicate Authorization on git push (HTTP 400).
+      # Upstream dart_changesets should unset includeIf credential configs; disable persist here meanwhile.
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+          persist-credentials: false
 
       - uses: Arenukvern/dart_changesets@v1
         with:

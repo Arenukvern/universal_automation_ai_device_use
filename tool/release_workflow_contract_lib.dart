@@ -587,6 +587,15 @@ List<String> validateChangesetsReleaseWorkflow(String yamlText) {
       continue;
     }
     final uses = step['uses']?.toString() ?? '';
+    if (uses.startsWith('actions/checkout@')) {
+      final withMap = step['with'];
+      if (withMap is! Map || withMap['persist-credentials'] != false) {
+        errors.add(
+          '$label: actions/checkout must set persist-credentials: false '
+          '(dart_changesets git push + checkout includeIf credentials duplicate Authorization)',
+        );
+      }
+    }
     if (uses == changesetsCompositeAction ||
         uses.startsWith('$changesetsCompositeAction@')) {
       sawChangesets = true;
