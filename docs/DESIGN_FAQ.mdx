@@ -12,7 +12,7 @@ A: **Why** (trade-offs, boundaries, honest platform status) vs **how** (commands
 ## Platform tiers (honest today)
 
 **Q: What is the macOS “computer use” tier really?**  
-A: **Preview**, not production-hardened desktop control. `universal_driver_macos` implements AX/CGEvent paths; toolkit MCP exposes `serve --os` and related tools. GitHub release binaries are **ad-hoc signed only** until Apple Developer signing is wired — [RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet). Unsigned host binaries **lose TCC grants** (Accessibility, Screen Recording) after each toolkit update; users must re-grant. Do not claim stable unattended macOS agent control.
+A: **Unsigned preview** — not production-hardened desktop control. `universal_driver_macos` implements AX/CGEvent paths; toolkit MCP exposes `serve --os` and related tools. The release pipeline **skips** Developer ID signing and notarization when signing secrets are unset ([RELEASING.md](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/RELEASING.md#macos-code-signing-optional-not-configured-yet)). arm64 linker output may carry an automatic ad-hoc signature only; that is **not** pipeline codesign and does **not** preserve TCC grants (Accessibility, Screen Recording) — users must re-grant after **each** toolkit update ([toolkit README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_automation_toolkit/README.md)). Do not claim stable unattended macOS agent control.
 
 **Q: Why does browser automation attach instead of launching Chrome?**  
 A: Target lifecycle belongs to the **host** (oka / your supervisor), not UA. `universal_browser_cdp` discovers and attaches to an **existing** CDP endpoint (`CdpBrowserSession.attach`); it does not spawn browsers. Keeps one observe/act contract while respecting who owns the process ([CDP README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_cdp/README.md)).
@@ -21,7 +21,10 @@ A: Target lifecycle belongs to the **host** (oka / your supervisor), not UA. `un
 A: **Roadmap only** in this repo. [ADR 0009](/decisions/0009_one_mcp_server_with_adapters) declares factory slots and `oka_devices` handoff — no shipped mobile adapters yet. Do not document or market mobile device-use as available here.
 
 **Q: What does Linux desktop support mean today?**  
-A: **AT-SPI read + semantic click** (`Action.DoAction`) via D-Bus — no keyboard synthesis, typing ladder, or browser navigation in `universal_driver_linux` ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). Live GNOME proof is still thin; conformance runs against stubs.
+A: **Preview — not yet tested on a live GNOME/AT-SPI desktop.** Scope today is AT-SPI **read + semantic click** (`Action.DoAction`) via D-Bus — no keyboard synthesis, typing ladder, or browser navigation ([driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_linux/README.md)). Conformance passes against a stub; treat live desktop behavior as unproven.
+
+**Q: Where does W3C WebDriver fit?**  
+A: **`universal_browser_webdriver`**: classic W3C WebDriver over HTTP (`WebDriverClient`) for sessions, navigation, elements, clicks, typing, and screenshots. `WebDriverDriver` implements the family contract but **refuses `snapshot()`** (no a11y tree on classic WebDriver). After `newSession`, when capabilities include `webSocketUrl`, `WebDriverClient.bidi()` opens a **WebDriver BiDi** WebSocket (`WebDriverBidiConnection` — commands, subscribe, live events); remotes with no `webSocketUrl` refuse BiDi (`DriverUnsupportedException` — e.g. safaridriver today per client docs). Classic HTTP stays the primary command path; BiDi adds observation where the remote supports it. Safari: `SafariDriverEndpoint.spawn` or attach to a host-owned base URL. Chromium-heavy work usually prefers CDP attach. Toolkit: `serve --webdriver` ([package README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_browser_webdriver/README.md)).
 
 **Q: What about Windows?**  
 A: The **UIA Rust sidecar is not shipped** as a release artifact consumers can rely on. Dart protocol + stub/conformance exist; live Windows UIA verification is pending ([Windows driver README](https://github.com/Arenukvern/universal_automation_ai_device_use/blob/main/pkgs/universal_driver_windows/README.md)). Toolkit refuses loudly without the sidecar binary.
@@ -55,3 +58,4 @@ A: [steward.yaml](https://github.com/Arenukvern/universal_automation_ai_device_u
 
 **Q: When do I update this file vs an ADR?**  
 A: **ADR** for durable cross-cutting decisions and trade-offs. **DESIGN_FAQ** for standing “why we still do X” answers agents hit every week. One Q&A per change when possible; link the ADR instead of copying it.
+

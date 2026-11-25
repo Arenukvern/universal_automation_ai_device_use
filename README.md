@@ -43,7 +43,7 @@ in [`dart_flutter_packages`](https://github.com/xsoulspace/dart_flutter_packages
 
 This monorepo holds the **universal automation** family: shared `AutomationDriver`
 contracts, semantic projections, conformance tests, platform drivers (macOS, Linux,
-Windows, CDP, WebDriver), screencast/capture helpers, and WebRTC sidecars. The
+CDP, WebDriver; Windows UIA **not shipped in releases yet**), screencast/capture helpers, and WebRTC sidecars. The
 agent-facing CLI and MCP server live in
 [`universal_automation_toolkit`](pkgs/universal_automation_toolkit/).
 
@@ -51,8 +51,8 @@ agent-facing CLI and MCP server live in
 
 Universal Automation exposes **one MCP server** (`universal-automation serve …`) and
 one `automation_*` tool surface (observe, act, capture/verify). Platform code plugs
-in as **adapter packages** registered on a single runtime registry — macOS, Windows,
-Linux, browser (CDP/WebDriver), and future Android, iOS, and Flutter tiers.
+in as **adapter packages** registered on a single runtime registry — macOS, Linux,
+browser (CDP/WebDriver), Windows UIA (**not shipped in releases yet** — sidecar missing), and future Android, iOS, and Flutter tiers.
 
 Do **not** ship or configure separate per-platform MCP servers (`android-use`,
 `ios-use`, `macos-use`, …). That would duplicate browser tooling, capture, and
