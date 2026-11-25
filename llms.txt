@@ -5,6 +5,8 @@
 ## Docs (docs.page)
 
 - https://docs.page/arenukvern/universal_automation_ai_device_use
+- https://docs.page/arenukvern/universal_automation_ai_device_use/DESIGN_FAQ
+- https://docs.page/arenukvern/universal_automation_ai_device_use/DX_FAQ
 - https://docs.page/arenukvern/universal_automation_ai_device_use/NORTH_STAR
 - https://docs.page/arenukvern/universal_automation_ai_device_use/start_here/docs_map
 - https://docs.page/arenukvern/universal_automation_ai_device_use/decisions/0009_one_mcp_server_with_adapters

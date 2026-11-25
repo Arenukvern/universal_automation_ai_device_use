@@ -26,6 +26,8 @@ Run the following commands to interact with the project's agentic tools:
 
 | I want to… | Read |
 |---|---|
+| Why (design, platforms, release policy) | [docs/DESIGN_FAQ.mdx](docs/DESIGN_FAQ.mdx) |
+| How (contrib, validate, pub, MCP) | [docs/DX_FAQ.mdx](docs/DX_FAQ.mdx) |
 | Know why drivers left DFP | `docs/decisions/0001_drivers_into_ua_private_oss_ready.mdx` |
 | Publish packages | README → Publish order; `dart pub publish --dry-run` per package |
 | Wire a consumer | path override to `pkgs/<name>` (not DFP) |
@@ -71,6 +73,7 @@ Skills are installed locally under `.agents/skills/`. You can view them using:
 
 For more information on the project charter and decisions:
 - Read [docs/NORTH_STAR.mdx](docs/NORTH_STAR.mdx) (charter)
+- Read [docs/DESIGN_FAQ.mdx](docs/DESIGN_FAQ.mdx) (why) and [docs/DX_FAQ.mdx](docs/DX_FAQ.mdx) (how)
 - Read [ADR Index](docs/decisions/README) (if present)
 - Read [ADR 0009 — one MCP server with adapters](docs/decisions/0009_one_mcp_server_with_adapters.mdx) before adding platforms or MCP surfaces
 
